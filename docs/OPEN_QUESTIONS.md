@@ -225,6 +225,24 @@ That means:
 - finish missing artifacts, vectors, and validation for the existing
   Milestone 1-2 baseline before starting Milestone 3.
 
+### 9. Final encoding of `supported_kex` and `supported_signatures`
+
+For MVP, `NodeRecord.supported_kex` and `NodeRecord.supported_signatures`
+are encoded as lowercase ASCII string enums in canonical JSON.
+
+Allowed key exchange values:
+- `x25519`
+
+Allowed signature values:
+- `ed25519`
+
+Rules:
+- arrays must be deduplicated;
+- arrays must be sorted lexicographically before signing or hashing;
+- unknown values must be rejected in signed protocol records;
+- unknown values may be ignored only in unsigned local config outside the
+  signed record path.
+
 ## Rule
 
 If a task requires an area still not fully specified:

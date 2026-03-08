@@ -15,6 +15,22 @@ pub enum RecordValidationError {
         expires_at_unix_s: u64,
         now_unix_s: u64,
     },
+    #[error("unknown transport class in signed record: {value}")]
+    UnknownTransportClass { value: String },
+    #[error("unknown key exchange in signed record: {value}")]
+    UnknownKeyExchange { value: String },
+    #[error("unknown signature algorithm in signed record: {value}")]
+    UnknownSignatureAlgorithm { value: String },
+    #[error("unknown capability in signed record: {value}")]
+    UnknownCapability { value: String },
+}
+
+#[derive(Debug, Error)]
+pub enum RecordEncodingError {
+    #[error(transparent)]
+    Validation(#[from] RecordValidationError),
+    #[error("canonical record serialization failed: {0}")]
+    Serialization(#[from] serde_json::Error),
 }
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]

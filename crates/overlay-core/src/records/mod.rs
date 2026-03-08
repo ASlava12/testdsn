@@ -1,7 +1,9 @@
+use std::collections::BTreeSet;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    error::RecordValidationError,
+    error::{RecordEncodingError, RecordValidationError},
     identity::{derive_node_id, AppId, NodeId},
 };
 
@@ -28,18 +30,23 @@ impl NodeRecord {
         Err(RecordValidationError::NodeIdMismatch)
     }
 
-    pub fn canonical_body_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
+    pub fn canonical_body_bytes(&self) -> Result<Vec<u8>, RecordEncodingError> {
+        let supported_transports = canonicalize_transport_classes(&self.supported_transports)?;
+        let supported_kex = canonicalize_supported_kex(&self.supported_kex)?;
+        let supported_signatures = canonicalize_supported_signatures(&self.supported_signatures)?;
+
         serde_json::to_vec(&NodeRecordBody {
             version: self.version,
             node_id: self.node_id,
             node_public_key: &self.node_public_key,
             created_at_unix_s: self.created_at_unix_s,
             flags: self.flags,
-            supported_transports: &self.supported_transports,
-            supported_kex: &self.supported_kex,
-            supported_signatures: &self.supported_signatures,
+            supported_transports: &supported_transports,
+            supported_kex: &supported_kex,
+            supported_signatures: &supported_signatures,
             anti_sybil_proof: &self.anti_sybil_proof,
         })
+        .map_err(Into::into)
     }
 }
 
@@ -61,21 +68,25 @@ pub struct PresenceRecord {
 }
 
 impl PresenceRecord {
-    pub fn canonical_body_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
+    pub fn canonical_body_bytes(&self) -> Result<Vec<u8>, RecordEncodingError> {
+        let transport_classes = canonicalize_transport_classes(&self.transport_classes)?;
+        let capability_requirements = canonicalize_capabilities(&self.capability_requirements)?;
+
         serde_json::to_vec(&PresenceRecordBody {
             version: self.version,
             node_id: self.node_id,
             epoch: self.epoch,
             expires_at_unix_s: self.expires_at_unix_s,
             sequence: self.sequence,
-            transport_classes: &self.transport_classes,
+            transport_classes: &transport_classes,
             reachability_mode: &self.reachability_mode,
             locator_commitment: &self.locator_commitment,
             encrypted_contact_blobs: &self.encrypted_contact_blobs,
             relay_hint_refs: &self.relay_hint_refs,
             intro_policy: &self.intro_policy,
-            capability_requirements: &self.capability_requirements,
+            capability_requirements: &capability_requirements,
         })
+        .map_err(Into::into)
     }
 }
 
@@ -94,7 +105,7 @@ pub struct ServiceRecord {
 }
 
 impl ServiceRecord {
-    pub fn canonical_body_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
+    pub fn canonical_body_bytes(&self) -> Result<Vec<u8>, RecordEncodingError> {
         serde_json::to_vec(&ServiceRecordBody {
             version: self.version,
             node_id: self.node_id,
@@ -106,6 +117,7 @@ impl ServiceRecord {
             reachability_ref: &self.reachability_ref,
             metadata_commitment: &self.metadata_commitment,
         })
+        .map_err(Into::into)
     }
 }
 
@@ -119,8 +131,18 @@ pub struct RelayHint {
 }
 
 impl RelayHint {
-    pub fn canonical_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
-        serde_json::to_vec(self)
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, RecordEncodingError> {
+        let relay_transport_class =
+            canonicalize_transport_class(&self.relay_transport_class)?.to_string();
+
+        serde_json::to_vec(&RelayHintBody {
+            relay_node_id: self.relay_node_id,
+            relay_transport_class: &relay_transport_class,
+            relay_score: self.relay_score,
+            relay_policy: &self.relay_policy,
+            expiry: self.expiry,
+        })
+        .map_err(Into::into)
     }
 }
 
@@ -137,7 +159,7 @@ pub struct IntroTicket {
 }
 
 impl IntroTicket {
-    pub fn canonical_body_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
+    pub fn canonical_body_bytes(&self) -> Result<Vec<u8>, RecordEncodingError> {
         serde_json::to_vec(&IntroTicketBody {
             ticket_id: &self.ticket_id,
             target_node_id: self.target_node_id,
@@ -147,6 +169,7 @@ impl IntroTicket {
             expires_at_unix_s: self.expires_at_unix_s,
             nonce: &self.nonce,
         })
+        .map_err(Into::into)
     }
 }
 
@@ -194,6 +217,87 @@ pub fn validate_record_freshness(
     })
 }
 
+fn canonicalize_transport_classes(
+    transport_classes: &[String],
+) -> Result<Vec<String>, RecordValidationError> {
+    canonicalize_string_set(transport_classes, canonicalize_transport_class)
+}
+
+fn canonicalize_capabilities(
+    capabilities: &[String],
+) -> Result<Vec<String>, RecordValidationError> {
+    canonicalize_string_set(capabilities, canonicalize_capability)
+}
+
+fn canonicalize_supported_kex(
+    supported_kex: &[String],
+) -> Result<Vec<String>, RecordValidationError> {
+    canonicalize_string_set(supported_kex, canonicalize_supported_kex_value)
+}
+
+fn canonicalize_supported_signatures(
+    supported_signatures: &[String],
+) -> Result<Vec<String>, RecordValidationError> {
+    canonicalize_string_set(supported_signatures, canonicalize_supported_signature_value)
+}
+
+fn canonicalize_string_set(
+    values: &[String],
+    validate: fn(&str) -> Result<&'static str, RecordValidationError>,
+) -> Result<Vec<String>, RecordValidationError> {
+    let mut normalized = BTreeSet::new();
+    for value in values {
+        normalized.insert(validate(value)?.to_string());
+    }
+
+    Ok(normalized.into_iter().collect())
+}
+
+fn canonicalize_transport_class(value: &str) -> Result<&'static str, RecordValidationError> {
+    match value {
+        "tcp" => Ok("tcp"),
+        "quic" => Ok("quic"),
+        "ws" => Ok("ws"),
+        "relay" => Ok("relay"),
+        _ => Err(RecordValidationError::UnknownTransportClass {
+            value: value.to_string(),
+        }),
+    }
+}
+
+fn canonicalize_capability(value: &str) -> Result<&'static str, RecordValidationError> {
+    match value {
+        "relay-forward" => Ok("relay-forward"),
+        "relay-intro" => Ok("relay-intro"),
+        "rendezvous-helper" => Ok("rendezvous-helper"),
+        "bridge" => Ok("bridge"),
+        "service-host" => Ok("service-host"),
+        _ => Err(RecordValidationError::UnknownCapability {
+            value: value.to_string(),
+        }),
+    }
+}
+
+fn canonicalize_supported_kex_value(value: &str) -> Result<&'static str, RecordValidationError> {
+    match value {
+        "x25519" => Ok("x25519"),
+        _ => Err(RecordValidationError::UnknownKeyExchange {
+            value: value.to_string(),
+        }),
+    }
+}
+
+fn canonicalize_supported_signature_value(
+    value: &str,
+) -> Result<&'static str, RecordValidationError> {
+    match value {
+        "ed25519" => Ok("ed25519"),
+        _ => Err(RecordValidationError::UnknownSignatureAlgorithm {
+            value: value.to_string(),
+        }),
+    }
+}
+
 // MVP canonical body encoding is locked to deterministic JSON bytes in
 // `docs/OPEN_QUESTIONS.md`, so signed record bodies use field-order JSON here.
 #[derive(Serialize)]
@@ -226,6 +330,15 @@ struct PresenceRecordBody<'a> {
 }
 
 #[derive(Serialize)]
+struct RelayHintBody<'a> {
+    relay_node_id: NodeId,
+    relay_transport_class: &'a str,
+    relay_score: u32,
+    relay_policy: &'a [u8],
+    expiry: u64,
+}
+
+#[derive(Serialize)]
 struct ServiceRecordBody<'a> {
     version: u8,
     node_id: NodeId,
@@ -255,9 +368,9 @@ mod tests {
 
     use serde::Deserialize;
 
-    use super::{FreshRecord, NodeRecord, PresenceRecord};
+    use super::{FreshRecord, NodeRecord, PresenceRecord, RelayHint};
     use crate::{
-        error::RecordValidationError,
+        error::{RecordEncodingError, RecordValidationError},
         identity::{derive_node_id, NodeId},
     };
 
@@ -297,12 +410,114 @@ mod tests {
             encrypted_contact_blobs: vec![vec![4, 5, 6]],
             relay_hint_refs: vec![vec![7, 8, 9]],
             intro_policy: "allow".to_string(),
-            capability_requirements: vec!["base".to_string()],
+            capability_requirements: vec!["bridge".to_string()],
             signature: vec![1, 2, 3],
         };
 
         assert!(record.is_fresh(99));
         assert!(!record.is_fresh(100));
+    }
+
+    #[test]
+    fn node_record_canonical_body_bytes_sort_and_deduplicate_supported_transports() {
+        let record = NodeRecord {
+            version: 1,
+            node_id: derive_node_id(b"node-public-key"),
+            node_public_key: b"node-public-key".to_vec(),
+            created_at_unix_s: 1,
+            flags: 0,
+            supported_transports: vec!["ws".to_string(), "tcp".to_string(), "ws".to_string()],
+            supported_kex: vec!["x25519".to_string()],
+            supported_signatures: vec!["ed25519".to_string()],
+            anti_sybil_proof: vec![],
+            signature: vec![1, 2, 3],
+        };
+
+        let canonical_body = String::from_utf8(
+            record
+                .canonical_body_bytes()
+                .expect("canonical node body should serialize"),
+        )
+        .expect("canonical body should be utf-8 json");
+
+        assert!(canonical_body.contains("\"supported_transports\":[\"tcp\",\"ws\"]"));
+    }
+
+    #[test]
+    fn node_record_canonical_body_bytes_sort_and_deduplicate_kex_and_signatures() {
+        let record = NodeRecord {
+            version: 1,
+            node_id: derive_node_id(b"node-public-key"),
+            node_public_key: b"node-public-key".to_vec(),
+            created_at_unix_s: 1,
+            flags: 0,
+            supported_transports: vec!["tcp".to_string()],
+            supported_kex: vec!["x25519".to_string(), "x25519".to_string()],
+            supported_signatures: vec!["ed25519".to_string(), "ed25519".to_string()],
+            anti_sybil_proof: vec![],
+            signature: vec![1, 2, 3],
+        };
+
+        let canonical_body = String::from_utf8(
+            record
+                .canonical_body_bytes()
+                .expect("canonical node body should serialize"),
+        )
+        .expect("canonical body should be utf-8 json");
+
+        assert!(canonical_body.contains("\"supported_kex\":[\"x25519\"]"));
+        assert!(canonical_body.contains("\"supported_signatures\":[\"ed25519\"]"));
+    }
+
+    #[test]
+    fn node_record_canonical_body_bytes_reject_unknown_kex() {
+        let record = NodeRecord {
+            version: 1,
+            node_id: derive_node_id(b"node-public-key"),
+            node_public_key: b"node-public-key".to_vec(),
+            created_at_unix_s: 1,
+            flags: 0,
+            supported_transports: vec!["tcp".to_string()],
+            supported_kex: vec!["kyber".to_string()],
+            supported_signatures: vec!["ed25519".to_string()],
+            anti_sybil_proof: vec![],
+            signature: vec![1, 2, 3],
+        };
+
+        let error = record
+            .canonical_body_bytes()
+            .expect_err("unknown key exchange values must be rejected");
+        assert!(matches!(
+            error,
+            RecordEncodingError::Validation(RecordValidationError::UnknownKeyExchange { value })
+            if value == "kyber"
+        ));
+    }
+
+    #[test]
+    fn node_record_canonical_body_bytes_reject_unknown_signature_algorithm() {
+        let record = NodeRecord {
+            version: 1,
+            node_id: derive_node_id(b"node-public-key"),
+            node_public_key: b"node-public-key".to_vec(),
+            created_at_unix_s: 1,
+            flags: 0,
+            supported_transports: vec!["tcp".to_string()],
+            supported_kex: vec!["x25519".to_string()],
+            supported_signatures: vec!["rsa".to_string()],
+            anti_sybil_proof: vec![],
+            signature: vec![1, 2, 3],
+        };
+
+        let error = record
+            .canonical_body_bytes()
+            .expect_err("unknown signature algorithms must be rejected");
+        assert!(matches!(
+            error,
+            RecordEncodingError::Validation(
+                RecordValidationError::UnknownSignatureAlgorithm { value }
+            ) if value == "rsa"
+        ));
     }
 
     #[test]
@@ -345,6 +560,117 @@ mod tests {
         );
         assert_eq!(canonical_body_hex, vector.canonical_body_hex);
         assert!(record.is_fresh(1_000_000_000));
+    }
+
+    #[test]
+    fn canonical_body_bytes_sort_and_deduplicate_transport_classes_and_capabilities() {
+        let record = PresenceRecord {
+            version: 1,
+            node_id: derive_node_id(b"node-public-key"),
+            epoch: 7,
+            expires_at_unix_s: 1_000,
+            sequence: 2,
+            transport_classes: vec!["tcp".to_string(), "relay".to_string(), "tcp".to_string()],
+            reachability_mode: "hybrid".to_string(),
+            locator_commitment: vec![1, 2, 3],
+            encrypted_contact_blobs: vec![vec![4, 5, 6]],
+            relay_hint_refs: vec![vec![7, 8, 9]],
+            intro_policy: "allow".to_string(),
+            capability_requirements: vec![
+                "service-host".to_string(),
+                "bridge".to_string(),
+                "bridge".to_string(),
+            ],
+            signature: vec![1, 2, 3],
+        };
+
+        let canonical_body = String::from_utf8(
+            record
+                .canonical_body_bytes()
+                .expect("canonical presence body should serialize"),
+        )
+        .expect("canonical body should be utf-8 json");
+
+        assert!(canonical_body.contains("\"transport_classes\":[\"relay\",\"tcp\"]"));
+        assert!(
+            canonical_body.contains("\"capability_requirements\":[\"bridge\",\"service-host\"]")
+        );
+    }
+
+    #[test]
+    fn canonical_body_bytes_reject_unknown_transport_classes() {
+        let record = PresenceRecord {
+            version: 1,
+            node_id: derive_node_id(b"node-public-key"),
+            epoch: 7,
+            expires_at_unix_s: 1_000,
+            sequence: 2,
+            transport_classes: vec!["smtp".to_string()],
+            reachability_mode: "hybrid".to_string(),
+            locator_commitment: vec![1, 2, 3],
+            encrypted_contact_blobs: vec![vec![4, 5, 6]],
+            relay_hint_refs: vec![vec![7, 8, 9]],
+            intro_policy: "allow".to_string(),
+            capability_requirements: vec!["bridge".to_string()],
+            signature: vec![1, 2, 3],
+        };
+
+        let error = record
+            .canonical_body_bytes()
+            .expect_err("unknown transport classes must be rejected");
+        assert!(matches!(
+            error,
+            RecordEncodingError::Validation(RecordValidationError::UnknownTransportClass { value })
+            if value == "smtp"
+        ));
+    }
+
+    #[test]
+    fn canonical_body_bytes_reject_unknown_capabilities() {
+        let record = PresenceRecord {
+            version: 1,
+            node_id: derive_node_id(b"node-public-key"),
+            epoch: 7,
+            expires_at_unix_s: 1_000,
+            sequence: 2,
+            transport_classes: vec!["relay".to_string()],
+            reachability_mode: "hybrid".to_string(),
+            locator_commitment: vec![1, 2, 3],
+            encrypted_contact_blobs: vec![vec![4, 5, 6]],
+            relay_hint_refs: vec![vec![7, 8, 9]],
+            intro_policy: "allow".to_string(),
+            capability_requirements: vec!["base".to_string()],
+            signature: vec![1, 2, 3],
+        };
+
+        let error = record
+            .canonical_body_bytes()
+            .expect_err("unknown capabilities must be rejected");
+        assert!(matches!(
+            error,
+            RecordEncodingError::Validation(RecordValidationError::UnknownCapability { value })
+            if value == "base"
+        ));
+    }
+
+    #[test]
+    fn relay_hint_canonical_bytes_reject_unknown_transport_class() {
+        let relay_hint = RelayHint {
+            relay_node_id: derive_node_id(b"relay-node-public-key"),
+            relay_transport_class: "smtp".to_string(),
+            relay_score: 7,
+            relay_policy: vec![1, 2, 3],
+            expiry: 1_000,
+        };
+
+        let error = relay_hint
+            .canonical_bytes()
+            .expect_err("unknown relay transport classes must be rejected");
+        assert!(matches!(
+            error,
+            RecordEncodingError::Validation(RecordValidationError::UnknownTransportClass { value })
+            if value == "smtp"
+        ));
     }
 
     #[derive(Debug, Deserialize)]

@@ -16,6 +16,10 @@ Fields:
 Validation:
 - `node_id == BLAKE3-256(node_public_key)`
 - signature valid over canonical serialized body
+- `supported_transports`, `supported_kex`, and `supported_signatures` must use
+  allowed lowercase string enums
+- those arrays must be deduplicated and sorted lexicographically before
+  signing or hashing
 
 ## PresenceRecord
 Fields:
