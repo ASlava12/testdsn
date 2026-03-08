@@ -251,8 +251,15 @@ struct IntroTicketBody<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::{fs, path::PathBuf};
+
+    use serde::Deserialize;
+
     use super::{FreshRecord, NodeRecord, PresenceRecord};
-    use crate::{error::RecordValidationError, identity::derive_node_id};
+    use crate::{
+        error::RecordValidationError,
+        identity::{derive_node_id, NodeId},
+    };
 
     #[test]
     fn node_record_validation_rejects_mismatched_node_id() {
@@ -296,5 +303,103 @@ mod tests {
 
         assert!(record.is_fresh(99));
         assert!(!record.is_fresh(100));
+    }
+
+    #[test]
+    fn presence_record_vector_matches_fixture() {
+        let vector = read_presence_record_vector();
+        let public_key = decode_hex(&vector.node_public_key_hex);
+        let expected_node_id = NodeId::from_slice(&decode_hex(&vector.node_id_hex))
+            .expect("node id vector must contain 32-byte ids");
+
+        assert_eq!(derive_node_id(&public_key), expected_node_id);
+
+        let record = PresenceRecord {
+            version: vector.version,
+            node_id: expected_node_id,
+            epoch: vector.epoch,
+            expires_at_unix_s: vector.expires_at_unix_s,
+            sequence: vector.sequence,
+            transport_classes: vector.transport_classes,
+            reachability_mode: vector.reachability_mode,
+            locator_commitment: decode_hex(&vector.locator_commitment_hex),
+            encrypted_contact_blobs: vector
+                .encrypted_contact_blobs_hex
+                .iter()
+                .map(|value| decode_hex(value))
+                .collect(),
+            relay_hint_refs: vector
+                .relay_hint_refs_hex
+                .iter()
+                .map(|value| decode_hex(value))
+                .collect(),
+            intro_policy: vector.intro_policy,
+            capability_requirements: vector.capability_requirements,
+            signature: decode_hex(&vector.signature_hex),
+        };
+
+        let canonical_body_hex = encode_hex(
+            &record
+                .canonical_body_bytes()
+                .expect("presence record vector should serialize"),
+        );
+        assert_eq!(canonical_body_hex, vector.canonical_body_hex);
+        assert!(record.is_fresh(1_000_000_000));
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct PresenceRecordVector {
+        node_public_key_hex: String,
+        version: u8,
+        node_id_hex: String,
+        epoch: u64,
+        expires_at_unix_s: u64,
+        sequence: u64,
+        transport_classes: Vec<String>,
+        reachability_mode: String,
+        locator_commitment_hex: String,
+        encrypted_contact_blobs_hex: Vec<String>,
+        relay_hint_refs_hex: Vec<String>,
+        intro_policy: String,
+        capability_requirements: Vec<String>,
+        signature_hex: String,
+        canonical_body_hex: String,
+    }
+
+    fn presence_record_vector_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("tests")
+            .join("vectors")
+            .join("presence_record.json")
+    }
+
+    fn read_presence_record_vector() -> PresenceRecordVector {
+        let bytes = fs::read(presence_record_vector_path())
+            .expect("presence record vector file should exist");
+        serde_json::from_slice(&bytes).expect("presence record vector file should parse")
+    }
+
+    fn decode_hex(hex: &str) -> Vec<u8> {
+        assert_eq!(hex.len() % 2, 0, "hex input must have even length");
+
+        hex.as_bytes()
+            .chunks_exact(2)
+            .map(|chunk| {
+                let text = std::str::from_utf8(chunk).expect("hex input must be utf-8");
+                u8::from_str_radix(text, 16).expect("hex input must be valid")
+            })
+            .collect()
+    }
+
+    fn encode_hex(bytes: &[u8]) -> String {
+        let mut encoded = String::with_capacity(bytes.len() * 2);
+        for byte in bytes {
+            use std::fmt::Write as _;
+            write!(&mut encoded, "{byte:02x}").expect("hex encoding should succeed");
+        }
+
+        encoded
     }
 }

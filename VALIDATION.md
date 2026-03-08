@@ -29,10 +29,10 @@ cargo test --workspace
 ## Focused test runs
 
 ```bash
-cargo test --test integration_bootstrap
-cargo test --test integration_publish_lookup
-cargo test --test integration_relay_fallback
-cargo test --test integration_service_open
+cargo test -p overlay-core --test integration_bootstrap
+cargo test -p overlay-core --test integration_publish_lookup
+cargo test -p overlay-core --test integration_relay_fallback
+cargo test -p overlay-core --test integration_service_open
 ```
 
 ## Notes for early milestones
@@ -42,3 +42,7 @@ If so, report exactly which command failed and whether it failed because:
 - the milestone has not introduced that subsystem yet;
 - dependencies are not wired yet;
 - a real regression was introduced.
+
+At the current `milestone-2-handshake` baseline, the focused integration tests
+act as stage-boundary smoke tests. Replace them with real subsystem scenarios
+when Milestones 4-8 land.
