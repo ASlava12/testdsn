@@ -1,5 +1,6 @@
 pub mod bootstrap;
 pub mod config;
+pub mod crypto;
 pub mod error;
 pub mod identity;
 pub mod metrics;
@@ -13,7 +14,7 @@ pub mod session;
 pub mod transport;
 pub mod wire;
 
-pub const REPOSITORY_STAGE: &str = "milestone-1-foundations";
+pub const REPOSITORY_STAGE: &str = "milestone-2-handshake";
 
 #[cfg(test)]
 mod tests {
@@ -21,6 +22,6 @@ mod tests {
 
     #[test]
     fn reports_repository_stage() {
-        assert_eq!(REPOSITORY_STAGE, "milestone-1-foundations");
+        assert_eq!(REPOSITORY_STAGE, "milestone-2-handshake");
     }
 }

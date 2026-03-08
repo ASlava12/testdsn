@@ -166,9 +166,6 @@ macro_rules! define_message_markers {
 }
 
 define_message_markers!(
-    ClientHello => ClientHello,
-    ServerHello => ServerHello,
-    ClientFinish => ClientFinish,
     Ping => Ping,
     Pong => Pong,
     Close => Close,
