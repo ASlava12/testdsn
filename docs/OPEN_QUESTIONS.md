@@ -243,6 +243,38 @@ Rules:
 - unknown values may be ignored only in unsigned local config outside the
   signed record path.
 
+### 10. Final encoding of `ServiceRecord.auth_mode` and `IntroTicket.scope`
+
+For MVP, these fields are also locked to lowercase ASCII string enums in
+canonical JSON.
+
+Allowed `ServiceRecord.auth_mode` values:
+- `none`
+
+Allowed `IntroTicket.scope` values:
+- `relay-intro`
+
+Rules:
+- unknown values must be rejected in signed protocol records;
+- do not invent additional auth or intro scope modes until later specs land.
+
+### 11. Final encoding of `PresenceRecord.reachability_mode` and `intro_policy`
+
+For MVP, these fields are also locked to lowercase ASCII string enums in
+canonical JSON.
+
+Allowed `PresenceRecord.reachability_mode` values:
+- `direct`
+- `hybrid`
+
+Allowed `PresenceRecord.intro_policy` values:
+- `allow`
+
+Rules:
+- unknown values must be rejected in signed protocol records;
+- do not invent additional reachability or intro policy modes until later
+  specs land.
+
 ## Rule
 
 If a task requires an area still not fully specified:

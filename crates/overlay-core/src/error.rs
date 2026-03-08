@@ -21,6 +21,14 @@ pub enum RecordValidationError {
     UnknownKeyExchange { value: String },
     #[error("unknown signature algorithm in signed record: {value}")]
     UnknownSignatureAlgorithm { value: String },
+    #[error("unknown reachability mode in signed record: {value}")]
+    UnknownReachabilityMode { value: String },
+    #[error("unknown intro policy in signed record: {value}")]
+    UnknownIntroPolicy { value: String },
+    #[error("unknown service auth mode in signed record: {value}")]
+    UnknownAuthMode { value: String },
+    #[error("unknown intro ticket scope in signed record: {value}")]
+    UnknownIntroScope { value: String },
     #[error("unknown capability in signed record: {value}")]
     UnknownCapability { value: String },
 }

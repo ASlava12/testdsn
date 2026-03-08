@@ -71,6 +71,9 @@ impl PresenceRecord {
     pub fn canonical_body_bytes(&self) -> Result<Vec<u8>, RecordEncodingError> {
         let transport_classes = canonicalize_transport_classes(&self.transport_classes)?;
         let capability_requirements = canonicalize_capabilities(&self.capability_requirements)?;
+        let reachability_mode =
+            canonicalize_reachability_mode(&self.reachability_mode)?.to_string();
+        let intro_policy = canonicalize_intro_policy(&self.intro_policy)?.to_string();
 
         serde_json::to_vec(&PresenceRecordBody {
             version: self.version,
@@ -79,11 +82,11 @@ impl PresenceRecord {
             expires_at_unix_s: self.expires_at_unix_s,
             sequence: self.sequence,
             transport_classes: &transport_classes,
-            reachability_mode: &self.reachability_mode,
+            reachability_mode: &reachability_mode,
             locator_commitment: &self.locator_commitment,
             encrypted_contact_blobs: &self.encrypted_contact_blobs,
             relay_hint_refs: &self.relay_hint_refs,
-            intro_policy: &self.intro_policy,
+            intro_policy: &intro_policy,
             capability_requirements: &capability_requirements,
         })
         .map_err(Into::into)
@@ -106,13 +109,15 @@ pub struct ServiceRecord {
 
 impl ServiceRecord {
     pub fn canonical_body_bytes(&self) -> Result<Vec<u8>, RecordEncodingError> {
+        let auth_mode = canonicalize_auth_mode(&self.auth_mode)?.to_string();
+
         serde_json::to_vec(&ServiceRecordBody {
             version: self.version,
             node_id: self.node_id,
             app_id: self.app_id,
             service_name: &self.service_name,
             service_version: &self.service_version,
-            auth_mode: &self.auth_mode,
+            auth_mode: &auth_mode,
             policy: &self.policy,
             reachability_ref: &self.reachability_ref,
             metadata_commitment: &self.metadata_commitment,
@@ -160,11 +165,13 @@ pub struct IntroTicket {
 
 impl IntroTicket {
     pub fn canonical_body_bytes(&self) -> Result<Vec<u8>, RecordEncodingError> {
+        let scope = canonicalize_intro_scope(&self.scope)?.to_string();
+
         serde_json::to_vec(&IntroTicketBody {
             ticket_id: &self.ticket_id,
             target_node_id: self.target_node_id,
             requester_binding: &self.requester_binding,
-            scope: &self.scope,
+            scope: &scope,
             issued_at_unix_s: self.issued_at_unix_s,
             expires_at_unix_s: self.expires_at_unix_s,
             nonce: &self.nonce,
@@ -278,6 +285,25 @@ fn canonicalize_capability(value: &str) -> Result<&'static str, RecordValidation
     }
 }
 
+fn canonicalize_reachability_mode(value: &str) -> Result<&'static str, RecordValidationError> {
+    match value {
+        "direct" => Ok("direct"),
+        "hybrid" => Ok("hybrid"),
+        _ => Err(RecordValidationError::UnknownReachabilityMode {
+            value: value.to_string(),
+        }),
+    }
+}
+
+fn canonicalize_intro_policy(value: &str) -> Result<&'static str, RecordValidationError> {
+    match value {
+        "allow" => Ok("allow"),
+        _ => Err(RecordValidationError::UnknownIntroPolicy {
+            value: value.to_string(),
+        }),
+    }
+}
+
 fn canonicalize_supported_kex_value(value: &str) -> Result<&'static str, RecordValidationError> {
     match value {
         "x25519" => Ok("x25519"),
@@ -293,6 +319,24 @@ fn canonicalize_supported_signature_value(
     match value {
         "ed25519" => Ok("ed25519"),
         _ => Err(RecordValidationError::UnknownSignatureAlgorithm {
+            value: value.to_string(),
+        }),
+    }
+}
+
+fn canonicalize_auth_mode(value: &str) -> Result<&'static str, RecordValidationError> {
+    match value {
+        "none" => Ok("none"),
+        _ => Err(RecordValidationError::UnknownAuthMode {
+            value: value.to_string(),
+        }),
+    }
+}
+
+fn canonicalize_intro_scope(value: &str) -> Result<&'static str, RecordValidationError> {
+    match value {
+        "relay-intro" => Ok("relay-intro"),
+        _ => Err(RecordValidationError::UnknownIntroScope {
             value: value.to_string(),
         }),
     }
@@ -368,10 +412,10 @@ mod tests {
 
     use serde::Deserialize;
 
-    use super::{FreshRecord, NodeRecord, PresenceRecord, RelayHint};
+    use super::{FreshRecord, IntroTicket, NodeRecord, PresenceRecord, RelayHint, ServiceRecord};
     use crate::{
         error::{RecordEncodingError, RecordValidationError},
-        identity::{derive_node_id, NodeId},
+        identity::{derive_app_id, derive_node_id, AppId, NodeId},
     };
 
     #[test]
@@ -521,6 +565,176 @@ mod tests {
     }
 
     #[test]
+    fn node_record_vector_matches_fixture() {
+        let vector = read_node_record_vector();
+        let public_key = decode_hex(&vector.node_public_key_hex);
+        let expected_node_id = NodeId::from_slice(&decode_hex(&vector.node_id_hex))
+            .expect("node id vector must contain 32-byte ids");
+
+        assert_eq!(derive_node_id(&public_key), expected_node_id);
+
+        let record = NodeRecord {
+            version: vector.version,
+            node_id: expected_node_id,
+            node_public_key: public_key,
+            created_at_unix_s: vector.created_at_unix_s,
+            flags: vector.flags,
+            supported_transports: vector.supported_transports,
+            supported_kex: vector.supported_kex,
+            supported_signatures: vector.supported_signatures,
+            anti_sybil_proof: decode_hex(&vector.anti_sybil_proof_hex),
+            signature: decode_hex(&vector.signature_hex),
+        };
+
+        let canonical_body_hex = encode_hex(
+            &record
+                .canonical_body_bytes()
+                .expect("node record vector should serialize"),
+        );
+        assert_eq!(canonical_body_hex, vector.canonical_body_hex);
+    }
+
+    #[test]
+    fn service_record_vector_matches_fixture() {
+        let vector = read_service_record_vector();
+        let public_key = decode_hex(&vector.node_public_key_hex);
+        let expected_node_id = NodeId::from_slice(&decode_hex(&vector.node_id_hex))
+            .expect("node id vector must contain 32-byte ids");
+        let expected_app_id = AppId::from_slice(&decode_hex(&vector.app_id_hex))
+            .expect("app id vector must contain 32-byte ids");
+
+        assert_eq!(derive_node_id(&public_key), expected_node_id);
+        assert_eq!(
+            derive_app_id(&expected_node_id, &vector.app_namespace, &vector.app_name),
+            expected_app_id
+        );
+
+        let record = ServiceRecord {
+            version: vector.version,
+            node_id: expected_node_id,
+            app_id: expected_app_id,
+            service_name: vector.service_name,
+            service_version: vector.service_version,
+            auth_mode: vector.auth_mode,
+            policy: decode_hex(&vector.policy_hex),
+            reachability_ref: decode_hex(&vector.reachability_ref_hex),
+            metadata_commitment: decode_hex(&vector.metadata_commitment_hex),
+            signature: decode_hex(&vector.signature_hex),
+        };
+
+        let canonical_body_hex = encode_hex(
+            &record
+                .canonical_body_bytes()
+                .expect("service record vector should serialize"),
+        );
+        assert_eq!(canonical_body_hex, vector.canonical_body_hex);
+    }
+
+    #[test]
+    fn service_record_canonical_body_bytes_reject_unknown_auth_mode() {
+        let node_id = derive_node_id(b"node-public-key");
+        let record = ServiceRecord {
+            version: 1,
+            node_id,
+            app_id: derive_app_id(&node_id, "chat", "terminal"),
+            service_name: "terminal".to_string(),
+            service_version: "1.0.0".to_string(),
+            auth_mode: "password".to_string(),
+            policy: vec![1, 2, 3, 4],
+            reachability_ref: vec![0xAA, 0xBB],
+            metadata_commitment: vec![0xCC, 0xDD],
+            signature: vec![0x11, 0x22, 0x33],
+        };
+
+        let error = record
+            .canonical_body_bytes()
+            .expect_err("unknown auth modes must be rejected");
+        assert!(matches!(
+            error,
+            RecordEncodingError::Validation(RecordValidationError::UnknownAuthMode { value })
+            if value == "password"
+        ));
+    }
+
+    #[test]
+    fn relay_hint_vector_matches_fixture() {
+        let vector = read_relay_hint_vector();
+        let relay_public_key = decode_hex(&vector.relay_node_public_key_hex);
+        let expected_relay_node_id = NodeId::from_slice(&decode_hex(&vector.relay_node_id_hex))
+            .expect("relay node id vector must contain 32-byte ids");
+
+        assert_eq!(derive_node_id(&relay_public_key), expected_relay_node_id);
+
+        let relay_hint = RelayHint {
+            relay_node_id: expected_relay_node_id,
+            relay_transport_class: vector.relay_transport_class,
+            relay_score: vector.relay_score,
+            relay_policy: decode_hex(&vector.relay_policy_hex),
+            expiry: vector.expiry,
+        };
+
+        let canonical_body_hex = encode_hex(
+            &relay_hint
+                .canonical_bytes()
+                .expect("relay hint vector should serialize"),
+        );
+        assert_eq!(canonical_body_hex, vector.canonical_body_hex);
+        assert!(relay_hint.is_fresh(700));
+    }
+
+    #[test]
+    fn intro_ticket_vector_matches_fixture() {
+        let vector = read_intro_ticket_vector();
+        let target_public_key = decode_hex(&vector.target_node_public_key_hex);
+        let expected_target_node_id = NodeId::from_slice(&decode_hex(&vector.target_node_id_hex))
+            .expect("target node id vector must contain 32-byte ids");
+
+        assert_eq!(derive_node_id(&target_public_key), expected_target_node_id);
+
+        let intro_ticket = IntroTicket {
+            ticket_id: decode_hex(&vector.ticket_id_hex),
+            target_node_id: expected_target_node_id,
+            requester_binding: decode_hex(&vector.requester_binding_hex),
+            scope: vector.scope,
+            issued_at_unix_s: vector.issued_at_unix_s,
+            expires_at_unix_s: vector.expires_at_unix_s,
+            nonce: decode_hex(&vector.nonce_hex),
+            signature: decode_hex(&vector.signature_hex),
+        };
+
+        let canonical_body_hex = encode_hex(
+            &intro_ticket
+                .canonical_body_bytes()
+                .expect("intro ticket vector should serialize"),
+        );
+        assert_eq!(canonical_body_hex, vector.canonical_body_hex);
+        assert!(intro_ticket.is_fresh(1_500));
+    }
+
+    #[test]
+    fn intro_ticket_canonical_body_bytes_reject_unknown_scope() {
+        let intro_ticket = IntroTicket {
+            ticket_id: vec![0x01, 0x23, 0x45, 0x67],
+            target_node_id: derive_node_id(b"node-public-key"),
+            requester_binding: vec![0x89, 0xAB, 0xCD],
+            scope: "full-access".to_string(),
+            issued_at_unix_s: 1_000,
+            expires_at_unix_s: 2_000,
+            nonce: vec![0x10, 0x20, 0x30, 0x40],
+            signature: vec![0x50, 0x60, 0x70],
+        };
+
+        let error = intro_ticket
+            .canonical_body_bytes()
+            .expect_err("unknown intro scopes must be rejected");
+        assert!(matches!(
+            error,
+            RecordEncodingError::Validation(RecordValidationError::UnknownIntroScope { value })
+            if value == "full-access"
+        ));
+    }
+
+    #[test]
     fn presence_record_vector_matches_fixture() {
         let vector = read_presence_record_vector();
         let public_key = decode_hex(&vector.node_public_key_hex);
@@ -595,6 +809,63 @@ mod tests {
         assert!(
             canonical_body.contains("\"capability_requirements\":[\"bridge\",\"service-host\"]")
         );
+    }
+
+    #[test]
+    fn presence_record_canonical_body_bytes_reject_unknown_reachability_mode() {
+        let record = PresenceRecord {
+            version: 1,
+            node_id: derive_node_id(b"node-public-key"),
+            epoch: 7,
+            expires_at_unix_s: 1_000,
+            sequence: 2,
+            transport_classes: vec!["relay".to_string()],
+            reachability_mode: "relay-only".to_string(),
+            locator_commitment: vec![1, 2, 3],
+            encrypted_contact_blobs: vec![vec![4, 5, 6]],
+            relay_hint_refs: vec![vec![7, 8, 9]],
+            intro_policy: "allow".to_string(),
+            capability_requirements: vec!["bridge".to_string()],
+            signature: vec![1, 2, 3],
+        };
+
+        let error = record
+            .canonical_body_bytes()
+            .expect_err("unknown reachability modes must be rejected");
+        assert!(matches!(
+            error,
+            RecordEncodingError::Validation(
+                RecordValidationError::UnknownReachabilityMode { value }
+            ) if value == "relay-only"
+        ));
+    }
+
+    #[test]
+    fn presence_record_canonical_body_bytes_reject_unknown_intro_policy() {
+        let record = PresenceRecord {
+            version: 1,
+            node_id: derive_node_id(b"node-public-key"),
+            epoch: 7,
+            expires_at_unix_s: 1_000,
+            sequence: 2,
+            transport_classes: vec!["relay".to_string()],
+            reachability_mode: "hybrid".to_string(),
+            locator_commitment: vec![1, 2, 3],
+            encrypted_contact_blobs: vec![vec![4, 5, 6]],
+            relay_hint_refs: vec![vec![7, 8, 9]],
+            intro_policy: "deny".to_string(),
+            capability_requirements: vec!["bridge".to_string()],
+            signature: vec![1, 2, 3],
+        };
+
+        let error = record
+            .canonical_body_bytes()
+            .expect_err("unknown intro policies must be rejected");
+        assert!(matches!(
+            error,
+            RecordEncodingError::Validation(RecordValidationError::UnknownIntroPolicy { value })
+            if value == "deny"
+        ));
     }
 
     #[test]
@@ -674,6 +945,64 @@ mod tests {
     }
 
     #[derive(Debug, Deserialize)]
+    struct NodeRecordVector {
+        version: u8,
+        node_public_key_hex: String,
+        node_id_hex: String,
+        created_at_unix_s: u64,
+        flags: u32,
+        supported_transports: Vec<String>,
+        supported_kex: Vec<String>,
+        supported_signatures: Vec<String>,
+        anti_sybil_proof_hex: String,
+        signature_hex: String,
+        canonical_body_hex: String,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct ServiceRecordVector {
+        version: u8,
+        node_public_key_hex: String,
+        node_id_hex: String,
+        app_namespace: String,
+        app_name: String,
+        app_id_hex: String,
+        service_name: String,
+        service_version: String,
+        auth_mode: String,
+        policy_hex: String,
+        reachability_ref_hex: String,
+        metadata_commitment_hex: String,
+        signature_hex: String,
+        canonical_body_hex: String,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct RelayHintVector {
+        relay_node_public_key_hex: String,
+        relay_node_id_hex: String,
+        relay_transport_class: String,
+        relay_score: u32,
+        relay_policy_hex: String,
+        expiry: u64,
+        canonical_body_hex: String,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct IntroTicketVector {
+        target_node_public_key_hex: String,
+        target_node_id_hex: String,
+        ticket_id_hex: String,
+        requester_binding_hex: String,
+        scope: String,
+        issued_at_unix_s: u64,
+        expires_at_unix_s: u64,
+        nonce_hex: String,
+        signature_hex: String,
+        canonical_body_hex: String,
+    }
+
+    #[derive(Debug, Deserialize)]
     struct PresenceRecordVector {
         node_public_key_hex: String,
         version: u8,
@@ -699,6 +1028,66 @@ mod tests {
             .join("tests")
             .join("vectors")
             .join("presence_record.json")
+    }
+
+    fn node_record_vector_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("tests")
+            .join("vectors")
+            .join("node_record.json")
+    }
+
+    fn service_record_vector_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("tests")
+            .join("vectors")
+            .join("service_record.json")
+    }
+
+    fn relay_hint_vector_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("tests")
+            .join("vectors")
+            .join("relay_hint.json")
+    }
+
+    fn intro_ticket_vector_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("tests")
+            .join("vectors")
+            .join("intro_ticket.json")
+    }
+
+    fn read_node_record_vector() -> NodeRecordVector {
+        let bytes =
+            fs::read(node_record_vector_path()).expect("node record vector file should exist");
+        serde_json::from_slice(&bytes).expect("node record vector file should parse")
+    }
+
+    fn read_service_record_vector() -> ServiceRecordVector {
+        let bytes = fs::read(service_record_vector_path())
+            .expect("service record vector file should exist");
+        serde_json::from_slice(&bytes).expect("service record vector file should parse")
+    }
+
+    fn read_relay_hint_vector() -> RelayHintVector {
+        let bytes =
+            fs::read(relay_hint_vector_path()).expect("relay hint vector file should exist");
+        serde_json::from_slice(&bytes).expect("relay hint vector file should parse")
+    }
+
+    fn read_intro_ticket_vector() -> IntroTicketVector {
+        let bytes =
+            fs::read(intro_ticket_vector_path()).expect("intro ticket vector file should exist");
+        serde_json::from_slice(&bytes).expect("intro ticket vector file should parse")
     }
 
     fn read_presence_record_vector() -> PresenceRecordVector {

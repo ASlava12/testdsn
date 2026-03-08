@@ -44,6 +44,9 @@ Conflict resolution:
 4. same epoch: higher sequence wins
 5. same epoch + same sequence: byte-identical only
 
+Validation:
+- `reachability_mode` and `intro_policy` must use allowed lowercase string enums
+
 ## ServiceRecord
 Fields:
 - version
@@ -56,6 +59,9 @@ Fields:
 - reachability_ref
 - metadata_commitment
 - signature
+
+Validation:
+- `auth_mode` must use an allowed lowercase string enum
 
 ## RelayHint
 Fields:
@@ -75,3 +81,6 @@ Fields:
 - expires_at_unix_s
 - nonce
 - signature
+
+Validation:
+- `scope` must use an allowed lowercase string enum
