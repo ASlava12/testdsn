@@ -1,3 +1,3 @@
 //! Placeholder for relay role handling and fallback reachability.
-// TODO(spec): Finalize relay quota defaults after
-// `docs/OPEN_QUESTIONS.md` item 4 is resolved.
+// Conservative relay quota defaults are locked in `docs/OPEN_QUESTIONS.md`;
+// implementation stays placeholder until Milestone 6.

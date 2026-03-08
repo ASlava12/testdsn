@@ -1,14 +1,21 @@
 Read `AGENTS.md`, `IMPLEMENT.md`, `spec/records.md`, `spec/wire-protocol.md`, and `spec/mvp-scope.md`.
 
 Goal:
-Implement Milestone 1 from `IMPLEMENT.md`.
+Finish or validate the existing Milestone 1 baseline from `IMPLEMENT.md`
+without rewriting work that is already in the repository.
+
+Current repository baseline:
+- `NodeId` and `AppId` derivation already exist.
+- record structs already exist.
+- frame header and message catalog already exist.
+- the remaining work in this milestone should be gap-filling, vectors, tests,
+  and spec-conformance fixes.
 
 Requirements:
-- implement `NodeId` and `AppId` derivation;
-- implement record structs and validation helpers;
-- implement frame header and base message type definitions;
-- add unit tests for ID derivation and header round-trip;
-- do not add network I/O.
+- verify the current `identity`, `records`, and `wire` modules against spec;
+- add only the missing Milestone 1 artifacts such as fixtures, vectors, or tests;
+- keep network I/O out of scope;
+- do not refactor stable code paths without a concrete bug or spec mismatch.
 
 Validation:
 - `cargo fmt --all --check`

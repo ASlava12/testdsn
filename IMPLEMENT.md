@@ -2,7 +2,33 @@
 
 This file is the execution plan for Codex.
 
+## Current repository stage
+
+The repository is no longer at Milestone 0.
+
+- Milestone 0 bootstrap is complete.
+- Milestone 1 foundations are already implemented in `crates/overlay-core/src/identity.rs`,
+  `crates/overlay-core/src/records/mod.rs`, and `crates/overlay-core/src/wire/mod.rs`.
+- Milestone 2 crypto wrappers and handshake surface are already implemented in
+  `crates/overlay-core/src/crypto/*` and `crates/overlay-core/src/session/handshake.rs`.
+- Milestone 3 and later are still placeholder modules and placeholder integration tests.
+
+Treat Milestones 0-2 as an existing baseline. Prefer doc synchronization,
+missing artifact completion, and validation over repeating or refactoring the
+already present work.
+
+## Recommended next Codex task
+
+Before starting any Milestone 3 work:
+
+1. sync repository status documents to the actual code baseline;
+2. lock down the agreed conservative MVP decisions in `docs/OPEN_QUESTIONS.md`;
+3. finish any missing Milestone 1 artifacts, especially test vectors;
+4. validate or conservatively complete the existing Milestone 2 handshake surface.
+
 ## Milestone 0 — repository bootstrap
+
+Status: already completed in this repository. Do not rerun from scratch.
 
 ### Goal
 Create a clean Rust workspace and all spec files, with no protocol logic yet.
@@ -22,6 +48,9 @@ Create a clean Rust workspace and all spec files, with no protocol logic yet.
 ---
 
 ## Milestone 1 — identities, records, and wire base
+
+Status: implemented baseline exists. Use this milestone for gap-filling,
+artifact completion, or spec-conformance fixes only.
 
 ### Goal
 Implement the immutable foundations that other layers depend on.
@@ -51,6 +80,9 @@ Implement the immutable foundations that other layers depend on.
 ---
 
 ## Milestone 2 — crypto wrappers and handshake
+
+Status: implemented baseline exists. Treat this as validate-and-finish work,
+not a greenfield handshake implementation task.
 
 ### Goal
 Implement a minimal secure handshake for session establishment.

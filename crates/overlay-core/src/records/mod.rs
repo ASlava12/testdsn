@@ -194,8 +194,8 @@ pub fn validate_record_freshness(
     })
 }
 
-// Canonical binary encoding is still open in the spec, so Milestone 1 uses
-// deterministic JSON field order as a conservative placeholder for signed bodies.
+// MVP canonical body encoding is locked to deterministic JSON bytes in
+// `docs/OPEN_QUESTIONS.md`, so signed record bodies use field-order JSON here.
 #[derive(Serialize)]
 struct NodeRecordBody<'a> {
     version: u8,

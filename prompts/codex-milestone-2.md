@@ -1,13 +1,19 @@
 Read `AGENTS.md`, `IMPLEMENT.md`, `spec/wire-protocol.md`, `spec/state-machines.md`, and `docs/OPEN_QUESTIONS.md`.
 
 Goal:
-Implement Milestone 2 from `IMPLEMENT.md`.
+Validate or conservatively complete the existing Milestone 2 handshake surface
+from `IMPLEMENT.md` without broadening scope beyond the current repository stage.
+
+Current repository baseline:
+- crypto wrappers already exist in `crates/overlay-core/src/crypto/*`;
+- `ClientHello`, `ServerHello`, and `ClientFinish` handling already exists;
+- transcript hashing, key derivation, and handshake vectors already exist.
 
 Requirements:
-- add crypto wrappers for BLAKE3, Ed25519, X25519, HKDF-SHA256, and ChaCha20-Poly1305;
-- implement `ClientHello`, `ServerHello`, and `ClientFinish` base handling;
-- implement transcript hashing and session key derivation in the simplest conservative MVP form;
-- add tests for valid and invalid handshake paths.
+- audit the existing handshake code against the spec and `docs/OPEN_QUESTIONS.md`;
+- add only missing validation, tests, vectors, or conservative fixes;
+- keep the MVP handshake scope unchanged;
+- do not start transport/session-manager work from Milestone 3.
 
 Constraints:
 - no PQ/hybrid suites;

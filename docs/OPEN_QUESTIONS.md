@@ -1,6 +1,8 @@
 # Open Questions
 
 This file exists so Codex does not silently invent protocol details.
+All currently known MVP ambiguities affecting Milestones 1 and 2 are resolved
+below and should be reused as the conservative defaults.
 
 ## Resolved conservative choices for MVP
 
@@ -45,7 +47,7 @@ MVP labels:
 
 - `client_hello`
 - `server_hello_unsigned`
-- `server_hello_signed`
+- `server_hello`
 - `client_finish_unsigned`
 
 Coverage rules:
@@ -56,11 +58,11 @@ Coverage rules:
 
 - hello transcript for key derivation covers:
 - `client_hello`
-- `server_hello_signed`
+- `server_hello`
 
 - client finish signature covers:
 - `client_hello`
-- `server_hello_signed`
+- `server_hello`
 - `client_finish_unsigned`
 
 ### 3. Full key schedule details beyond MVP wrappers
@@ -207,18 +209,25 @@ Rules:
 - unknown values must be rejected in signed protocol records;
 - unknown values may be ignored only in unsigned local config.
 
+### 8. Repository stage lock-in
+
+For current work, treat the repository stage as:
+
+- Milestone 0 complete;
+- Milestone 1 foundations implemented;
+- Milestone 2 handshake surface implemented;
+- Milestone 3+ not started beyond placeholders.
+
+That means:
+
+- do not restart from Milestone 0;
+- do not re-implement Milestone 1 or 2 from scratch;
+- finish missing artifacts, vectors, and validation for the existing
+  Milestone 1-2 baseline before starting Milestone 3.
+
 ## Rule
 
 If a task requires an area still not fully specified:
 - choose the smallest conservative implementation;
 - document the choice in the final report;
 - update this file if a new gap is discovered.
-
-## Additional project gap discovered
-
-The repository currently contains mixed stage signals:
-- README still says Milestone 0;
-- the crate stage constant says `milestone-2-handshake`;
-- handshake vectors already exist.
-
-Before further Codex milestones, update repository status documents to a single agreed stage.

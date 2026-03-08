@@ -158,6 +158,10 @@ fn write_hex(f: &mut fmt::Formatter<'_>, bytes: &[u8]) -> fmt::Result {
 
 #[cfg(test)]
 mod tests {
+    use std::{fs, path::PathBuf};
+
+    use serde::Deserialize;
+
     use super::{derive_app_id, derive_node_id, AppId, NodeId};
     use blake3::Hasher;
 
@@ -187,5 +191,66 @@ mod tests {
             AppId::derive(&node_id, "chat", "terminal").into_bytes(),
             expected
         );
+    }
+
+    #[test]
+    fn node_id_vectors_match_fixture() {
+        let vectors = read_node_id_vectors();
+        assert!(
+            !vectors.is_empty(),
+            "node_id vector fixture must not be empty"
+        );
+
+        for vector in vectors {
+            let public_key = decode_hex(&vector.pubkey_hex);
+            let actual_node_id = encode_hex(derive_node_id(&public_key).as_bytes());
+            assert_eq!(
+                actual_node_id, vector.node_id_hex,
+                "pubkey_hex={}",
+                vector.pubkey_hex
+            );
+        }
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct NodeIdVector {
+        pubkey_hex: String,
+        node_id_hex: String,
+    }
+
+    fn node_id_vector_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("tests")
+            .join("vectors")
+            .join("node_id.json")
+    }
+
+    fn read_node_id_vectors() -> Vec<NodeIdVector> {
+        let bytes = fs::read(node_id_vector_path()).expect("node_id vector file should exist");
+        serde_json::from_slice(&bytes).expect("node_id vector file should parse")
+    }
+
+    fn decode_hex(hex: &str) -> Vec<u8> {
+        assert_eq!(hex.len() % 2, 0, "hex input must have even length");
+
+        hex.as_bytes()
+            .chunks_exact(2)
+            .map(|chunk| {
+                let text = std::str::from_utf8(chunk).expect("hex input must be utf-8");
+                u8::from_str_radix(text, 16).expect("hex input must be valid")
+            })
+            .collect()
+    }
+
+    fn encode_hex(bytes: &[u8]) -> String {
+        let mut encoded = String::with_capacity(bytes.len() * 2);
+        for byte in bytes {
+            use std::fmt::Write as _;
+            write!(&mut encoded, "{byte:02x}").expect("hex encoding should succeed");
+        }
+
+        encoded
     }
 }

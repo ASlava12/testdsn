@@ -13,11 +13,13 @@ A Codex-oriented handoff bundle containing:
 ## Recommended first Codex task
 
 Use the contents of `prompts/codex-first-task.md` as the first task.
+It assumes the repository is already past Milestone 0 and should not be
+restarted from the skeleton stage.
 
 ## Recommended workflow
 
-1. Run milestone 0 / skeleton creation.
-2. Run milestone 1.
-3. Review output and spec drift.
-4. Run milestone 2.
-5. Continue milestone-by-milestone.
+1. Confirm the repository baseline from `IMPLEMENT.md` before changing code.
+2. Sync status docs and `docs/OPEN_QUESTIONS.md` to the current code baseline.
+3. Finish missing Milestone 1 artifacts and vectors.
+4. Validate or complete the existing Milestone 2 handshake surface.
+5. Start Milestone 3 only after the Milestone 1-2 baseline is aligned.
