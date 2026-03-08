@@ -13,7 +13,7 @@ pub mod session;
 pub mod transport;
 pub mod wire;
 
-pub const REPOSITORY_STAGE: &str = "milestone-0-skeleton";
+pub const REPOSITORY_STAGE: &str = "milestone-1-foundations";
 
 #[cfg(test)]
 mod tests {
@@ -21,6 +21,6 @@ mod tests {
 
     #[test]
     fn reports_repository_stage() {
-        assert_eq!(REPOSITORY_STAGE, "milestone-0-skeleton");
+        assert_eq!(REPOSITORY_STAGE, "milestone-1-foundations");
     }
 }
