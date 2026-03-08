@@ -1,28 +1,26 @@
 Read `AGENTS.md`, `IMPLEMENT.md`, `spec/records.md`, `spec/wire-protocol.md`, and `spec/mvp-scope.md`.
 
 Goal:
-Finish or validate the existing Milestone 1 baseline from `IMPLEMENT.md`
-without rewriting work that is already in the repository.
+Audit or repair the closed Milestone 1 baseline from `IMPLEMENT.md` without
+rewriting work that is already in the repository.
 
 Current repository baseline:
-- `NodeId` and `AppId` derivation already exist.
-- record structs already exist.
-- frame header and message catalog already exist.
-- the remaining work in this milestone should be gap-filling, vectors, tests,
-  and spec-conformance fixes.
+- `NodeId` and `AppId` derivation already exist and are covered by vectors.
+- record structs already exist and are covered by deterministic record fixtures.
+- frame header and message catalog already exist, including a frame header vector.
+- Milestone 2 is also closed; next new feature work starts at Milestone 3.
 
 Requirements:
 - verify the current `identity`, `records`, and `wire` modules against spec;
-- add only the missing Milestone 1 artifacts such as fixtures, vectors, or tests;
+- touch Milestone 1 only for regression fixes, fixture maintenance, or spec-conformance fixes;
 - keep network I/O out of scope;
 - do not refactor stable code paths without a concrete bug or spec mismatch.
 
 Validation:
-- `cargo fmt --all --check`
-- `cargo clippy --workspace --all-targets --all-features -- -D warnings`
-- `cargo test --workspace`
+- run the applicable commands from `VALIDATION.md`;
+- prefer the focused Milestone 1 regression runs when the change is limited to this baseline.
 
 Report:
 - changed files
-- tests added
+- tests or vectors updated
 - remaining underspecified areas

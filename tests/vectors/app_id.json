@@ -1,0 +1,9 @@
+[
+  {
+    "node_public_key_hex": "6e6f64652d7075626c69632d6b6579",
+    "node_id_hex": "dfdcb969257f41c0cde47ccd09b66ed67e6bac90b878460cd7c40a8d6a40542b",
+    "app_namespace": "chat",
+    "app_name": "terminal",
+    "app_id_hex": "40212275072d4c460a687522387b92bbdec0418b43748f04b5451e8264a7cbae"
+  }
+]

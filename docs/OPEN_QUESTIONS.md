@@ -25,7 +25,7 @@ The wire format is therefore:
 For byte arrays inside JSON bodies, MVP uses arrays of `u8` values, not hex strings.
 
 Rationale:
-- this matches the current handshake vectors;
+- this matches the current identity, record, wire, and handshake vectors;
 - it is the smallest conservative choice;
 - it avoids inventing a second canonical body codec before Milestone 3+.
 
@@ -214,16 +214,17 @@ Rules:
 For current work, treat the repository stage as:
 
 - Milestone 0 complete;
-- Milestone 1 foundations implemented;
-- Milestone 2 handshake surface implemented;
-- Milestone 3+ not started beyond placeholders.
+- Milestone 1 foundations implemented, vectorized, and validated;
+- Milestone 2 handshake surface implemented, vectorized, validated, and considered closed;
+- Milestone 3+ not started beyond placeholders and stage-boundary smoke tests.
 
 That means:
 
 - do not restart from Milestone 0;
 - do not re-implement Milestone 1 or 2 from scratch;
-- finish missing artifacts, vectors, and validation for the existing
-  Milestone 1-2 baseline before starting Milestone 3.
+- touch Milestones 1-2 only for regression fixes, spec mismatches,
+  vector maintenance, or validation maintenance;
+- Milestone 2 is considered closed; next work starts at Milestone 3.
 
 ### 9. Final encoding of `supported_kex` and `supported_signatures`
 

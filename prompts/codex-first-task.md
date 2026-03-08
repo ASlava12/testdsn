@@ -2,15 +2,16 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `VALIDATION.md`, `docs/OPEN_QUESTIONS.md`,
 and the relevant files under `spec/`.
 
 Goal:
-Synchronize the repository's status documents with the actual code baseline and
-finish any missing Milestone 1 / Milestone 2 artifacts without advancing into
-Milestone 3.
+Start Milestone 3 from the current closed Milestone 1-2 baseline without
+reopening finished work.
 
 Current repository baseline:
 - Milestone 0 is already complete.
-- Milestone 1 foundations already exist in `overlay-core` (`identity`, `records`, `wire`).
-- Milestone 2 crypto and handshake surface already exist in `overlay-core`
-  (`crypto`, `session::handshake`).
+- Milestone 1 foundations are already implemented, vectorized, and validated in
+  `overlay-core` (`identity`, `records`, `wire`).
+- Milestone 2 crypto and handshake surface are already implemented, vectorized,
+  and validated in `overlay-core` (`crypto`, `session::handshake`).
+- Milestone 2 is considered closed; next work starts at Milestone 3.
 - Milestone 3 and later are still placeholders.
 
 Constraints:
@@ -20,10 +21,11 @@ Constraints:
 - keep changes minimal and local.
 
 Tasks:
-- sync `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, and prompt files to the current stage;
-- lock down the agreed conservative MVP decisions in `docs/OPEN_QUESTIONS.md`;
-- fill missing Milestone 1 fixtures such as `tests/vectors/node_id.json`;
-- validate or conservatively complete the existing Milestone 2 handshake surface.
+- define the `Transport` trait;
+- add placeholder transport adapters for TCP, QUIC, WebSocket/HTTPS tunnel, and relay transport;
+- implement the session state machine surface from `spec/state-machines.md`;
+- add keepalive/timeout scaffolding and structured session events;
+- stop before Milestone 4 peer/bootstrap logic.
 
 Validation:
 - run the applicable commands from `VALIDATION.md`;

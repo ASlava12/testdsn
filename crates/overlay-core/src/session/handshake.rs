@@ -557,6 +557,58 @@ mod tests {
     }
 
     #[test]
+    fn rejects_client_hello_with_mismatched_node_id() {
+        let config = HandshakeConfig::default();
+        let client_signing_key = Ed25519SigningKey::from_seed(CLIENT_SIGNING_SEED);
+        let client_ephemeral_secret = X25519StaticSecret::from_bytes(CLIENT_EPHEMERAL_SECRET);
+        let (_, mut client_hello) =
+            ClientHandshake::start(config, client_signing_key, client_ephemeral_secret);
+        client_hello.client_node_id = derive_node_id(b"mismatched-client-signing-key");
+
+        let error = match ServerHandshake::accept(
+            config,
+            Ed25519SigningKey::from_seed(SERVER_SIGNING_SEED),
+            X25519StaticSecret::from_bytes(SERVER_EPHEMERAL_SECRET),
+            &client_hello,
+        ) {
+            Ok(_) => panic!("server must reject client hellos with mismatched node ids"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            HandshakeError::NodeIdMismatch { role: "client" }
+        ));
+    }
+
+    #[test]
+    fn rejects_server_hello_with_mismatched_node_id() {
+        let config = HandshakeConfig::default();
+        let (client_handshake, client_hello) = ClientHandshake::start(
+            config,
+            Ed25519SigningKey::from_seed(CLIENT_SIGNING_SEED),
+            X25519StaticSecret::from_bytes(CLIENT_EPHEMERAL_SECRET),
+        );
+        let (_, mut server_hello) = ServerHandshake::accept(
+            config,
+            Ed25519SigningKey::from_seed(SERVER_SIGNING_SEED),
+            X25519StaticSecret::from_bytes(SERVER_EPHEMERAL_SECRET),
+            &client_hello,
+        )
+        .expect("server hello should build");
+        server_hello.server_node_id = derive_node_id(b"mismatched-server-signing-key");
+
+        let error = client_handshake
+            .handle_server_hello(&server_hello)
+            .expect_err("client must reject server hellos with mismatched node ids");
+
+        assert!(matches!(
+            error,
+            HandshakeError::NodeIdMismatch { role: "server" }
+        ));
+    }
+
+    #[test]
     fn rejects_invalid_server_signature() {
         let config = HandshakeConfig::default();
         let (client_handshake, client_hello) = ClientHandshake::start(

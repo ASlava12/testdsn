@@ -59,3 +59,21 @@ impl X25519SharedSecret {
         &self.0
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{X25519PublicKey, X25519StaticSecret};
+    use crate::error::CryptoError;
+
+    #[test]
+    fn rejects_all_zero_shared_secret() {
+        let secret = X25519StaticSecret::from_bytes([7_u8; 32]);
+        let peer_public_key = X25519PublicKey::from_bytes([0_u8; 32]);
+
+        let error = secret
+            .diffie_hellman(&peer_public_key)
+            .expect_err("all-zero shared secret must be rejected");
+
+        assert_eq!(error, CryptoError::ReplayUnsafeSharedSecret);
+    }
+}

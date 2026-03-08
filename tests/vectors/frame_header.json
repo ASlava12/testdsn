@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "message_type_id": 11,
+  "flags": 4611,
+  "body_len": 1024,
+  "correlation_id": 72623859790382856,
+  "encoded_hex": "01000b1203000004000102030405060708"
+}

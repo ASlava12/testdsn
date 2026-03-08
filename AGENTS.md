@@ -46,6 +46,16 @@ Do not add by default:
 - store-and-forward messaging
 - distributed consensus not required by the specs
 
+### Current repository baseline
+
+- Milestone 0 bootstrap is complete.
+- Milestone 1 identities, records, and wire foundations are implemented, vectorized, and validated.
+- Milestone 2 crypto wrappers and handshake surface are implemented, vectorized, and validated.
+- Milestone 2 is considered closed; next work starts at Milestone 3.
+- Milestone 3 and later remain placeholder modules or smoke-test stubs unless the task explicitly begins that milestone.
+
+For normal work, touch Milestones 1-2 only for regression fixes, spec mismatches, vector maintenance, or validation maintenance.
+
 ## 3. Change policy
 
 Before large edits:

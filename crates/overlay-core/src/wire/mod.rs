@@ -188,6 +188,10 @@ define_message_markers!(
 
 #[cfg(test)]
 mod tests {
+    use std::{fs, path::PathBuf};
+
+    use serde::Deserialize;
+
     use super::{FrameHeader, MessageType};
 
     #[test]
@@ -213,5 +217,63 @@ mod tests {
             decoded.message_type().expect("message type should decode"),
             MessageType::LookupNode
         );
+    }
+
+    #[test]
+    fn frame_header_vector_matches_fixture() {
+        let vector = read_frame_header_vector();
+        let message_type = MessageType::try_from(vector.message_type_id)
+            .expect("frame header vector must use a known message type");
+        let header = FrameHeader::new(
+            vector.version,
+            message_type,
+            vector.flags,
+            vector.body_len,
+            vector.correlation_id,
+        )
+        .expect("frame header vector must be valid");
+
+        let encoded = header.encode().expect("frame header should encode");
+        assert_eq!(encode_hex(&encoded), vector.encoded_hex);
+        assert_eq!(header.msg_type, vector.message_type_id);
+        assert_eq!(
+            header.message_type().expect("message type should decode"),
+            message_type
+        );
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct FrameHeaderVector {
+        version: u8,
+        message_type_id: u16,
+        flags: u16,
+        body_len: u32,
+        correlation_id: u64,
+        encoded_hex: String,
+    }
+
+    fn frame_header_vector_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("tests")
+            .join("vectors")
+            .join("frame_header.json")
+    }
+
+    fn read_frame_header_vector() -> FrameHeaderVector {
+        let bytes =
+            fs::read(frame_header_vector_path()).expect("frame header vector file should exist");
+        serde_json::from_slice(&bytes).expect("frame header vector file should parse")
+    }
+
+    fn encode_hex(bytes: &[u8]) -> String {
+        let mut encoded = String::with_capacity(bytes.len() * 2);
+        for byte in bytes {
+            use std::fmt::Write as _;
+            write!(&mut encoded, "{byte:02x}").expect("hex encoding should succeed");
+        }
+
+        encoded
     }
 }

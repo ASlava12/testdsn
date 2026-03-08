@@ -212,10 +212,49 @@ mod tests {
         }
     }
 
+    #[test]
+    fn app_id_vectors_match_fixture() {
+        let vectors = read_app_id_vectors();
+        assert!(
+            !vectors.is_empty(),
+            "app_id vector fixture must not be empty"
+        );
+
+        for vector in vectors {
+            let public_key = decode_hex(&vector.node_public_key_hex);
+            let actual_node_id = encode_hex(derive_node_id(&public_key).as_bytes());
+            assert_eq!(
+                actual_node_id, vector.node_id_hex,
+                "node_public_key_hex={}",
+                vector.node_public_key_hex
+            );
+
+            let node_id = NodeId::from_slice(&decode_hex(&vector.node_id_hex))
+                .expect("app_id vector must contain 32-byte node ids");
+            let actual_app_id = encode_hex(
+                derive_app_id(&node_id, &vector.app_namespace, &vector.app_name).as_bytes(),
+            );
+            assert_eq!(
+                actual_app_id, vector.app_id_hex,
+                "node_id_hex={}, namespace={}, name={}",
+                vector.node_id_hex, vector.app_namespace, vector.app_name
+            );
+        }
+    }
+
     #[derive(Debug, Deserialize)]
     struct NodeIdVector {
         pubkey_hex: String,
         node_id_hex: String,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct AppIdVector {
+        node_public_key_hex: String,
+        node_id_hex: String,
+        app_namespace: String,
+        app_name: String,
+        app_id_hex: String,
     }
 
     fn node_id_vector_path() -> PathBuf {
@@ -227,9 +266,23 @@ mod tests {
             .join("node_id.json")
     }
 
+    fn app_id_vector_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("tests")
+            .join("vectors")
+            .join("app_id.json")
+    }
+
     fn read_node_id_vectors() -> Vec<NodeIdVector> {
         let bytes = fs::read(node_id_vector_path()).expect("node_id vector file should exist");
         serde_json::from_slice(&bytes).expect("node_id vector file should parse")
+    }
+
+    fn read_app_id_vectors() -> Vec<AppIdVector> {
+        let bytes = fs::read(app_id_vector_path()).expect("app_id vector file should exist");
+        serde_json::from_slice(&bytes).expect("app_id vector file should parse")
     }
 
     fn decode_hex(hex: &str) -> Vec<u8> {

@@ -4,27 +4,30 @@ This file is the execution plan for Codex.
 
 ## Current repository stage
 
-The repository is no longer at Milestone 0.
+The repository is past Milestone 2.
 
 - Milestone 0 bootstrap is complete.
-- Milestone 1 foundations are already implemented in `crates/overlay-core/src/identity.rs`,
-  `crates/overlay-core/src/records/mod.rs`, and `crates/overlay-core/src/wire/mod.rs`.
-- Milestone 2 crypto wrappers and handshake surface are already implemented in
-  `crates/overlay-core/src/crypto/*` and `crates/overlay-core/src/session/handshake.rs`.
-- Milestone 3 and later are still placeholder modules and placeholder integration tests.
+- Milestone 1 foundations are implemented, vectorized, and validated in
+  `crates/overlay-core/src/identity.rs`, `crates/overlay-core/src/records/mod.rs`,
+  and `crates/overlay-core/src/wire/mod.rs`.
+- Milestone 2 crypto wrappers and handshake surface are implemented, vectorized,
+  and validated in `crates/overlay-core/src/crypto/*` and
+  `crates/overlay-core/src/session/handshake.rs`.
+- Milestone 2 is considered closed; next work starts at Milestone 3.
+- Milestone 3 and later are still placeholder modules and stage-boundary smoke tests.
 
-Treat Milestones 0-2 as an existing baseline. Prefer doc synchronization,
-missing artifact completion, and validation over repeating or refactoring the
+Treat Milestones 0-2 as a closed baseline. Prefer regression fixes,
+spec-conformance fixes, and validation maintenance there over refactoring the
 already present work.
 
 ## Recommended next Codex task
 
-Before starting any Milestone 3 work:
+Start Milestone 3 work:
 
-1. sync repository status documents to the actual code baseline;
-2. lock down the agreed conservative MVP decisions in `docs/OPEN_QUESTIONS.md`;
-3. finish any missing Milestone 1 artifacts, especially test vectors;
-4. validate or conservatively complete the existing Milestone 2 handshake surface.
+1. define the `Transport` trait and placeholder transport adapters;
+2. implement the session state machine surface from `spec/state-machines.md`;
+3. add keepalive/timeout scaffolding and structured session events;
+4. keep Milestone 4+ behavior out of scope until Milestone 3 is stable.
 
 ## Milestone 0 — repository bootstrap
 
@@ -49,8 +52,8 @@ Create a clean Rust workspace and all spec files, with no protocol logic yet.
 
 ## Milestone 1 — identities, records, and wire base
 
-Status: implemented baseline exists. Use this milestone for gap-filling,
-artifact completion, or spec-conformance fixes only.
+Status: closed in this repository. Use this milestone only for regression
+fixes, fixture maintenance, or spec-conformance fixes.
 
 ### Goal
 Implement the immutable foundations that other layers depend on.
@@ -73,16 +76,16 @@ Implement the immutable foundations that other layers depend on.
 - Do not invent additional record fields.
 
 ### Done when
-- unit tests exist for `node_id` / `app_id`
-- record structs compile and serialize deterministically
-- frame header encode/decode round-trips
+- unit tests and vectors exist for `node_id` / `app_id`
+- record structs compile and serialize deterministically with record vectors
+- frame header encode/decode round-trips and matches the vector fixture
 
 ---
 
 ## Milestone 2 — crypto wrappers and handshake
 
-Status: implemented baseline exists. Treat this as validate-and-finish work,
-not a greenfield handshake implementation task.
+Status: closed in this repository. Treat this milestone as regression-fix,
+fixture-maintenance, or spec-conformance work only.
 
 ### Goal
 Implement a minimal secure handshake for session establishment.
@@ -110,11 +113,13 @@ Implement a minimal secure handshake for session establishment.
 ### Done when
 - handshake unit tests pass
 - transcript test vectors exist
-- invalid transcript cases fail cleanly
+- invalid transcript cases fail cleanly, including identity-binding and replay-unsafe rejection
 
 ---
 
 ## Milestone 3 — transport abstraction and session manager
+
+Status: next active milestone.
 
 ### Goal
 Create a stable session layer independent from specific transports.
