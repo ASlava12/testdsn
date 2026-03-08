@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "node_id_hex": "TODO",
+  "epoch": 123,
+  "expires_at_unix_s": 9999999999,
+  "sequence": 1,
+  "transport_classes": ["tcp", "relay"],
+  "reachability_mode": "hybrid"
+}

@@ -1,0 +1,2 @@
+# Codex project-local configuration
+project_root_markers = [".git"]
