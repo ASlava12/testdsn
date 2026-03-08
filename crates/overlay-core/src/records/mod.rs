@@ -1,5 +1,3 @@
-pub mod node;
-pub mod presence;
-pub mod service;
-pub mod relay;
-pub mod intro;
+//! Placeholder for repository record types and validation scaffolding.
+// TODO(spec): Finalize canonical record encoding after
+// `docs/OPEN_QUESTIONS.md` items 1 and 7 are resolved.

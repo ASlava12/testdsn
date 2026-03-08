@@ -1,3 +1,1 @@
-pub mod placement;
-pub mod publish;
-pub mod lookup;
+//! Placeholder for presence publish and exact `node_id` lookup flows.

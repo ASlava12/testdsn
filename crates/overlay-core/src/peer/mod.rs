@@ -1,3 +1,1 @@
-pub mod state;
-pub mod manager;
-pub mod diversity;
+//! Placeholder for peer management and bounded neighbor policies.

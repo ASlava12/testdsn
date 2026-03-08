@@ -1,9 +1,7 @@
-# Overlay Codex Handoff
+# Overlay
 
-This repository is prepared for Codex-driven implementation of a censorship-resistant overlay network.
+Specification-first Rust workspace for a censorship-resistant overlay network.
 
-Start with:
-- `AGENTS.md`
-- `IMPLEMENT.md`
-- `VALIDATION.md`
-- `spec/*.md`
+The repository is currently at Milestone 0. The workspace layout matches
+`docs/REPO_LAYOUT.md`, and the Rust crates contain compileable placeholders
+only. Protocol logic starts in later milestones.

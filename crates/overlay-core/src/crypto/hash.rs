@@ -1,3 +1,0 @@
-pub fn blake3_256(data: &[u8]) -> [u8; 32] {
-    *blake3::hash(data).as_bytes()
-}

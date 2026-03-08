@@ -1,5 +1,1 @@
-pub mod traits;
-pub mod tcp;
-pub mod quic;
-pub mod ws;
-pub mod relay;
+//! Placeholder for transport abstractions and adapters.

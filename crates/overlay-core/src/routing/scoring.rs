@@ -1,1 +1,0 @@
-// TODO: path score calculation.

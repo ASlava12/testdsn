@@ -1,1 +1,1 @@
-pub mod events;
+//! Placeholder for metrics and structured logging surfaces.
