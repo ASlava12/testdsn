@@ -4,7 +4,8 @@ This file is the execution plan for Codex.
 
 ## Current repository stage
 
-The repository is past Milestone 2.
+The repository has a closed Milestone 1-2 baseline plus a minimal Milestone 3
+transport/session skeleton.
 
 - Milestone 0 bootstrap is complete.
 - Milestone 1 foundations are implemented, vectorized, and validated in
@@ -13,21 +14,28 @@ The repository is past Milestone 2.
 - Milestone 2 crypto wrappers and handshake surface are implemented, vectorized,
   and validated in `crates/overlay-core/src/crypto/*` and
   `crates/overlay-core/src/session/handshake.rs`.
-- Milestone 2 is considered closed; next work starts at Milestone 3.
-- Milestone 3 and later are still placeholder modules and stage-boundary smoke tests.
+- Milestone 2 is considered closed.
+- Milestone 3 transport abstraction and session-manager work has started at a
+  minimal compileable skeleton level in `crates/overlay-core/src/transport/mod.rs`
+  and `crates/overlay-core/src/session/manager.rs`, including explicit polled
+  keepalive/timeout scaffolding, handshake-bound session context, and a queued
+  I/O-action surface for future session runners, plus explicit degraded-session
+  recovery back to `established`.
+- Milestone 4 and later are still placeholder modules and stage-boundary smoke tests.
 
 Treat Milestones 0-2 as a closed baseline. Prefer regression fixes,
-spec-conformance fixes, and validation maintenance there over refactoring the
-already present work.
+spec-conformance fixes, vector maintenance, and validation maintenance there
+over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Start Milestone 3 work:
+Before more Milestone 3 feature work, align the repository baseline:
 
-1. define the `Transport` trait and placeholder transport adapters;
-2. implement the session state machine surface from `spec/state-machines.md`;
-3. add keepalive/timeout scaffolding and structured session events;
-4. keep Milestone 4+ behavior out of scope until Milestone 3 is stable.
+1. sync status docs and prompts to the current repository state;
+2. lock down conservative MVP defaults in `docs/OPEN_QUESTIONS.md`;
+3. finish any remaining Milestone 1 fixture or validation gaps;
+4. validate or complete remaining Milestone 2 handshake-surface gaps;
+5. only then resume Milestone 3 transport/session work without adding Milestone 4+ behavior.
 
 ## Milestone 0 — repository bootstrap
 
@@ -119,7 +127,9 @@ Implement a minimal secure handshake for session establishment.
 
 ## Milestone 3 — transport abstraction and session manager
 
-Status: next active milestone.
+Status: in progress. A minimal compileable skeleton exists, but baseline
+docs/vectors/validation should stay aligned before additional Milestone 3
+feature work lands.
 
 ### Goal
 Create a stable session layer independent from specific transports.
@@ -142,7 +152,7 @@ Create a stable session layer independent from specific transports.
 ### Done when
 - session manager compiles
 - session state machine matches `spec/state-machines.md`
-- session tests cover open/close/error transitions
+- session tests cover open/close/error/degraded/recovery transitions and timer scaffolding
 
 ---
 

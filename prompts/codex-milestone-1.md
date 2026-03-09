@@ -8,7 +8,7 @@ Current repository baseline:
 - `NodeId` and `AppId` derivation already exist and are covered by vectors.
 - record structs already exist and are covered by deterministic record fixtures.
 - frame header and message catalog already exist, including a frame header vector.
-- Milestone 2 is also closed; next new feature work starts at Milestone 3.
+- Milestone 2 is also closed, and current new feature work is within Milestone 3.
 
 Requirements:
 - verify the current `identity`, `records`, and `wire` modules against spec;

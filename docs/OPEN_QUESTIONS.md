@@ -1,8 +1,8 @@
 # Open Questions
 
 This file exists so Codex does not silently invent protocol details.
-All currently known MVP ambiguities affecting Milestones 1 and 2 are resolved
-below and should be reused as the conservative defaults.
+All currently known MVP ambiguities affecting the current Milestone 1-3
+baseline are resolved below and should be reused as the conservative defaults.
 
 ## Resolved conservative choices for MVP
 
@@ -216,7 +216,8 @@ For current work, treat the repository stage as:
 - Milestone 0 complete;
 - Milestone 1 foundations implemented, vectorized, and validated;
 - Milestone 2 handshake surface implemented, vectorized, validated, and considered closed;
-- Milestone 3+ not started beyond placeholders and stage-boundary smoke tests.
+- Milestone 3 transport/session work started at a minimal compileable skeleton level;
+- Milestone 4+ not started beyond placeholders and stage-boundary smoke tests.
 
 That means:
 
@@ -224,7 +225,10 @@ That means:
 - do not re-implement Milestone 1 or 2 from scratch;
 - touch Milestones 1-2 only for regression fixes, spec mismatches,
   vector maintenance, or validation maintenance;
-- Milestone 2 is considered closed; next work starts at Milestone 3.
+- sync status docs and prompts to this baseline before extending protocol logic;
+- lock missing conservative defaults here before inventing new wire or session behavior;
+- keep Milestone 3 scoped to transport/session skeleton work unless the task explicitly expands it;
+- Milestone 4+ remains out of scope for current work.
 
 ### 9. Final encoding of `supported_kex` and `supported_signatures`
 
@@ -259,7 +263,68 @@ Rules:
 - unknown values must be rejected in signed protocol records;
 - do not invent additional auth or intro scope modes until later specs land.
 
-### 11. Final encoding of `PresenceRecord.reachability_mode` and `intro_policy`
+### 11. Conservative lookup scope and freshness defaults for MVP
+
+For MVP lookup behavior, keep the scope exact and freshness rules strict.
+
+Rules:
+- `LookupNode` operates on a full `node_id` only;
+- no prefix scan, range scan, wildcard lookup, or open enumeration;
+- expired records must not be returned as fresh lookup results;
+- when multiple candidate `PresenceRecord` values exist, higher epoch wins, then
+  higher sequence, and equal epoch plus sequence must be byte-identical to be
+  treated as the same record.
+
+### 12. Conservative direct-first reachability policy for MVP
+
+For MVP session establishment and service reachability:
+
+- prefer direct transport attempts first;
+- use relay only as fallback when direct reachability is unavailable or fails;
+- do not make any single relay mandatory for the connection policy;
+- keep this as a local policy default until the Milestone 6 relay flow is
+  implemented.
+
+### 13. Conservative keepalive and timeout scaffolding for the Milestone 3 session skeleton
+
+For the current Milestone 3 session skeleton, use explicit polled timers only.
+
+There is no background scheduler yet.
+The session layer evaluates deadlines only when `SessionManager::poll_timers(now_ms)`
+is called.
+
+Default local timing values:
+- `open_timeout_ms = 10_000`
+- `keepalive_interval_ms = 15_000`
+- `idle_timeout_ms = 45_000`
+- `degraded_timeout_ms = 30_000`
+- `close_timeout_ms = 5_000`
+
+Rules:
+- `idle_timeout_ms` must be strictly greater than `keepalive_interval_ms`;
+- entering `opening` schedules only the open deadline;
+- entering `established` schedules keepalive and idle deadlines;
+- entering `degraded` schedules keepalive and degraded deadlines;
+- degraded recovery is explicit only; local activity alone does not auto-promote a
+  degraded session back to `established`;
+- `mark_recovered(...)` is the conservative local transition back to
+  `established` and reschedules established keepalive/idle deadlines;
+- entering `closing` schedules only the close deadline;
+- `open`, `degraded`, and `close` timeout expiry closes the session;
+- `idle` timeout expiry degrades an established session before closing it later;
+- keepalive expiry emits a structured event only and does not send network traffic
+  by itself in the current skeleton;
+- observed local activity refreshes keepalive and liveness deadlines but does not
+  invent new routing or transport behavior.
+
+Handshake binding rule:
+- when `mark_established_with_handshake` is used, the session manager stores the
+  peer `node_id`, transcript hash, and derived session keys as local session
+  context;
+- structured session events may reference the peer `node_id`, but must not expose
+  session keys.
+
+### 14. Final encoding of `PresenceRecord.reachability_mode` and `intro_policy`
 
 For MVP, these fields are also locked to lowercase ASCII string enums in
 canonical JSON.
@@ -275,6 +340,26 @@ Rules:
 - unknown values must be rejected in signed protocol records;
 - do not invent additional reachability or intro policy modes until later
   specs land.
+
+### 15. Conservative I/O action surface for the Milestone 3 session skeleton
+
+The session layer still does not perform real network I/O directly.
+Instead, it may queue local I/O actions that a future session runner can consume
+through `SessionManager::drain_io_actions()`.
+
+Current action kinds:
+- `begin_handshake`
+- `send_keepalive`
+- `start_close`
+- `abort_transport`
+
+Rules:
+- `begin_open` queues `begin_handshake` for the selected placeholder transport;
+- keepalive timer expiry queues `send_keepalive`;
+- `begin_close` queues `start_close` as the conservative graceful-close attempt;
+- failures and timeout-driven closes queue `abort_transport`;
+- queued actions may include transport binding and peer `node_id`;
+- queued actions must not expose derived session keys.
 
 ## Rule
 

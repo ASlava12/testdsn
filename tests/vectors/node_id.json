@@ -1,5 +1,9 @@
 [
   {
+    "pubkey_hex": "6e6f64652d7075626c69632d6b6579",
+    "node_id_hex": "dfdcb969257f41c0cde47ccd09b66ed67e6bac90b878460cd7c40a8d6a40542b"
+  },
+  {
     "pubkey_hex": "00112233",
     "node_id_hex": "903be2a18ceb88cbf94ea0dfcfa8ec2d4e19dab0a30347d9277bb9f8b4425ba8"
   }
