@@ -3,7 +3,10 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    error::{RecordEncodingError, RecordValidationError},
+    crypto::sign::{
+        Ed25519PublicKey, Ed25519Signature, ED25519_PUBLIC_KEY_LEN, ED25519_SIGNATURE_LEN,
+    },
+    error::{PresenceVerificationError, RecordEncodingError, RecordValidationError},
     identity::{derive_node_id, AppId, NodeId},
 };
 
@@ -48,6 +51,17 @@ impl NodeRecord {
         })
         .map_err(Into::into)
     }
+
+    pub fn ed25519_public_key(&self) -> Result<Ed25519PublicKey, PresenceVerificationError> {
+        let actual = self.node_public_key.len();
+        let bytes = self.node_public_key.as_slice().try_into().map_err(|_| {
+            PresenceVerificationError::InvalidPublicKeyLength {
+                expected: ED25519_PUBLIC_KEY_LEN,
+                actual,
+            }
+        })?;
+        Ok(Ed25519PublicKey::from_bytes(bytes))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,6 +104,67 @@ impl PresenceRecord {
             capability_requirements: &capability_requirements,
         })
         .map_err(Into::into)
+    }
+
+    pub fn verify_with_public_key(
+        self,
+        signer_public_key: &Ed25519PublicKey,
+    ) -> Result<VerifiedPresenceRecord, PresenceVerificationError> {
+        let signer_node_id = derive_node_id(signer_public_key.as_bytes());
+        if self.node_id != signer_node_id {
+            return Err(PresenceVerificationError::SignerNodeIdMismatch {
+                record_node_id: self.node_id,
+                signer_node_id,
+            });
+        }
+
+        let body = self.canonical_body_bytes()?;
+        signer_public_key.verify(&body, &self.ed25519_signature()?)?;
+        Ok(VerifiedPresenceRecord(self))
+    }
+
+    pub fn verify_with_trusted_node_record(
+        self,
+        node_record: &NodeRecord,
+    ) -> Result<VerifiedPresenceRecord, PresenceVerificationError> {
+        node_record.validate_node_id()?;
+        self.verify_with_public_key(&node_record.ed25519_public_key()?)
+    }
+
+    fn ed25519_signature(&self) -> Result<Ed25519Signature, PresenceVerificationError> {
+        let actual = self.signature.len();
+        let bytes = self.signature.as_slice().try_into().map_err(|_| {
+            PresenceVerificationError::InvalidSignatureLength {
+                expected: ED25519_SIGNATURE_LEN,
+                actual,
+            }
+        })?;
+        Ok(Ed25519Signature::from_bytes(bytes))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedPresenceRecord(PresenceRecord);
+
+impl VerifiedPresenceRecord {
+    pub fn into_inner(self) -> PresenceRecord {
+        self.0
+    }
+
+    pub fn as_ref(&self) -> &PresenceRecord {
+        &self.0
+    }
+}
+
+impl AsRef<PresenceRecord> for VerifiedPresenceRecord {
+    fn as_ref(&self) -> &PresenceRecord {
+        self.as_ref()
+    }
+}
+
+impl From<VerifiedPresenceRecord> for PresenceRecord {
+    fn from(record: VerifiedPresenceRecord) -> Self {
+        record.into_inner()
     }
 }
 
@@ -414,7 +489,8 @@ mod tests {
 
     use super::{FreshRecord, IntroTicket, NodeRecord, PresenceRecord, RelayHint, ServiceRecord};
     use crate::{
-        error::{RecordEncodingError, RecordValidationError},
+        crypto::sign::Ed25519SigningKey,
+        error::{PresenceVerificationError, RecordEncodingError, RecordValidationError},
         identity::{derive_app_id, derive_node_id, AppId, NodeId},
     };
 
@@ -460,6 +536,151 @@ mod tests {
 
         assert!(record.is_fresh(99));
         assert!(!record.is_fresh(100));
+    }
+
+    #[test]
+    fn presence_record_verifies_with_matching_public_key() {
+        let signing_key = Ed25519SigningKey::from_seed([7_u8; 32]);
+        let public_key = signing_key.public_key();
+        let mut record = PresenceRecord {
+            version: 1,
+            node_id: derive_node_id(public_key.as_bytes()),
+            epoch: 7,
+            expires_at_unix_s: 100,
+            sequence: 2,
+            transport_classes: vec!["tcp".to_string()],
+            reachability_mode: "direct".to_string(),
+            locator_commitment: vec![1, 2, 3],
+            encrypted_contact_blobs: vec![vec![4, 5, 6]],
+            relay_hint_refs: vec![vec![7, 8, 9]],
+            intro_policy: "allow".to_string(),
+            capability_requirements: vec!["bridge".to_string()],
+            signature: Vec::new(),
+        };
+        let body = record
+            .canonical_body_bytes()
+            .expect("presence body should serialize");
+        record.signature = signing_key.sign(&body).as_bytes().to_vec();
+
+        let verified = record
+            .clone()
+            .verify_with_public_key(&public_key)
+            .expect("presence signature should verify");
+
+        assert_eq!(verified.into_inner(), record);
+    }
+
+    #[test]
+    fn presence_record_rejects_mismatched_signer_public_key() {
+        let signing_key = Ed25519SigningKey::from_seed([7_u8; 32]);
+        let wrong_public_key = Ed25519SigningKey::from_seed([8_u8; 32]).public_key();
+        let mut record = PresenceRecord {
+            version: 1,
+            node_id: derive_node_id(signing_key.public_key().as_bytes()),
+            epoch: 7,
+            expires_at_unix_s: 100,
+            sequence: 2,
+            transport_classes: vec!["tcp".to_string()],
+            reachability_mode: "direct".to_string(),
+            locator_commitment: vec![1, 2, 3],
+            encrypted_contact_blobs: vec![vec![4, 5, 6]],
+            relay_hint_refs: vec![vec![7, 8, 9]],
+            intro_policy: "allow".to_string(),
+            capability_requirements: vec!["bridge".to_string()],
+            signature: Vec::new(),
+        };
+        let body = record
+            .canonical_body_bytes()
+            .expect("presence body should serialize");
+        record.signature = signing_key.sign(&body).as_bytes().to_vec();
+
+        let error = record
+            .verify_with_public_key(&wrong_public_key)
+            .expect_err("mismatched signer should be rejected");
+
+        assert!(matches!(
+            error,
+            PresenceVerificationError::SignerNodeIdMismatch {
+                record_node_id,
+                signer_node_id,
+            } if record_node_id == derive_node_id(signing_key.public_key().as_bytes())
+                && signer_node_id == derive_node_id(wrong_public_key.as_bytes())
+        ));
+    }
+
+    #[test]
+    fn presence_record_rejects_invalid_signature_length() {
+        let public_key = Ed25519SigningKey::from_seed([7_u8; 32]).public_key();
+        let record = PresenceRecord {
+            version: 1,
+            node_id: derive_node_id(public_key.as_bytes()),
+            epoch: 7,
+            expires_at_unix_s: 100,
+            sequence: 2,
+            transport_classes: vec!["tcp".to_string()],
+            reachability_mode: "direct".to_string(),
+            locator_commitment: vec![1, 2, 3],
+            encrypted_contact_blobs: vec![vec![4, 5, 6]],
+            relay_hint_refs: vec![vec![7, 8, 9]],
+            intro_policy: "allow".to_string(),
+            capability_requirements: vec!["bridge".to_string()],
+            signature: vec![1, 2, 3],
+        };
+
+        let error = record
+            .verify_with_public_key(&public_key)
+            .expect_err("invalid signature length should be rejected");
+        assert!(matches!(
+            error,
+            PresenceVerificationError::InvalidSignatureLength {
+                expected: 64,
+                actual: 3
+            }
+        ));
+    }
+
+    #[test]
+    fn presence_record_verifies_with_trusted_node_record() {
+        let signing_key = Ed25519SigningKey::from_seed([7_u8; 32]);
+        let public_key = signing_key.public_key();
+        let mut record = PresenceRecord {
+            version: 1,
+            node_id: derive_node_id(public_key.as_bytes()),
+            epoch: 7,
+            expires_at_unix_s: 100,
+            sequence: 2,
+            transport_classes: vec!["tcp".to_string()],
+            reachability_mode: "direct".to_string(),
+            locator_commitment: vec![1, 2, 3],
+            encrypted_contact_blobs: vec![vec![4, 5, 6]],
+            relay_hint_refs: vec![vec![7, 8, 9]],
+            intro_policy: "allow".to_string(),
+            capability_requirements: vec!["bridge".to_string()],
+            signature: Vec::new(),
+        };
+        let body = record
+            .canonical_body_bytes()
+            .expect("presence body should serialize");
+        record.signature = signing_key.sign(&body).as_bytes().to_vec();
+        let trusted_node_record = NodeRecord {
+            version: 1,
+            node_id: derive_node_id(public_key.as_bytes()),
+            node_public_key: public_key.as_bytes().to_vec(),
+            created_at_unix_s: 1,
+            flags: 0,
+            supported_transports: vec!["tcp".to_string()],
+            supported_kex: vec!["x25519".to_string()],
+            supported_signatures: vec!["ed25519".to_string()],
+            anti_sybil_proof: vec![],
+            signature: vec![1, 2, 3],
+        };
+
+        let verified = record
+            .clone()
+            .verify_with_trusted_node_record(&trusted_node_record)
+            .expect("trusted node record should supply signer public key");
+
+        assert_eq!(verified.into_inner(), record);
     }
 
     #[test]

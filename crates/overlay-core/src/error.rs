@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::identity::NodeId;
+
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum IdentityError {
     #[error("invalid identifier length: expected {expected} bytes, got {actual}")]
@@ -65,6 +67,27 @@ pub enum CryptoError {
     AeadEncrypt,
     #[error("ChaCha20-Poly1305 decryption failed")]
     AeadDecrypt,
+}
+
+#[derive(Debug, Error)]
+pub enum PresenceVerificationError {
+    #[error(
+        "trusted signer node_id {signer_node_id} does not match presence record node_id {record_node_id}"
+    )]
+    SignerNodeIdMismatch {
+        record_node_id: NodeId,
+        signer_node_id: NodeId,
+    },
+    #[error("presence record signature must be {expected} bytes, got {actual}")]
+    InvalidSignatureLength { expected: usize, actual: usize },
+    #[error("trusted signer public key must be {expected} bytes, got {actual}")]
+    InvalidPublicKeyLength { expected: usize, actual: usize },
+    #[error(transparent)]
+    RecordValidation(#[from] RecordValidationError),
+    #[error(transparent)]
+    RecordEncoding(#[from] RecordEncodingError),
+    #[error(transparent)]
+    Crypto(#[from] CryptoError),
 }
 
 #[derive(Debug, Error)]

@@ -66,12 +66,20 @@ cargo test -p overlay-core --test integration_relay_fallback
 cargo test -p overlay-core --test integration_service_open
 ```
 
+## Milestone 5 regression runs
+
+```bash
+cargo test -p overlay-core rendezvous::tests
+cargo test -p overlay-core --test integration_publish_lookup
+```
+
 ## Notes
 
-- Milestone 4 is considered closed, and active feature work now begins at Milestone 5.
-- Use the Milestone 1-4 regression runs above as the primary checks for baseline regressions while Milestone 5 and later land.
+- Milestone 4 is considered closed, and Milestone 5 rendezvous/presence work is now active in code.
+- Use the Milestone 1-4 regression runs above as the primary checks for baseline regressions while Milestone 5 continues to land.
 - If `REPOSITORY_STAGE`, milestone prompts, or other status markers change, rerun the stage-boundary smoke tests so code and docs stay aligned.
-- The stage-boundary integration tests remain smoke tests until the Milestone 5-8 subsystems land.
+- `integration_publish_lookup` is now a real Milestone 5 integration path; `integration_relay_fallback` and `integration_service_open` remain stage-boundary smoke tests until their later milestones land.
+- `rendezvous::tests` now also covers deterministic publish/lookup message vectors in `tests/vectors/rendezvous_messages.json`.
 - If the default temp directory is not writable in your environment, prefix the build, lint, and test commands with `TMPDIR=/tmp`.
 
 If a command fails, report exactly which command failed and whether it failed because:

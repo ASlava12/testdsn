@@ -9,8 +9,9 @@ Current repository status:
 - Milestone 2 is considered closed.
 - Milestone 3 transport/session work in `overlay-core` (`transport`, `session::manager`) now has an explicit placeholder runner boundary, runner-facing session input surface, bounded event and I/O-action stores, handshake-bound session context, integration coverage for handshake-to-session establishment, and state-transition tests. Milestone 3 is considered closed. It still intentionally excludes bootstrap, rendezvous, relay intro, and real path logic.
 - Milestone 4 peer/bootstrap work in `overlay-core` (`bootstrap`, `peer`) now has validated bootstrap response types, a static bootstrap provider abstraction, a bounded peer store, deterministic diversity-preserving rebalance policy, and bootstrap integration coverage. Milestone 4 is considered closed.
-- Milestone 5 and later remain placeholder modules or stage-boundary smoke tests.
+- Milestone 5 rendezvous/presence work in `overlay-core` (`rendezvous`) now has deterministic placement key derivation, bounded in-memory `PublishPresence` / `PublishAck` and exact `LookupNode` / `LookupResult` / `LookupNotFound` flows, canonical wire-body helpers with MVP frame-size enforcement, deterministic message vectors for publish/lookup payloads, strict freshness plus epoch/sequence conflict handling, bounded lookup budget and seen-set state, negative-cache behavior, and integration coverage. The current store expects already-verified `PresenceRecord` signatures from upstream callers. Milestone 5 is now active in code.
+- Milestone 6 and later remain placeholder modules or stage-boundary smoke tests.
 
-The baseline docs and minimal identity fixtures are aligned to this repository state. The next active feature stage is Milestone 5 presence publish/exact lookup work; keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, prompts, and `docs/OPEN_QUESTIONS.md` in sync whenever that stage boundary changes.
+The baseline docs and minimal identity fixtures are aligned to this repository state. The current repository stage is `milestone-5-presence-lookup`; keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, prompts, and `docs/OPEN_QUESTIONS.md` in sync whenever that stage boundary changes.
 
 In sandboxed Linux-on-Windows environments, set `TMPDIR=/tmp` for commands that link test binaries if the default temp directory is not writable.

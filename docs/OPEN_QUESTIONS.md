@@ -218,7 +218,12 @@ For current work, treat the repository stage as:
 - Milestone 2 handshake surface implemented, vectorized, validated, and considered closed;
 - Milestone 3 transport/session layer implemented, validated, and considered closed;
 - Milestone 4 peer/bootstrap layer implemented, validated, and considered closed;
-- Milestone 5+ not started beyond placeholders and stage-boundary smoke tests.
+- Milestone 5 rendezvous/presence publish and exact lookup work started in
+  `crates/overlay-core/src/rendezvous/mod.rs` with deterministic placement key
+  derivation, bounded in-memory publish/lookup flows, canonical wire-body
+  helpers, deterministic message vectors, freshness and epoch/sequence conflict
+  handling, bounded lookup state, and negative cache;
+- Milestone 6+ not started beyond placeholders and remaining stage-boundary smoke tests.
 
 That means:
 
@@ -228,8 +233,8 @@ That means:
   vector maintenance, or validation maintenance;
 - keep status docs and prompts synchronized to this baseline as protocol logic evolves;
 - lock missing conservative defaults here before inventing new wire or session behavior;
-- Milestone 5 is now the next active feature stage;
-- Milestone 5+ remains out of scope for current work.
+- Milestone 5 is active in code and remains the current feature stage;
+- Milestone 6+ remains out of scope for current work.
 
 ### 9. Final encoding of `supported_kex` and `supported_signatures`
 
@@ -447,6 +452,54 @@ Rules:
 - do not require runtime RNG for the Milestone 4 fill phase;
 - keep bootstrap and peer management advisory and separate from Milestone 5
   presence publication and lookup.
+
+### 19. Deterministic rendezvous placement key derivation for the Milestone 5 baseline
+
+For the current Milestone 5 exact-lookup baseline, derive the local placement
+key from the full `node_id` using a domain-separated BLAKE3 hash:
+
+`placement_key = BLAKE3("overlay-mvp-rendezvous-placement" || node_id)`
+
+Rules:
+- derive one placement key from the full 32-byte `node_id`;
+- do not truncate the `node_id` or placement key for prefix/range behavior;
+- use the placement key only for local rendezvous addressing, not as a public
+  replacement for `node_id`.
+
+### 20. Conservative bounded rendezvous defaults for the Milestone 5 baseline
+
+The current in-memory Milestone 5 store stays explicitly bounded.
+
+Defaults:
+- `max_published_records = 1024`
+- `max_negative_cache_entries = 256`
+- `negative_cache_ttl_s = 60`
+- `max_lookup_budget = 8`
+- `max_lookup_seen_helpers = 16`
+
+Rules:
+- clamp requested lookup budgets to the local maximum before a lookup starts;
+- consume one budget unit per local lookup attempt;
+- keep the seen-set as local helper state rather than an enumerable remote
+  surface;
+- evict the oldest entry first when a bounded published-record or negative-cache
+  store is full;
+- clear any negative-cache entry for a node when a fresher presence record is
+  accepted for that node.
+
+### 21. Signature-verification handoff for the conservative Milestone 5 store
+
+The current rendezvous store does not independently verify `PresenceRecord`
+signatures because the local source of trusted node public keys lives outside
+this module boundary.
+
+Rules:
+- call the publish path only with records whose signatures were already
+  validated upstream;
+- still enforce freshness plus epoch/sequence conflict handling locally inside
+  the rendezvous store;
+- do not treat this handoff as permission to accept unchecked signed records
+  silently anywhere else in the node pipeline.
 
 ## Rule
 

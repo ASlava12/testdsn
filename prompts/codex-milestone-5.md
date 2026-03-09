@@ -3,7 +3,7 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `spec/mvp-scope.md`, `spec/architecture.md`,
 rendezvous modules under `crates/overlay-core/src/`.
 
 Goal:
-Start Milestone 5 presence publish and exact lookup work from the current
+Continue Milestone 5 presence publish and exact lookup work from the current
 closed Milestone 1-4 baseline.
 
 Current repository baseline:
@@ -16,13 +16,19 @@ Current repository baseline:
   closed.
 - Milestone 4 peer/bootstrap work is implemented, validated, and considered
   closed.
-- Milestone 5 and later are still placeholders.
+- Milestone 5 rendezvous/presence publish and exact lookup work is active in
+  `overlay-core` (`rendezvous`) with bounded local publish/lookup state,
+  freshness and conflict handling, verified-signature handoff at the store
+  boundary, and integration coverage.
+- Milestone 6 and later are still placeholders.
 
 Requirements:
 - implement exact `LookupNode` / `LookupResult` / `LookupNotFound` behavior with
   no prefix or range scan;
 - implement presence publication and conflict handling using expiry, epoch, and
   sequence rules already locked in `docs/OPEN_QUESTIONS.md`;
+- keep the current `publish_verified` contract intact: signature verification
+  happens upstream from the rendezvous store boundary;
 - add bounded lookup budgets, seen-set, and negative-cache behavior without
   crossing into Milestone 6 relay logic;
 - preserve explicit layering between rendezvous/presence and the already closed

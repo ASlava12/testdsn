@@ -229,7 +229,7 @@ impl PeerStore {
             },
         );
         self.select_neighbors(
-            random_order.into_iter(),
+            random_order,
             &mut selected,
             &mut transport_counts,
             &mut relay_selected,

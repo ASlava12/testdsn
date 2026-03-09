@@ -2,7 +2,7 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `VALIDATION.md`, `docs/OPEN_QUESTIONS.md`,
 and the relevant files under `spec/`.
 
 Goal:
-Start Milestone 5 from the current closed Milestone 1-4 baseline while keeping
+Continue Milestone 5 from the current closed Milestone 1-4 baseline while keeping
 status documents and conservative defaults synchronized to the actual code
 state.
 
@@ -17,7 +17,9 @@ Current repository baseline:
   closed in `overlay-core` (`transport`, `session::manager`).
 - Milestone 4 peer/bootstrap work is implemented, validated, and considered
   closed in `overlay-core` (`bootstrap`, `peer`).
-- Milestone 5 and later are still placeholders.
+- Milestone 5 rendezvous/presence publish and exact lookup work is active in
+  `overlay-core` (`rendezvous`) with bounded local publish/lookup state.
+- Milestone 6 and later are still placeholders.
 
 Constraints:
 - do not restart the repository from Milestone 0;
@@ -26,8 +28,8 @@ Constraints:
 - keep changes minimal and local.
 
 Tasks:
-- start Milestone 5 presence publish/exact lookup work from the closed
-  Milestone 4 boundary;
+- continue Milestone 5 presence publish/exact lookup work from the current
+  rendezvous baseline;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the repository baseline changes;
 - treat Milestones 1-4 as closed baseline work, touching them only for

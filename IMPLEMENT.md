@@ -25,7 +25,14 @@ The repository has a closed Milestone 1-4 baseline.
   `crates/overlay-core/src/peer/mod.rs`, including validated bootstrap
   responses, static provider abstractions, a bounded peer store, diversity-aware
   rebalance, and bootstrap integration coverage.
-- Milestone 5 and later are still placeholder modules and stage-boundary smoke tests.
+- Milestone 5 rendezvous/presence work is now active in
+  `crates/overlay-core/src/rendezvous/mod.rs`, including deterministic placement
+  key derivation, bounded in-memory publish/lookup flows, canonical
+  publish/lookup wire-body helpers with frame-size enforcement, deterministic
+  publish/lookup message vectors, freshness and epoch/sequence conflict
+  handling, bounded lookup state, negative cache behavior, verified-signature
+  handoff at the store boundary, and publish/lookup integration coverage.
+- Milestone 6 and later are still placeholder modules and stage-boundary smoke tests.
 
 Treat Milestones 0-4 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -33,14 +40,17 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Start Milestone 5 conservatively from the closed Milestone 4 boundary:
+Continue Milestone 5 conservatively from the current rendezvous baseline:
 
-1. implement presence publish and exact `LookupNode` / `LookupResult` / `LookupNotFound` flow;
-2. enforce expiry, epoch, and sequence conflict rules for fresh lookup results;
-3. add bounded lookup budgets, seen-set, and negative-cache behavior without crossing into Milestone 6 relay logic;
-4. keep Milestones 1-4 limited to regression fixes, vector maintenance, or validation maintenance;
-5. update status docs, prompts, and `docs/OPEN_QUESTIONS.md` whenever the documented baseline changes;
-6. keep Milestone 6+ behavior out of scope until Milestone 5 is materially complete.
+1. keep the current exact publish/lookup path aligned with `spec/records.md`,
+   `spec/wire-protocol.md`, and `docs/OPEN_QUESTIONS.md`;
+2. broaden Milestone 5 coverage only around publish/lookup edge cases,
+   validation, or conservative wire-surface maintenance;
+3. keep Milestones 1-4 limited to regression fixes, vector maintenance, or
+   validation maintenance;
+4. update status docs, prompts, and `docs/OPEN_QUESTIONS.md` whenever the
+   documented baseline changes;
+5. keep Milestone 6+ behavior out of scope until Milestone 5 is materially complete.
 
 ## Milestone 0 — repository bootstrap
 
@@ -195,7 +205,7 @@ Allow a node to obtain peers and maintain a bounded neighbor set.
 
 ## Milestone 5 — presence publish and exact lookup
 
-Status: next active milestone.
+Status: active and partially implemented in this repository.
 
 ### Goal
 Make nodes discoverable by exact `node_id` without open enumeration.
@@ -211,6 +221,8 @@ Make nodes discoverable by exact `node_id` without open enumeration.
 - Exact lookup only.
 - No range or prefix scan.
 - Expired records must not be returned as fresh.
+- The current rendezvous store expects `PresenceRecord` signatures to be
+  validated upstream before `publish_verified`.
 
 ### Done when
 - publish/lookup integration smoke tests pass
