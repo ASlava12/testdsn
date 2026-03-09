@@ -10,6 +10,8 @@ use crate::{
 use super::handshake::{HandshakeOutcome, SessionKeys};
 
 const SESSION_COMPONENT: &str = "session";
+pub const MAX_SESSION_EVENT_LOG_LEN: usize = 64;
+pub const MAX_SESSION_IO_ACTION_QUEUE_LEN: usize = 32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -52,6 +54,7 @@ pub enum SessionEventResult {
 pub enum SessionAction {
     BeginOpen,
     MarkEstablished,
+    HandleRunnerInput,
     RecordActivity,
     MarkDegraded,
     MarkRecovered,
@@ -203,6 +206,14 @@ pub struct SessionIoAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SessionRunnerInput {
+    FrameReceived { byte_len: usize },
+    HandshakeSucceeded { outcome: HandshakeOutcome },
+    TransportClosed { detail: Option<String> },
+    TransportFailed { detail: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionManager {
     correlation_id: u64,
     node_id: Option<NodeId>,
@@ -325,6 +336,53 @@ impl SessionManager {
             None,
             Some("opening session over placeholder transport".to_string()),
         ))
+    }
+
+    pub fn handle_runner_input(
+        &mut self,
+        timestamp_unix_ms: u64,
+        input: SessionRunnerInput,
+    ) -> Result<SessionEvent, SessionError> {
+        self.ensure_state(
+            SessionAction::HandleRunnerInput,
+            matches!(
+                (self.state, &input),
+                (
+                    SessionState::Opening,
+                    SessionRunnerInput::HandshakeSucceeded { .. }
+                        | SessionRunnerInput::TransportClosed { .. }
+                        | SessionRunnerInput::TransportFailed { .. }
+                ) | (
+                    SessionState::Established,
+                    SessionRunnerInput::FrameReceived { .. }
+                        | SessionRunnerInput::TransportClosed { .. }
+                        | SessionRunnerInput::TransportFailed { .. }
+                ) | (
+                    SessionState::Degraded,
+                    SessionRunnerInput::FrameReceived { .. }
+                        | SessionRunnerInput::TransportClosed { .. }
+                        | SessionRunnerInput::TransportFailed { .. }
+                ) | (
+                    SessionState::Closing,
+                    SessionRunnerInput::TransportClosed { .. }
+                        | SessionRunnerInput::TransportFailed { .. }
+                )
+            ),
+        )?;
+
+        match input {
+            SessionRunnerInput::FrameReceived { byte_len } => self.record_activity(
+                timestamp_unix_ms,
+                Some(format!("runner delivered {byte_len} bytes")),
+            ),
+            SessionRunnerInput::HandshakeSucceeded { outcome } => {
+                self.mark_established_with_handshake(timestamp_unix_ms, outcome)
+            }
+            SessionRunnerInput::TransportClosed { detail } => {
+                self.handle_transport_closed(timestamp_unix_ms, detail)
+            }
+            SessionRunnerInput::TransportFailed { detail } => self.fail(timestamp_unix_ms, detail),
+        }
     }
 
     pub fn mark_established(
@@ -460,14 +518,7 @@ impl SessionManager {
             self.state == SessionState::Closing,
         )?;
 
-        let event = self.record_event(
-            timestamp_unix_ms,
-            SessionEventKind::Closed,
-            SessionEventResult::Ok,
-            SessionState::Closed,
-            None,
-            None,
-        );
+        let event = self.record_closed_event(timestamp_unix_ms, None);
         self.clear_runtime_state();
 
         Ok(event)
@@ -614,6 +665,31 @@ impl SessionManager {
         ))
     }
 
+    fn handle_transport_closed(
+        &mut self,
+        timestamp_unix_ms: u64,
+        detail: Option<String>,
+    ) -> Result<SessionEvent, SessionError> {
+        match self.state {
+            SessionState::Opening => self.fail(
+                timestamp_unix_ms,
+                detail
+                    .unwrap_or_else(|| "transport closed before session establishment".to_string()),
+            ),
+            SessionState::Established | SessionState::Degraded | SessionState::Closing => {
+                let event = self.record_closed_event(timestamp_unix_ms, detail);
+                self.clear_runtime_state();
+                Ok(event)
+            }
+            SessionState::Idle | SessionState::Closed => {
+                Err(SessionError::InvalidStateTransition {
+                    state: self.state,
+                    action: SessionAction::HandleRunnerInput,
+                })
+            }
+        }
+    }
+
     fn ensure_state(&self, action: SessionAction, predicate: bool) -> Result<(), SessionError> {
         if predicate {
             return Ok(());
@@ -649,8 +725,23 @@ impl SessionManager {
             detail,
         };
         self.state = new_state;
-        self.events.push(session_event.clone());
+        self.push_event(session_event.clone());
         session_event
+    }
+
+    fn record_closed_event(
+        &mut self,
+        timestamp_unix_ms: u64,
+        detail: Option<String>,
+    ) -> SessionEvent {
+        self.record_event(
+            timestamp_unix_ms,
+            SessionEventKind::Closed,
+            SessionEventResult::Ok,
+            SessionState::Closed,
+            None,
+            detail,
+        )
     }
 
     fn schedule_established_timers(&mut self, timestamp_unix_ms: u64) {
@@ -723,7 +814,7 @@ impl SessionManager {
         action: SessionIoActionKind,
         detail: Option<String>,
     ) {
-        self.io_actions.push(SessionIoAction {
+        self.push_io_action(SessionIoAction {
             timestamp_unix_ms,
             correlation_id: self.correlation_id,
             action,
@@ -731,6 +822,18 @@ impl SessionManager {
             peer_node_id: self.security.map(|security| security.peer_node_id),
             detail,
         });
+    }
+
+    fn push_event(&mut self, event: SessionEvent) {
+        push_bounded(&mut self.events, event, MAX_SESSION_EVENT_LOG_LEN);
+    }
+
+    fn push_io_action(&mut self, action: SessionIoAction) {
+        push_bounded(
+            &mut self.io_actions,
+            action,
+            MAX_SESSION_IO_ACTION_QUEUE_LEN,
+        );
     }
 
     fn clear_runtime_state(&mut self) {
@@ -744,11 +847,19 @@ impl SessionManager {
     }
 }
 
+fn push_bounded<T>(items: &mut Vec<T>, item: T, limit: usize) {
+    if items.len() == limit {
+        items.remove(0);
+    }
+    items.push(item);
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         SessionAction, SessionError, SessionEventKind, SessionEventResult, SessionIoActionKind,
-        SessionManager, SessionState, SessionTimerKind, SessionTimingConfig,
+        SessionManager, SessionRunnerInput, SessionState, SessionTimerKind, SessionTimingConfig,
+        MAX_SESSION_EVENT_LOG_LEN, MAX_SESSION_IO_ACTION_QUEUE_LEN,
     };
     use crate::{
         crypto::{aead::ChaCha20Poly1305Key, hash::Blake3Digest},
@@ -1208,6 +1319,181 @@ mod tests {
         ));
         assert!(manager.security().is_none());
         assert!(manager.io_actions().is_empty());
+    }
+
+    #[test]
+    fn runner_input_can_bind_handshake_and_track_frame_activity() {
+        let mut manager =
+            SessionManager::with_timing(19, TEST_TIMING).expect("timing config should be valid");
+        manager
+            .begin_open(100, &TcpTransport)
+            .expect("open should transition from idle to opening");
+
+        let established = manager
+            .handle_runner_input(
+                120,
+                SessionRunnerInput::HandshakeSucceeded {
+                    outcome: handshake_outcome(),
+                },
+            )
+            .expect("runner handshake result should establish the session");
+        let observed = manager
+            .handle_runner_input(150, SessionRunnerInput::FrameReceived { byte_len: 128 })
+            .expect("runner frame input should refresh liveness");
+
+        assert_eq!(established.event, SessionEventKind::OpenSucceeded);
+        assert_eq!(manager.state(), SessionState::Established);
+        assert_eq!(observed.event, SessionEventKind::ActivityObserved);
+        assert_eq!(
+            observed.detail.as_deref(),
+            Some("runner delivered 128 bytes")
+        );
+    }
+
+    #[test]
+    fn runner_reported_transport_close_closes_established_session() {
+        let mut manager =
+            SessionManager::with_timing(20, TEST_TIMING).expect("timing config should be valid");
+        manager
+            .begin_open(100, &TcpTransport)
+            .expect("open should transition from idle to opening");
+        manager
+            .mark_established(120)
+            .expect("opening should transition to established");
+
+        let closed = manager
+            .handle_runner_input(
+                180,
+                SessionRunnerInput::TransportClosed {
+                    detail: Some("peer closed transport".to_string()),
+                },
+            )
+            .expect("runner close should close the session");
+
+        assert_eq!(manager.state(), SessionState::Closed);
+        assert_eq!(closed.event, SessionEventKind::Closed);
+        assert_eq!(closed.detail.as_deref(), Some("peer closed transport"));
+        assert!(manager.active_transport().is_none());
+    }
+
+    #[test]
+    fn runner_reported_transport_failure_closes_opening_session() {
+        let mut manager =
+            SessionManager::with_timing(21, TEST_TIMING).expect("timing config should be valid");
+        manager
+            .begin_open(100, &TcpTransport)
+            .expect("open should transition from idle to opening");
+
+        let failed = manager
+            .handle_runner_input(
+                110,
+                SessionRunnerInput::TransportFailed {
+                    detail: "dial failed".to_string(),
+                },
+            )
+            .expect("runner failure should fail the session");
+
+        assert_eq!(manager.state(), SessionState::Closed);
+        assert_eq!(failed.event, SessionEventKind::Failed);
+        assert_eq!(failed.detail.as_deref(), Some("dial failed"));
+    }
+
+    #[test]
+    fn event_log_is_bounded() {
+        let mut manager =
+            SessionManager::with_timing(22, TEST_TIMING).expect("timing config should be valid");
+        let cycles = MAX_SESSION_EVENT_LOG_LEN + 8;
+
+        for cycle in 0..cycles {
+            let timestamp = 100 + (cycle as u64) * 10;
+            manager
+                .begin_open(timestamp, &TcpTransport)
+                .expect("open should transition from idle to opening");
+            manager
+                .fail(timestamp + 1, format!("failure-{cycle}"))
+                .expect("failure should close the session");
+        }
+
+        assert_eq!(manager.events().len(), MAX_SESSION_EVENT_LOG_LEN);
+        let dropped_cycles = ((2 * cycles) - MAX_SESSION_EVENT_LOG_LEN) / 2;
+        let expected_last_failure = format!("failure-{}", cycles - 1);
+        assert_eq!(manager.events()[0].event, SessionEventKind::OpenStarted);
+        assert_eq!(
+            manager.events()[0].timestamp_unix_ms,
+            100 + (dropped_cycles as u64) * 10
+        );
+        assert_eq!(
+            manager
+                .events()
+                .last()
+                .expect("bounded event log should keep latest event")
+                .detail
+                .as_deref(),
+            Some(expected_last_failure.as_str())
+        );
+        assert!(!manager
+            .events()
+            .iter()
+            .any(|event| event.detail.as_deref() == Some("failure-0")));
+    }
+
+    #[test]
+    fn io_action_queue_is_bounded_until_drained() {
+        let mut manager =
+            SessionManager::with_timing(23, TEST_TIMING).expect("timing config should be valid");
+        let cycles = MAX_SESSION_IO_ACTION_QUEUE_LEN + 8;
+
+        for cycle in 0..cycles {
+            let timestamp = 100 + (cycle as u64) * 10;
+            manager
+                .begin_open(timestamp, &TcpTransport)
+                .expect("open should transition from idle to opening");
+            manager
+                .fail(timestamp + 1, format!("failure-{cycle}"))
+                .expect("failure should close the session");
+        }
+
+        assert_eq!(manager.io_actions().len(), MAX_SESSION_IO_ACTION_QUEUE_LEN);
+        let dropped_cycles = ((2 * cycles) - MAX_SESSION_IO_ACTION_QUEUE_LEN) / 2;
+        let expected_last_failure = format!("failure-{}", cycles - 1);
+        assert_eq!(
+            manager
+                .io_actions()
+                .first()
+                .expect("bounded io queue should retain oldest surviving action")
+                .action,
+            SessionIoActionKind::BeginHandshake
+        );
+        assert_eq!(
+            manager
+                .io_actions()
+                .first()
+                .expect("bounded io queue should retain oldest surviving action")
+                .timestamp_unix_ms,
+            100 + (dropped_cycles as u64) * 10
+        );
+        assert_eq!(
+            manager
+                .io_actions()
+                .first()
+                .expect("bounded io queue should retain oldest surviving action")
+                .detail
+                .as_deref(),
+            Some("begin handshake on selected transport")
+        );
+        assert_eq!(
+            manager
+                .io_actions()
+                .last()
+                .expect("bounded io queue should keep latest action")
+                .detail
+                .as_deref(),
+            Some(expected_last_failure.as_str())
+        );
+        assert!(!manager
+            .io_actions()
+            .iter()
+            .any(|action| action.detail.as_deref() == Some("failure-0")));
     }
 
     fn handshake_outcome() -> HandshakeOutcome {

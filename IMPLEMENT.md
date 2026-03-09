@@ -4,8 +4,7 @@ This file is the execution plan for Codex.
 
 ## Current repository stage
 
-The repository has a closed Milestone 1-2 baseline plus a minimal Milestone 3
-transport/session skeleton.
+The repository has a closed Milestone 1-4 baseline.
 
 - Milestone 0 bootstrap is complete.
 - Milestone 1 foundations are implemented, vectorized, and validated in
@@ -15,26 +14,33 @@ transport/session skeleton.
   and validated in `crates/overlay-core/src/crypto/*` and
   `crates/overlay-core/src/session/handshake.rs`.
 - Milestone 2 is considered closed.
-- Milestone 3 transport abstraction and session-manager work has started at a
-  minimal compileable skeleton level in `crates/overlay-core/src/transport/mod.rs`
-  and `crates/overlay-core/src/session/manager.rs`, including explicit polled
-  keepalive/timeout scaffolding, handshake-bound session context, and a queued
-  I/O-action surface for future session runners, plus explicit degraded-session
-  recovery back to `established`.
-- Milestone 4 and later are still placeholder modules and stage-boundary smoke tests.
+- Milestone 3 transport abstraction and session-manager work is implemented and
+  considered closed in `crates/overlay-core/src/transport/mod.rs` and
+  `crates/overlay-core/src/session/manager.rs`, including an explicit runner
+  boundary, runner-facing session inputs, explicit polled keepalive/timeout
+  scaffolding, handshake-bound session context, bounded event and I/O-action
+  stores, and an integration-level handshake-to-session scenario.
+- Milestone 4 peer manager and bootstrap work is implemented and considered
+  closed in `crates/overlay-core/src/bootstrap/mod.rs` and
+  `crates/overlay-core/src/peer/mod.rs`, including validated bootstrap
+  responses, static provider abstractions, a bounded peer store, diversity-aware
+  rebalance, and bootstrap integration coverage.
+- Milestone 5 and later are still placeholder modules and stage-boundary smoke tests.
 
-Treat Milestones 0-2 as a closed baseline. Prefer regression fixes,
+Treat Milestones 0-4 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
 over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Continue Milestone 3 conservatively from the current aligned baseline:
+Start Milestone 5 conservatively from the closed Milestone 4 boundary:
 
-1. preserve the current timer, handshake-bound session skeleton, and queued I/O-action surface while wiring future session entrypoints only as needed;
-2. keep Milestones 1-2 limited to regression fixes, vector maintenance, or validation maintenance;
-3. update status docs, prompts, and `docs/OPEN_QUESTIONS.md` whenever the documented baseline changes;
-4. keep Milestone 4+ behavior out of scope until the Milestone 3 skeleton is materially more complete.
+1. implement presence publish and exact `LookupNode` / `LookupResult` / `LookupNotFound` flow;
+2. enforce expiry, epoch, and sequence conflict rules for fresh lookup results;
+3. add bounded lookup budgets, seen-set, and negative-cache behavior without crossing into Milestone 6 relay logic;
+4. keep Milestones 1-4 limited to regression fixes, vector maintenance, or validation maintenance;
+5. update status docs, prompts, and `docs/OPEN_QUESTIONS.md` whenever the documented baseline changes;
+6. keep Milestone 6+ behavior out of scope until Milestone 5 is materially complete.
 
 ## Milestone 0 — repository bootstrap
 
@@ -126,9 +132,9 @@ Implement a minimal secure handshake for session establishment.
 
 ## Milestone 3 — transport abstraction and session manager
 
-Status: in progress. A minimal compileable skeleton exists, but baseline
-docs/vectors/validation should stay aligned before additional Milestone 3
-feature work lands.
+Status: closed in this repository. Reopen only for regression fixes,
+runner-boundary adjustments, fixture maintenance, or conservative
+spec-conformance fixes.
 
 ### Goal
 Create a stable session layer independent from specific transports.
@@ -143,6 +149,9 @@ Create a stable session layer independent from specific transports.
 3. Implement session states and transitions.
 4. Add keepalive/timeout handling.
 5. Add structured session events.
+6. Define the minimal runner boundary between session and transport.
+7. Bound local session event and I/O-action stores.
+8. Add an integration-level handshake-to-session scenario.
 
 ### Important constraints
 - Keep transport-specific logic behind the trait.
@@ -151,11 +160,17 @@ Create a stable session layer independent from specific transports.
 ### Done when
 - session manager compiles
 - session state machine matches `spec/state-machines.md`
-- session tests cover open/close/error/degraded/recovery transitions and timer scaffolding
+- placeholder runner boundary exists for open/send/close/poll
+- session tests cover open/close/error/degraded/recovery transitions, timer scaffolding, and bounded stores
+- an integration test covers handshake outcome binding through the session runner surface
 
 ---
 
 ## Milestone 4 — peer manager and bootstrap
+
+Status: closed in this repository. Reopen only for regression fixes,
+fixture maintenance, bootstrap-schema adjustments, or conservative
+spec-conformance fixes.
 
 ### Goal
 Allow a node to obtain peers and maintain a bounded neighbor set.
@@ -179,6 +194,8 @@ Allow a node to obtain peers and maintain a bounded neighbor set.
 ---
 
 ## Milestone 5 — presence publish and exact lookup
+
+Status: next active milestone.
 
 ### Goal
 Make nodes discoverable by exact `node_id` without open enumeration.

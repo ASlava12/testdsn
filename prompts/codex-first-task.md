@@ -2,8 +2,9 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `VALIDATION.md`, `docs/OPEN_QUESTIONS.md`,
 and the relevant files under `spec/`.
 
 Goal:
-Continue Milestone 3 from the current aligned baseline while keeping status
-documents and conservative defaults synchronized to the actual code state.
+Start Milestone 5 from the current closed Milestone 1-4 baseline while keeping
+status documents and conservative defaults synchronized to the actual code
+state.
 
 Current repository baseline:
 - Milestone 0 is already complete.
@@ -12,9 +13,11 @@ Current repository baseline:
 - Milestone 2 crypto and handshake surface are already implemented, vectorized,
   and validated in `overlay-core` (`crypto`, `session::handshake`).
 - Milestone 2 is considered closed.
-- Milestone 3 already has a minimal compileable transport/session skeleton in
-  `overlay-core` (`transport`, `session::manager`).
-- Milestone 4 and later are still placeholders.
+- Milestone 3 transport/session work is implemented, validated, and considered
+  closed in `overlay-core` (`transport`, `session::manager`).
+- Milestone 4 peer/bootstrap work is implemented, validated, and considered
+  closed in `overlay-core` (`bootstrap`, `peer`).
+- Milestone 5 and later are still placeholders.
 
 Constraints:
 - do not restart the repository from Milestone 0;
@@ -23,15 +26,15 @@ Constraints:
 - keep changes minimal and local.
 
 Tasks:
-- continue the current `transport` / `session::manager` skeleton without
-  broadening scope beyond documented Milestone 3 work;
+- start Milestone 5 presence publish/exact lookup work from the closed
+  Milestone 4 boundary;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the repository baseline changes;
-- treat Milestones 1-2 as closed baseline work, touching them only for
+- treat Milestones 1-4 as closed baseline work, touching them only for
   regression fixes, vector maintenance, or validation maintenance;
-- run the applicable Milestone 1-3 and stage-boundary validation from
+- run the applicable Milestone 1-4 and stage-boundary validation from
   `VALIDATION.md`;
-- stop before adding Milestone 4+ protocol behavior.
+- stop before adding Milestone 6+ protocol behavior.
 
 Validation:
 - run the applicable commands from `VALIDATION.md`;

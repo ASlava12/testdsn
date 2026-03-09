@@ -46,6 +46,15 @@ cargo test -p overlay-core session::handshake::tests
 ```bash
 cargo test -p overlay-core transport::tests
 cargo test -p overlay-core session::manager::tests
+cargo test -p overlay-core --test integration_session_handshake
+```
+
+## Milestone 4 regression runs
+
+```bash
+cargo test -p overlay-core bootstrap::tests
+cargo test -p overlay-core peer::tests
+cargo test -p overlay-core --test integration_bootstrap
 ```
 
 ## Stage-boundary smoke tests
@@ -59,10 +68,10 @@ cargo test -p overlay-core --test integration_service_open
 
 ## Notes
 
-- Milestone 2 is considered closed, and active feature work is now within Milestone 3.
-- Use the Milestone 1 and Milestone 2 regression runs above as the primary checks for baseline regressions, and keep the Milestone 3 regression runs clean while the session skeleton evolves.
+- Milestone 4 is considered closed, and active feature work now begins at Milestone 5.
+- Use the Milestone 1-4 regression runs above as the primary checks for baseline regressions while Milestone 5 and later land.
 - If `REPOSITORY_STAGE`, milestone prompts, or other status markers change, rerun the stage-boundary smoke tests so code and docs stay aligned.
-- The stage-boundary integration tests remain smoke tests until the Milestone 4-8 subsystems land.
+- The stage-boundary integration tests remain smoke tests until the Milestone 5-8 subsystems land.
 - If the default temp directory is not writable in your environment, prefix the build, lint, and test commands with `TMPDIR=/tmp`.
 
 If a command fails, report exactly which command failed and whether it failed because:

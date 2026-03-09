@@ -14,7 +14,7 @@ pub mod session;
 pub mod transport;
 pub mod wire;
 
-pub const REPOSITORY_STAGE: &str = "milestone-3-session-skeleton";
+pub const REPOSITORY_STAGE: &str = "milestone-4-bootstrap-peer";
 
 #[cfg(test)]
 mod tests {
@@ -22,6 +22,6 @@ mod tests {
 
     #[test]
     fn reports_repository_stage() {
-        assert_eq!(REPOSITORY_STAGE, "milestone-3-session-skeleton");
+        assert_eq!(REPOSITORY_STAGE, "milestone-4-bootstrap-peer");
     }
 }

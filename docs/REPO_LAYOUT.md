@@ -11,7 +11,10 @@ overlay/
 ├─ prompts/
 │  ├─ codex-first-task.md
 │  ├─ codex-milestone-1.md
-│  └─ codex-milestone-2.md
+│  ├─ codex-milestone-2.md
+│  ├─ codex-milestone-3.md
+│  ├─ codex-milestone-4.md
+│  └─ codex-milestone-5.md
 ├─ spec/
 │  ├─ architecture.md
 │  ├─ threat-model.md

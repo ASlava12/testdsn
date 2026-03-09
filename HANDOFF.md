@@ -13,17 +13,15 @@ A Codex-oriented handoff bundle containing:
 ## Recommended first Codex task
 
 Use the contents of `prompts/codex-first-task.md` as the first task.
-It assumes the repository already has a closed Milestone 1-2 baseline plus a
-minimal Milestone 3 transport/session skeleton, and that baseline alignment for
-docs, conservative defaults, and minimal identity fixtures is already done.
+It assumes the repository already has a closed Milestone 1-4 baseline and that
+the next active feature work begins at Milestone 5.
 
 ## Recommended workflow
 
-1. Confirm from `IMPLEMENT.md` that Milestones 1-2 are closed and that a
-   minimal Milestone 3 skeleton already exists.
-2. Treat Milestones 1-2 as regression-fix, vector-maintenance, and
-   validation-maintenance territory only.
-3. Continue Milestone 3 transport/session work from the current skeleton.
+1. Confirm from `IMPLEMENT.md` that Milestones 1-4 are closed.
+2. Treat Milestones 1-4 as regression-fix, vector-maintenance, and
+   validation-maintenance territory only unless the task explicitly reopens them.
+3. Start Milestone 5 presence publish/exact lookup work from the closed Milestone 4 boundary.
 4. Keep status docs, milestone prompts, and `docs/OPEN_QUESTIONS.md` aligned as
-   the baseline evolves.
-5. Keep Milestones 4+ out of scope unless the task explicitly advances them.
+   the repository stage evolves.
+5. Keep Milestone 6+ out of scope unless the task explicitly advances them.

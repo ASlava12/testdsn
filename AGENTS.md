@@ -52,10 +52,13 @@ Do not add by default:
 - Milestone 1 identities, records, and wire foundations are implemented, vectorized, and validated.
 - Milestone 2 crypto wrappers and handshake surface are implemented, vectorized, and validated.
 - Milestone 2 is considered closed.
-- Milestone 3 transport/session work has started at a minimal compileable skeleton level.
-- Milestone 4 and later remain placeholder modules or smoke-test stubs unless the task explicitly begins those milestones.
+- Milestone 3 transport/session layer is implemented with a minimal runner boundary, explicit session-runner input surface, bounded local session stores, and an integration-level handshake-to-session scenario.
+- Milestone 3 is considered closed.
+- Milestone 4 peer/bootstrap layer is implemented with validated bootstrap responses, provider abstractions, a bounded peer store, and deterministic diversity-preserving rebalance.
+- Milestone 4 is considered closed.
+- Milestone 5 and later remain placeholder modules or smoke-test stubs unless the task explicitly begins those milestones.
 
-For normal work, touch Milestones 1-2 only for regression fixes, spec mismatches, vector maintenance, or validation maintenance. Keep Milestone 3 scoped to transport/session unless the task explicitly expands beyond it.
+For normal work, touch Milestones 1-4 only for regression fixes, spec mismatches, vector maintenance, or validation maintenance unless the task explicitly reopens that stage. Milestone 5 is now the next active feature stage.
 
 ## 3. Change policy
 

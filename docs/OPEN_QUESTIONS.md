@@ -216,19 +216,20 @@ For current work, treat the repository stage as:
 - Milestone 0 complete;
 - Milestone 1 foundations implemented, vectorized, and validated;
 - Milestone 2 handshake surface implemented, vectorized, validated, and considered closed;
-- Milestone 3 transport/session work started at a minimal compileable skeleton level;
-- Milestone 4+ not started beyond placeholders and stage-boundary smoke tests.
+- Milestone 3 transport/session layer implemented, validated, and considered closed;
+- Milestone 4 peer/bootstrap layer implemented, validated, and considered closed;
+- Milestone 5+ not started beyond placeholders and stage-boundary smoke tests.
 
 That means:
 
 - do not restart from Milestone 0;
-- do not re-implement Milestone 1 or 2 from scratch;
-- touch Milestones 1-2 only for regression fixes, spec mismatches,
+- do not re-implement Milestones 1-4 from scratch;
+- touch Milestones 1-4 only for regression fixes, spec mismatches,
   vector maintenance, or validation maintenance;
 - keep status docs and prompts synchronized to this baseline as protocol logic evolves;
 - lock missing conservative defaults here before inventing new wire or session behavior;
-- keep Milestone 3 scoped to transport/session skeleton work unless the task explicitly expands it;
-- Milestone 4+ remains out of scope for current work.
+- Milestone 5 is now the next active feature stage;
+- Milestone 5+ remains out of scope for current work.
 
 ### 9. Final encoding of `supported_kex` and `supported_signatures`
 
@@ -341,11 +342,15 @@ Rules:
 - do not invent additional reachability or intro policy modes until later
   specs land.
 
-### 15. Conservative I/O action surface for the Milestone 3 session skeleton
+### 15. Conservative runner boundary for the closed Milestone 3 session layer
 
 The session layer still does not perform real network I/O directly.
-Instead, it may queue local I/O actions that a future session runner can consume
-through `SessionManager::drain_io_actions()`.
+Instead, the session/transport boundary is explicit:
+
+- `SessionManager::drain_io_actions()` exposes queued session-originated actions;
+- `SessionManager::handle_runner_input(...)` consumes runner-originated session inputs;
+- `transport::TransportRunner` defines the placeholder adapter-side boundary for
+  `begin_open`, `send_frame`, `begin_close`, `abort`, and `poll_event`.
 
 Current action kinds:
 - `begin_handshake`
@@ -360,6 +365,88 @@ Rules:
 - failures and timeout-driven closes queue `abort_transport`;
 - queued actions may include transport binding and peer `node_id`;
 - queued actions must not expose derived session keys.
+
+Current runner inputs:
+- `frame_received`
+- `handshake_succeeded`
+- `transport_closed`
+- `transport_failed`
+
+Rules:
+- handshake completion reaches the session manager only through a runner-delivered
+  handshake outcome;
+- session-frame activity refreshes liveness only after the session is established
+  or degraded;
+- placeholder transports may expose the runner contract while still returning
+  unsupported operations until a real runner lands.
+
+### 16. Bounded local stores for the closed Milestone 3 session layer
+
+The session manager keeps explicit bounded local stores instead of unbounded logs.
+
+Limits:
+- `MAX_SESSION_EVENT_LOG_LEN = 64`
+- `MAX_SESSION_IO_ACTION_QUEUE_LEN = 32`
+
+Rules:
+- when a store reaches its limit, the oldest entry is dropped first;
+- these limits apply only to the local session-manager buffers, not to future
+  network byte budgets;
+- if later work needs different limits, change the docs and validation together.
+
+### 17. Conservative bootstrap response details for the closed Milestone 4 layer
+
+For the closed Milestone 4 bootstrap baseline, use the smallest explicit schema
+that satisfies the advisory bootstrap response contract.
+
+`BootstrapNetworkParams`:
+- `network_id: String`
+
+Allowed `BootstrapPeer.observed_role` values:
+- `standard`
+- `relay`
+
+Rules:
+- bootstrap schema version is `1`;
+- `generated_at_unix_s` must not exceed `expires_at_unix_s`;
+- bootstrap responses must be fresh when validated;
+- `handshake_version` must match the current MVP handshake version;
+- `max_frame_body_len` must not exceed the wire-layer MVP body limit;
+- peer and bridge transport classes use the same lowercase string enums as the
+  record layer;
+- bootstrap capabilities use the same lowercase string enums as the record layer;
+- peer `dial_hints[]` and `bridge_hints[].dial_hint` are trimmed, deduplicated,
+  and must remain non-empty;
+- bootstrap responses are advisory only and do not, by themselves, establish trust.
+
+### 18. Conservative peer-store defaults for the closed Milestone 4 layer
+
+For the closed Milestone 4 peer baseline, keep the local peer store bounded and
+rebalance deterministically.
+
+`NeighborState` values:
+- `candidate`
+- `active`
+
+Selection defaults:
+- `max_neighbors = 16`
+- `max_relay_neighbors = 4`
+- `max_neighbors_per_transport = 8`
+
+Rebalance phases:
+1. reserve relay-capable peers first;
+2. preserve transport diversity before filling more slots;
+3. fill remaining slots using deterministic hash-ordered randomization;
+4. leave overflow peers in `candidate`.
+
+Rules:
+- relay-capable peers are identified by `observed_role == relay`, relay
+  capability strings, or relay transport support;
+- do not collapse the active set to a single dominant transport class if valid
+  alternatives exist;
+- do not require runtime RNG for the Milestone 4 fill phase;
+- keep bootstrap and peer management advisory and separate from Milestone 5
+  presence publication and lookup.
 
 ## Rule
 
