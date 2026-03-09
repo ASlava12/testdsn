@@ -20,8 +20,8 @@ Requirements:
 - keep session states and transitions aligned with `spec/state-machines.md`;
 - add keepalive/timeout scaffolding and structured session events;
 - do not add real protocol-specific transport I/O yet;
-- do not start new Milestone 3 feature work until status docs, open questions,
-  fixtures, and baseline validation are aligned with the current repository state;
+- keep status docs, open questions, fixtures, and baseline validation aligned as
+  the current Milestone 3 skeleton evolves;
 - keep Milestone 4+ behavior out of scope.
 
 Constraints:

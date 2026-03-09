@@ -1,5 +1,13 @@
 [
   {
+    "pubkey_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+    "node_id_hex": "0871f3aabc26e4582c508af5c03884e6a96f0989d1dd8cfb49cd17ed25792433"
+  },
+  {
+    "pubkey_hex": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
+    "node_id_hex": "8fd4250c7e19a226bb17ae00d988b53656db1d9cf0eca5e8e09f53e95e18856d"
+  },
+  {
     "pubkey_hex": "6e6f64652d7075626c69632d6b6579",
     "node_id_hex": "dfdcb969257f41c0cde47ccd09b66ed67e6bac90b878460cd7c40a8d6a40542b"
   },

@@ -225,7 +225,7 @@ That means:
 - do not re-implement Milestone 1 or 2 from scratch;
 - touch Milestones 1-2 only for regression fixes, spec mismatches,
   vector maintenance, or validation maintenance;
-- sync status docs and prompts to this baseline before extending protocol logic;
+- keep status docs and prompts synchronized to this baseline as protocol logic evolves;
 - lock missing conservative defaults here before inventing new wire or session behavior;
 - keep Milestone 3 scoped to transport/session skeleton work unless the task explicitly expands it;
 - Milestone 4+ remains out of scope for current work.

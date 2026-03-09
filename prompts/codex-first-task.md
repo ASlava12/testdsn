@@ -2,8 +2,8 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `VALIDATION.md`, `docs/OPEN_QUESTIONS.md`,
 and the relevant files under `spec/`.
 
 Goal:
-Synchronize the repository's status documents and conservative defaults with
-the actual current code state before any further feature work.
+Continue Milestone 3 from the current aligned baseline while keeping status
+documents and conservative defaults synchronized to the actual code state.
 
 Current repository baseline:
 - Milestone 0 is already complete.
@@ -23,15 +23,15 @@ Constraints:
 - keep changes minimal and local.
 
 Tasks:
-- sync `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, and any affected prompts to the
-  actual repository baseline;
-- lock conservative MVP defaults in `docs/OPEN_QUESTIONS.md` instead of silently
-  inventing them later;
-- fill missing Milestone 1 identity fixtures, especially `tests/vectors/node_id.json`,
-  with real values and keep them aligned with existing record fixtures;
-- run the applicable Milestone 1, Milestone 2, and stage-boundary validation from
+- continue the current `transport` / `session::manager` skeleton without
+  broadening scope beyond documented Milestone 3 work;
+- keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
+  `docs/OPEN_QUESTIONS.md` synchronized if the repository baseline changes;
+- treat Milestones 1-2 as closed baseline work, touching them only for
+  regression fixes, vector maintenance, or validation maintenance;
+- run the applicable Milestone 1-3 and stage-boundary validation from
   `VALIDATION.md`;
-- stop before adding new Milestone 3+ protocol behavior.
+- stop before adding Milestone 4+ protocol behavior.
 
 Validation:
 - run the applicable commands from `VALIDATION.md`;

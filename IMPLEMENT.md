@@ -29,13 +29,12 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Before more Milestone 3 feature work, align the repository baseline:
+Continue Milestone 3 conservatively from the current aligned baseline:
 
-1. sync status docs and prompts to the current repository state;
-2. lock down conservative MVP defaults in `docs/OPEN_QUESTIONS.md`;
-3. finish any remaining Milestone 1 fixture or validation gaps;
-4. validate or complete remaining Milestone 2 handshake-surface gaps;
-5. only then resume Milestone 3 transport/session work without adding Milestone 4+ behavior.
+1. preserve the current timer, handshake-bound session skeleton, and queued I/O-action surface while wiring future session entrypoints only as needed;
+2. keep Milestones 1-2 limited to regression fixes, vector maintenance, or validation maintenance;
+3. update status docs, prompts, and `docs/OPEN_QUESTIONS.md` whenever the documented baseline changes;
+4. keep Milestone 4+ behavior out of scope until the Milestone 3 skeleton is materially more complete.
 
 ## Milestone 0 — repository bootstrap
 
