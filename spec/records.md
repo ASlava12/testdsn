@@ -84,3 +84,5 @@ Fields:
 
 Validation:
 - `scope` must use an allowed lowercase string enum
+- during signature verification, `target_node_id` must match the signing public key
+- expired tickets must not be used as fresh relay-intro material

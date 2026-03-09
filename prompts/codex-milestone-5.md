@@ -3,8 +3,8 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `spec/mvp-scope.md`, `spec/architecture.md`,
 rendezvous modules under `crates/overlay-core/src/`.
 
 Goal:
-Continue Milestone 5 presence publish and exact lookup work from the current
-closed Milestone 1-4 baseline.
+Audit or repair the closed Milestone 5 presence publish and exact lookup
+baseline from the current closed Milestone 1-5 repository state.
 
 Current repository baseline:
 - Milestone 0 is complete.
@@ -16,23 +16,21 @@ Current repository baseline:
   closed.
 - Milestone 4 peer/bootstrap work is implemented, validated, and considered
   closed.
-- Milestone 5 rendezvous/presence publish and exact lookup work is active in
+- Milestone 5 rendezvous/presence publish and exact lookup work is closed in
   `overlay-core` (`rendezvous`) with bounded local publish/lookup state,
   freshness and conflict handling, verified-signature handoff at the store
   boundary, and integration coverage.
-- Milestone 6 and later are still placeholders.
+- Milestone 6 relay intro/fallback work is active.
+- Milestone 7 and later are still placeholders.
 
 Requirements:
-- implement exact `LookupNode` / `LookupResult` / `LookupNotFound` behavior with
-  no prefix or range scan;
-- implement presence publication and conflict handling using expiry, epoch, and
-  sequence rules already locked in `docs/OPEN_QUESTIONS.md`;
 - keep the current `publish_verified` contract intact: signature verification
   happens upstream from the rendezvous store boundary;
-- add bounded lookup budgets, seen-set, and negative-cache behavior without
-  crossing into Milestone 6 relay logic;
+- keep Milestone 5 limited to regression fixes, validation maintenance,
+  vectors, or conservative spec-conformance fixes without broadening into
+  active Milestone 6 relay logic;
 - preserve explicit layering between rendezvous/presence and the already closed
-  bootstrap and transport/session baselines;
+  bootstrap, transport/session, and active relay baselines;
 - keep status docs, prompts, fixtures, and `docs/OPEN_QUESTIONS.md` aligned if
   the documented baseline changes;
 - stop before adding Milestone 6+ behavior.
@@ -44,4 +42,4 @@ Constraints:
 
 Validation:
 - run the applicable commands from `VALIDATION.md`;
-- keep the Milestone 1-4 regression runs clean while Milestone 5 lands.
+- keep the Milestone 1-5 regression runs clean while Milestone 6 lands.

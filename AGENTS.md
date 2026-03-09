@@ -56,9 +56,18 @@ Do not add by default:
 - Milestone 3 is considered closed.
 - Milestone 4 peer/bootstrap layer is implemented with validated bootstrap responses, provider abstractions, a bounded peer store, and deterministic diversity-preserving rebalance.
 - Milestone 4 is considered closed.
-- Milestone 5 and later remain placeholder modules or smoke-test stubs unless the task explicitly begins those milestones.
+- Milestone 5 rendezvous/presence publish and exact lookup work is implemented,
+  vectorized, and validated.
+- Milestone 5 is considered closed.
+- Milestone 6 relay intro and fallback work is now active with local quota
+  enforcement, verified intro-ticket usage, and direct-first fallback planning.
+- Milestone 7 and later remain placeholder modules or smoke-test stubs unless
+  the task explicitly begins those milestones.
 
-For normal work, touch Milestones 1-4 only for regression fixes, spec mismatches, vector maintenance, or validation maintenance unless the task explicitly reopens that stage. Milestone 5 is now the next active feature stage.
+For normal work, touch Milestones 1-5 only for regression fixes, spec
+mismatches, vector maintenance, or validation maintenance unless the task
+explicitly reopens that stage. Milestone 6 is now the next active feature
+stage.
 
 ## 3. Change policy
 

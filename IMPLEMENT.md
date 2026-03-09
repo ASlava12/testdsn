@@ -4,7 +4,7 @@ This file is the execution plan for Codex.
 
 ## Current repository stage
 
-The repository has a closed Milestone 1-4 baseline.
+The repository has a closed Milestone 1-5 baseline.
 
 - Milestone 0 bootstrap is complete.
 - Milestone 1 foundations are implemented, vectorized, and validated in
@@ -25,14 +25,19 @@ The repository has a closed Milestone 1-4 baseline.
   `crates/overlay-core/src/peer/mod.rs`, including validated bootstrap
   responses, static provider abstractions, a bounded peer store, diversity-aware
   rebalance, and bootstrap integration coverage.
-- Milestone 5 rendezvous/presence work is now active in
+- Milestone 5 rendezvous/presence work is implemented and considered closed in
   `crates/overlay-core/src/rendezvous/mod.rs`, including deterministic placement
   key derivation, bounded in-memory publish/lookup flows, canonical
   publish/lookup wire-body helpers with frame-size enforcement, deterministic
   publish/lookup message vectors, freshness and epoch/sequence conflict
   handling, bounded lookup state, negative cache behavior, verified-signature
   handoff at the store boundary, and publish/lookup integration coverage.
-- Milestone 6 and later are still placeholder modules and stage-boundary smoke tests.
+- Milestone 6 relay intro and fallback work is now active in
+  `crates/overlay-core/src/relay/mod.rs`, including profile-based bounded relay
+  quota defaults, local intro/tunnel/byte quota enforcement, verified
+  `IntroTicket` usage, direct-first/relay-second reachability planning, and
+  relay fallback integration coverage.
+- Milestone 7 and later are still placeholder modules and stage-boundary smoke tests.
 
 Treat Milestones 0-4 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -40,17 +45,18 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Continue Milestone 5 conservatively from the current rendezvous baseline:
+Continue Milestone 6 conservatively from the current relay baseline:
 
-1. keep the current exact publish/lookup path aligned with `spec/records.md`,
-   `spec/wire-protocol.md`, and `docs/OPEN_QUESTIONS.md`;
-2. broaden Milestone 5 coverage only around publish/lookup edge cases,
-   validation, or conservative wire-surface maintenance;
-3. keep Milestones 1-4 limited to regression fixes, vector maintenance, or
+1. keep the current relay quota model, verified intro-ticket path, and
+   direct-first fallback policy aligned with `spec/relay.md`,
+   `spec/records.md`, and `docs/OPEN_QUESTIONS.md`;
+2. broaden Milestone 6 only around relay intro/fallback behavior, validation,
+   or conservative wire-surface maintenance;
+3. keep Milestones 1-5 limited to regression fixes, vector maintenance, or
    validation maintenance;
 4. update status docs, prompts, and `docs/OPEN_QUESTIONS.md` whenever the
    documented baseline changes;
-5. keep Milestone 6+ behavior out of scope until Milestone 5 is materially complete.
+5. keep Milestone 7+ behavior out of scope until Milestone 6 is materially complete.
 
 ## Milestone 0 — repository bootstrap
 
@@ -205,7 +211,8 @@ Allow a node to obtain peers and maintain a bounded neighbor set.
 
 ## Milestone 5 — presence publish and exact lookup
 
-Status: active and partially implemented in this repository.
+Status: closed in this repository. Reopen only for regression fixes, vector
+maintenance, or conservative spec-conformance fixes.
 
 ### Goal
 Make nodes discoverable by exact `node_id` without open enumeration.
@@ -233,6 +240,8 @@ Make nodes discoverable by exact `node_id` without open enumeration.
 
 ## Milestone 6 — relay intro and fallback connectivity
 
+Status: active and partially implemented in this repository.
+
 ### Goal
 Allow nodes to reach each other when direct transport is unavailable.
 
@@ -246,6 +255,7 @@ Allow nodes to reach each other when direct transport is unavailable.
 ### Important constraints
 - Do not make a single relay mandatory.
 - Maintain secondary relay candidates.
+- Prefer direct transport first and use relay only as bounded fallback.
 
 ### Done when
 - relay fallback integration test passes

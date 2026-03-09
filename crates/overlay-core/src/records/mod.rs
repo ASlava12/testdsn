@@ -6,7 +6,10 @@ use crate::{
     crypto::sign::{
         Ed25519PublicKey, Ed25519Signature, ED25519_PUBLIC_KEY_LEN, ED25519_SIGNATURE_LEN,
     },
-    error::{PresenceVerificationError, RecordEncodingError, RecordValidationError},
+    error::{
+        IntroTicketVerificationError, PresenceVerificationError, RecordEncodingError,
+        RecordValidationError,
+    },
     identity::{derive_node_id, AppId, NodeId},
 };
 
@@ -253,6 +256,76 @@ impl IntroTicket {
         })
         .map_err(Into::into)
     }
+
+    pub fn verify_with_public_key(
+        self,
+        signer_public_key: &Ed25519PublicKey,
+    ) -> Result<VerifiedIntroTicket, IntroTicketVerificationError> {
+        let signer_node_id = derive_node_id(signer_public_key.as_bytes());
+        if self.target_node_id != signer_node_id {
+            return Err(IntroTicketVerificationError::SignerNodeIdMismatch {
+                ticket_target_node_id: self.target_node_id,
+                signer_node_id,
+            });
+        }
+
+        let body = self.canonical_body_bytes()?;
+        signer_public_key.verify(&body, &self.ed25519_signature()?)?;
+        Ok(VerifiedIntroTicket(self))
+    }
+
+    pub fn verify_with_trusted_node_record(
+        self,
+        node_record: &NodeRecord,
+    ) -> Result<VerifiedIntroTicket, IntroTicketVerificationError> {
+        node_record.validate_node_id()?;
+        let actual = node_record.node_public_key.len();
+        let bytes = node_record
+            .node_public_key
+            .as_slice()
+            .try_into()
+            .map_err(|_| IntroTicketVerificationError::InvalidPublicKeyLength {
+                expected: ED25519_PUBLIC_KEY_LEN,
+                actual,
+            })?;
+        self.verify_with_public_key(&Ed25519PublicKey::from_bytes(bytes))
+    }
+
+    fn ed25519_signature(&self) -> Result<Ed25519Signature, IntroTicketVerificationError> {
+        let actual = self.signature.len();
+        let bytes = self.signature.as_slice().try_into().map_err(|_| {
+            IntroTicketVerificationError::InvalidSignatureLength {
+                expected: ED25519_SIGNATURE_LEN,
+                actual,
+            }
+        })?;
+        Ok(Ed25519Signature::from_bytes(bytes))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedIntroTicket(IntroTicket);
+
+impl VerifiedIntroTicket {
+    pub fn into_inner(self) -> IntroTicket {
+        self.0
+    }
+
+    pub fn as_ref(&self) -> &IntroTicket {
+        &self.0
+    }
+}
+
+impl AsRef<IntroTicket> for VerifiedIntroTicket {
+    fn as_ref(&self) -> &IntroTicket {
+        self.as_ref()
+    }
+}
+
+impl From<VerifiedIntroTicket> for IntroTicket {
+    fn from(ticket: VerifiedIntroTicket) -> Self {
+        ticket.into_inner()
+    }
 }
 
 pub trait FreshRecord {
@@ -490,7 +563,10 @@ mod tests {
     use super::{FreshRecord, IntroTicket, NodeRecord, PresenceRecord, RelayHint, ServiceRecord};
     use crate::{
         crypto::sign::Ed25519SigningKey,
-        error::{PresenceVerificationError, RecordEncodingError, RecordValidationError},
+        error::{
+            IntroTicketVerificationError, PresenceVerificationError, RecordEncodingError,
+            RecordValidationError,
+        },
         identity::{derive_app_id, derive_node_id, AppId, NodeId},
     };
 
@@ -956,6 +1032,66 @@ mod tests {
     }
 
     #[test]
+    fn intro_ticket_verifies_with_matching_public_key() {
+        let signing_key = Ed25519SigningKey::from_seed([9_u8; 32]);
+        let public_key = signing_key.public_key();
+        let ticket = sample_signed_intro_ticket(&signing_key, b"requester-binding", 2_000);
+
+        let verified = ticket
+            .clone()
+            .verify_with_public_key(&public_key)
+            .expect("intro ticket signature should verify");
+
+        assert_eq!(verified.into_inner(), ticket);
+    }
+
+    #[test]
+    fn intro_ticket_rejects_mismatched_signer_public_key() {
+        let signing_key = Ed25519SigningKey::from_seed([9_u8; 32]);
+        let wrong_public_key = Ed25519SigningKey::from_seed([10_u8; 32]).public_key();
+        let ticket = sample_signed_intro_ticket(&signing_key, b"requester-binding", 2_000);
+
+        let error = ticket
+            .verify_with_public_key(&wrong_public_key)
+            .expect_err("mismatched intro ticket signer should be rejected");
+
+        assert!(matches!(
+            error,
+            IntroTicketVerificationError::SignerNodeIdMismatch {
+                ticket_target_node_id,
+                signer_node_id,
+            } if ticket_target_node_id == derive_node_id(signing_key.public_key().as_bytes())
+                && signer_node_id == derive_node_id(wrong_public_key.as_bytes())
+        ));
+    }
+
+    #[test]
+    fn intro_ticket_verifies_with_trusted_node_record() {
+        let signing_key = Ed25519SigningKey::from_seed([9_u8; 32]);
+        let public_key = signing_key.public_key();
+        let ticket = sample_signed_intro_ticket(&signing_key, b"requester-binding", 2_000);
+        let trusted_node_record = NodeRecord {
+            version: 1,
+            node_id: derive_node_id(public_key.as_bytes()),
+            node_public_key: public_key.as_bytes().to_vec(),
+            created_at_unix_s: 1,
+            flags: 0,
+            supported_transports: vec!["tcp".to_string()],
+            supported_kex: vec!["x25519".to_string()],
+            supported_signatures: vec!["ed25519".to_string()],
+            anti_sybil_proof: vec![],
+            signature: vec![1, 2, 3],
+        };
+
+        let verified = ticket
+            .clone()
+            .verify_with_trusted_node_record(&trusted_node_record)
+            .expect("trusted node record should supply intro ticket signer key");
+
+        assert_eq!(verified.into_inner(), ticket);
+    }
+
+    #[test]
     fn presence_record_vector_matches_fixture() {
         let vector = read_presence_record_vector();
         let public_key = decode_hex(&vector.node_public_key_hex);
@@ -1309,6 +1445,28 @@ mod tests {
         let bytes =
             fs::read(intro_ticket_vector_path()).expect("intro ticket vector file should exist");
         serde_json::from_slice(&bytes).expect("intro ticket vector file should parse")
+    }
+
+    fn sample_signed_intro_ticket(
+        signing_key: &Ed25519SigningKey,
+        requester_binding: &[u8],
+        expires_at_unix_s: u64,
+    ) -> IntroTicket {
+        let mut ticket = IntroTicket {
+            ticket_id: vec![0x01, 0x23, 0x45, 0x67],
+            target_node_id: derive_node_id(signing_key.public_key().as_bytes()),
+            requester_binding: requester_binding.to_vec(),
+            scope: "relay-intro".to_string(),
+            issued_at_unix_s: 1_000,
+            expires_at_unix_s,
+            nonce: vec![0x10, 0x20, 0x30, 0x40],
+            signature: Vec::new(),
+        };
+        let body = ticket
+            .canonical_body_bytes()
+            .expect("intro ticket body should serialize before signing");
+        ticket.signature = signing_key.sign(&body).as_bytes().to_vec();
+        ticket
     }
 
     fn read_presence_record_vector() -> PresenceRecordVector {

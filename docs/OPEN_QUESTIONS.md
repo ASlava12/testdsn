@@ -1,7 +1,7 @@
 # Open Questions
 
 This file exists so Codex does not silently invent protocol details.
-All currently known MVP ambiguities affecting the current Milestone 1-3
+All currently known MVP ambiguities affecting the current Milestone 1-6
 baseline are resolved below and should be reused as the conservative defaults.
 
 ## Resolved conservative choices for MVP
@@ -218,12 +218,19 @@ For current work, treat the repository stage as:
 - Milestone 2 handshake surface implemented, vectorized, validated, and considered closed;
 - Milestone 3 transport/session layer implemented, validated, and considered closed;
 - Milestone 4 peer/bootstrap layer implemented, validated, and considered closed;
-- Milestone 5 rendezvous/presence publish and exact lookup work started in
+- Milestone 5 rendezvous/presence publish and exact lookup work is implemented
+  and considered closed in
   `crates/overlay-core/src/rendezvous/mod.rs` with deterministic placement key
   derivation, bounded in-memory publish/lookup flows, canonical wire-body
   helpers, deterministic message vectors, freshness and epoch/sequence conflict
-  handling, bounded lookup state, and negative cache;
-- Milestone 6+ not started beyond placeholders and remaining stage-boundary smoke tests.
+  handling, bounded lookup state, negative cache, and verified-signature
+  handoff at the store boundary;
+- Milestone 6 relay intro and fallback work started in
+  `crates/overlay-core/src/relay/mod.rs` with profile-based bounded relay quota
+  defaults, local intro/tunnel/byte quota enforcement, verified `IntroTicket`
+  usage, direct-first/relay-second reachability planning, and relay fallback
+  integration coverage;
+- Milestone 7+ not started beyond placeholders and remaining stage-boundary smoke tests.
 
 That means:
 
@@ -233,8 +240,10 @@ That means:
   vector maintenance, or validation maintenance;
 - keep status docs and prompts synchronized to this baseline as protocol logic evolves;
 - lock missing conservative defaults here before inventing new wire or session behavior;
-- Milestone 5 is active in code and remains the current feature stage;
-- Milestone 6+ remains out of scope for current work.
+- Milestone 5 is closed and should be touched only for regressions,
+  vectors, or spec mismatches;
+- Milestone 6 is active in code and remains the current feature stage;
+- Milestone 7+ remains out of scope for current work.
 
 ### 9. Final encoding of `supported_kex` and `supported_signatures`
 
@@ -288,8 +297,7 @@ For MVP session establishment and service reachability:
 - prefer direct transport attempts first;
 - use relay only as fallback when direct reachability is unavailable or fails;
 - do not make any single relay mandatory for the connection policy;
-- keep this as a local policy default until the Milestone 6 relay flow is
-  implemented.
+- keep this as the local default for the current Milestone 6 relay baseline.
 
 ### 13. Conservative keepalive and timeout scaffolding for the Milestone 3 session skeleton
 
@@ -500,6 +508,21 @@ Rules:
   the rendezvous store;
 - do not treat this handoff as permission to accept unchecked signed records
   silently anywhere else in the node pipeline.
+
+### 22. Conservative relay fallback planning defaults for the current Milestone 6 baseline
+
+For the current Milestone 6 baseline, relay planning remains explicit and local.
+
+Rules:
+- verify `IntroTicket` signatures before relay planning begins;
+- require a fresh `IntroTicket` whose `target_node_id` matches the requested
+  node and whose `requester_binding` matches the local requester binding;
+- build direct attempts first from non-`relay` transport classes on the target
+  `PresenceRecord`;
+- keep relay candidates as fallback only, sorted by higher `relay_score` first
+  with deterministic tie-breaking;
+- preserve secondary relay candidates instead of collapsing to one mandatory
+  relay.
 
 ## Rule
 
