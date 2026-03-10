@@ -119,9 +119,13 @@ cargo test -p overlay-core --test integration_service_open
 
 ## Notes
 
-- Milestone 8 is considered closed, and Milestone 9 hardening and polish is now the active repository stage.
-- Use the Milestone 1-8 regression runs above as the primary checks for baseline regressions while Milestone 9 continues to land.
-- If `REPOSITORY_STAGE`, milestone prompts, or other status markers change, rerun the stage-boundary smoke tests so code and docs stay aligned.
+- Milestone 8 is considered closed, and the active repository stage marker is
+  `milestone-9-hardening` (Milestone 9 hardening and polish).
+- Use the Milestone 1-8 regression runs above as the primary checks for
+  baseline regressions while Milestone 9 continues to land.
+- If `REPOSITORY_STAGE`, `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, milestone
+  prompts, or other status markers change, rerun the stage-boundary smoke
+  tests so code and docs stay aligned.
 - `integration_publish_lookup` remains the real Milestone 5 integration path; `integration_relay_fallback` is the real Milestone 6 integration path; `integration_routing` is the real Milestone 7 integration path; `integration_service_open` is now the real Milestone 8 integration path.
 - Milestone 9 currently extends the closed-baseline regression runs and
   stage-boundary smoke tests with `bootstrap::tests`, `config::tests`,

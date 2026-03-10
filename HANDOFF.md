@@ -10,28 +10,31 @@ A Codex-oriented handoff bundle containing:
 - starter prompts (`prompts/*.md`)
 - protocol/spec files (`spec/*.md`)
 
+## Current repository stage
+
+- `REPOSITORY_STAGE` is `milestone-9-hardening`.
+- Milestones 0-8 are a closed baseline in this repository.
+- Milestone 9 hardening and polish is the active stage with
+  observability/config groundwork, a bounded handshake replay cache, explicit
+  subsystem observability integration, and the current regression,
+  stage-boundary, and Milestone 9 unit suites as the working validation
+  boundary.
+
 ## Recommended first Codex task
 
-Use the contents of `prompts/codex-milestone-9.md` as the first task.
-It assumes the repository already has a closed Milestone 1-8 baseline and that
-Milestone 9 hardening and polish is now active with observability/config
-groundwork, a bounded replay cache, and broad explicit subsystem
-observability integration landed, including bootstrap provider fetch/validation
-logging, explicit transport-buffer config projection from top-level node
-config and runner-boundary transport frame validation, plus expanded
-malformed-input coverage in the wire-helper tests, including bootstrap schema
-timing and frame-limit rejection paths, and an explicit established-session
-gauge sync helper, and with the current regression, stage-boundary, and
-Milestone 9 unit suites as its working boundary.
+Use `prompts/codex-milestone-9.md` as the first task prompt for the current
+`milestone-9-hardening` stage. It assumes the repository already has a closed
+Milestone 1-8 baseline and does not need to restart from Milestone 0/1/2.
 
 ## Recommended workflow
 
-1. Confirm from `IMPLEMENT.md` that Milestones 1-8 are closed and Milestone 9
-   is the active stage.
-2. Treat Milestones 1-8 as regression-fix, vector-maintenance, and
-   validation-maintenance territory only unless the task explicitly reopens them.
-3. Continue Milestone 9 hardening and polish work from the current validation
-   baseline instead of broadening scope prematurely.
+1. Confirm from `README.md`, `AGENTS.md`, and `IMPLEMENT.md` that the current
+   stage is `milestone-9-hardening`.
+2. Do not restart from Milestone 0/1/2; treat Milestones 1-8 as
+   regression-fix, vector-maintenance, and validation-maintenance territory
+   only unless the task explicitly reopens them.
+3. Scope Milestone 9 work narrowly from the current hardening boundary instead
+   of treating it as a broad umbrella task.
 4. Keep simulation-focused expansion and broader protocol scope out of work
    until Milestone 9 is materially complete.
 5. Keep status docs, milestone prompts, and `docs/OPEN_QUESTIONS.md` aligned as

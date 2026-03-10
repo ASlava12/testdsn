@@ -246,6 +246,7 @@ For current work, treat the repository stage as:
   open-session store, exact `app_id` resolution, `reachability_ref` binding
   checks, allow/deny local policy enforcement, and integration coverage.
   Milestone 8 is considered closed;
+- the current repository stage marker is `milestone-9-hardening`;
 - Milestone 9 hardening and polish is now the current feature stage, with
   bounded observability groundwork in `crates/overlay-core/src/metrics/mod.rs`,
   a validated top-level config baseline in `crates/overlay-core/src/config.rs`

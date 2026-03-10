@@ -1,13 +1,14 @@
-Read `AGENTS.md`, `IMPLEMENT.md`, `VALIDATION.md`, `spec/mvp-scope.md`,
-`spec/architecture.md`, `spec/observability.md`, `spec/threat-model.md`,
-`spec/config.md`, `docs/OPEN_QUESTIONS.md`, and the relevant modules under
-`crates/overlay-core/src/`.
+Read `AGENTS.md`, `IMPLEMENT.md`, `README.md`, `HANDOFF.md`, `VALIDATION.md`,
+`docs/OPEN_QUESTIONS.md`, `spec/mvp-scope.md`, `spec/architecture.md`,
+`spec/observability.md`, `spec/threat-model.md`, `spec/config.md`, and the
+relevant modules under `crates/overlay-core/src/`.
 
 Goal:
-Continue Milestone 9 hardening and polish work from the current closed
-Milestone 1-8 baseline.
+Work only within the current repository stage, `milestone-9-hardening`, from
+the closed Milestone 1-8 baseline.
 
 Current repository baseline:
+- The current repository stage marker is `milestone-9-hardening`.
 - Milestone 0 is complete.
 - Milestone 1 identities, records, and wire foundations are implemented,
   vectorized, and validated.
@@ -26,27 +27,27 @@ Current repository baseline:
 - Milestone 8 service-layer work is implemented, validated, and considered
   closed.
 - Milestone 9 hardening and polish is active with observability/config
-  groundwork, a bounded replay cache in `session::manager`, and broad explicit
-  subsystem observability integration landed, including bootstrap provider
-  fetch/validation logging, explicit transport-buffer config projection from
-  top-level node config and runner-boundary transport frame validation, plus
-  expanded malformed-input coverage in bootstrap, relay, routing, and service
-  wire helpers, an explicit established-session gauge sync helper, and with the
-  current regression suites, stage-boundary integration tests, and Milestone 9
-  unit coverage as its working boundary.
+  groundwork, a bounded replay cache in `session::manager`, broad explicit
+  subsystem observability integration, expanded malformed-input coverage, and
+  the current regression suites, stage-boundary integration tests, and
+  Milestone 9 unit coverage as its working boundary.
 
 Requirements:
+- do not treat Milestone 9 as a broad umbrella task; take one concrete
+  hardening slice at a time;
 - keep hardening work aligned with `spec/observability.md`,
   `spec/threat-model.md`, `spec/config.md`, and `docs/OPEN_QUESTIONS.md`;
 - keep explicit layering between identity, transport/session, peer/bootstrap,
   rendezvous, relay, routing, and service code;
 - prefer local, bounded hardening changes such as rate limits, byte budgets,
-  replay-risk mitigation, structured metrics/logs, stale/malformed input tests,
-  and validation maintenance;
+  replay-risk mitigation, structured metrics/logs, stale/malformed input
+  tests, and validation maintenance;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
-  `docs/OPEN_QUESTIONS.md` synchronized if the Milestone 9 baseline changes.
+  `docs/OPEN_QUESTIONS.md` synchronized if the `milestone-9-hardening`
+  baseline changes.
 
 Constraints:
+- do not restart from Milestone 0/1/2;
 - do not rework Milestones 1-8 except for a concrete regression or spec
   mismatch;
 - do not broaden into new protocol scope, global enumeration, or
@@ -57,4 +58,6 @@ Constraints:
 Validation:
 - run the applicable commands from `VALIDATION.md`;
 - keep the Milestone 1-8 regression runs and stage-boundary smoke tests clean
-  while Milestone 9 lands.
+  while Milestone 9 lands;
+- if `REPOSITORY_STAGE` or the status docs change, rerun the stage-boundary
+  smoke tests.

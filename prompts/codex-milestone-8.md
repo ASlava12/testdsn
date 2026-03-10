@@ -29,7 +29,8 @@ Current repository baseline:
   resolution, `reachability_ref` binding checks, allow/deny local policy
   enforcement, deterministic message vectors, and
   `integration_service_open` coverage.
-- Milestone 9 hardening and polish is active.
+- The current repository stage is `milestone-9-hardening` (Milestone 9
+  hardening and polish).
 
 Requirements:
 - keep exact `app_id` service resolution aligned with `spec/service-layer.md`,

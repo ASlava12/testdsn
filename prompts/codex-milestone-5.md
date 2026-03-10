@@ -23,7 +23,8 @@ Current repository baseline:
 - Milestone 6 relay intro/fallback work is closed.
 - Milestone 7 routing work is closed.
 - Milestone 8 service-layer work is closed.
-- Milestone 9 hardening and polish is active.
+- The current repository stage is `milestone-9-hardening` (Milestone 9
+  hardening and polish).
 
 Requirements:
 - keep the current `publish_verified` contract intact: signature verification

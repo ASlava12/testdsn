@@ -74,14 +74,15 @@ Do not add by default:
   bounded local service registry and open-session store, exact `app_id`
   resolution, `reachability_ref` binding checks, and integration coverage.
 - Milestone 8 is considered closed.
+- The current repository stage marker is `milestone-9-hardening`.
 - Milestone 9 hardening and polish is now the active feature stage with the
   current regression suites and stage-boundary integration tests as the entry
   boundary until Milestone 9-specific hardening work lands.
 
 For normal work, touch Milestones 1-8 only for regression fixes, spec
 mismatches, vector maintenance, or validation maintenance unless the task
-explicitly reopens that stage. Milestone 9 is now the next active feature
-stage.
+explicitly reopens that stage. Treat current-stage work as narrow
+`milestone-9-hardening` work, not as a restart from earlier milestones.
 
 ## 3. Change policy
 

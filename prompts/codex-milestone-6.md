@@ -24,7 +24,8 @@ Current repository baseline:
   direct-first fallback planning.
 - Milestone 7 routing work is closed in `overlay-core` (`routing`).
 - Milestone 8 service-layer work is closed in `overlay-core` (`service`).
-- Milestone 9 hardening and polish is active.
+- The current repository stage is `milestone-9-hardening` (Milestone 9
+  hardening and polish).
 
 Requirements:
 - keep direct transport attempts first and use relay only as bounded fallback;

@@ -5,6 +5,7 @@ This file is the execution plan for Codex.
 ## Current repository stage
 
 The repository has a closed Milestone 1-8 baseline.
+The current repository stage marker is `milestone-9-hardening`.
 
 - Milestone 0 bootstrap is complete.
 - Milestone 1 foundations are implemented, vectorized, and validated in
@@ -89,14 +90,16 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Use `prompts/codex-milestone-9.md` as the recommended next-task prompt and
-continue Milestone 9 conservatively from the current hardening boundary:
+Use `prompts/codex-milestone-9.md` as the recommended next-task prompt for the
+current `milestone-9-hardening` stage and continue Milestone 9 conservatively
+from the current hardening boundary:
 
 1. keep hardening work aligned with `spec/observability.md`,
    `spec/threat-model.md`, `spec/config.md`, and `docs/OPEN_QUESTIONS.md`;
-2. broaden Milestone 9 only around local rate limits, byte budgets, replay-risk
-   mitigation, structured metrics/logs, stale or malformed input coverage, or
-   validation maintenance;
+2. do not treat Milestone 9 as a broad umbrella task; take one concrete
+   hardening slice at a time around local rate limits, byte budgets,
+   replay-risk mitigation, structured metrics/logs, stale or malformed input
+   coverage, or validation maintenance;
 3. keep Milestones 1-8 limited to regression fixes, vector maintenance, or
    validation maintenance;
 4. update status docs, prompts, and `docs/OPEN_QUESTIONS.md` whenever the
