@@ -79,6 +79,18 @@ or
 ./devnet/run-smoke.sh
 ```
 
+## Milestone 12 local runtime soak
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- smoke --devnet-dir devnet --soak-seconds 1800 --status-interval-seconds 300
+```
+
+or
+
+```bash
+./devnet/run-soak.sh
+```
+
 ## Milestone 5 regression runs
 
 ```bash
@@ -176,6 +188,13 @@ cargo test -p overlay-core --test integration_service_open
   session establishment, verified presence publish handoff, exact lookup,
   service open, and one relay-fallback path without introducing real network
   listeners.
+- The Milestone 12 soak path also stays in-process and advances logical time
+  through repeated runtime ticks so stale-session/service/relay/probe cleanup,
+  bootstrap retry, and health snapshots can be exercised without a separate
+  simulation platform or long wall-clock sleeps.
+- `overlay-cli run --status-every <ticks>` now emits JSON health snapshots with
+  runtime counts, observability counters, relay usage, cleanup totals, and
+  resource-limit surfaces for a single node.
 - If the default temp directory is not writable in your environment, prefix the build, lint, and test commands with `TMPDIR=/tmp`.
 
 If a command fails, report exactly which command failed and whether it failed because:

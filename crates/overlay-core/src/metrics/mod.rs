@@ -119,6 +119,10 @@ impl Observability {
         &self.logs
     }
 
+    pub const fn max_log_entries(&self) -> usize {
+        self.max_log_entries
+    }
+
     pub fn latest_log(&self) -> Option<&StructuredLogEntry> {
         self.logs.back()
     }

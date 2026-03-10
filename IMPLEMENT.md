@@ -94,6 +94,16 @@ The current repository stage marker is `milestone-9-hardening`.
   local-only orchestration layer on top of the existing runtime and subsystem
   boundaries; it does not advance the protocol stage marker beyond
   `milestone-9-hardening`.
+- Milestone 12 launch-hardening work is now implemented in
+  `crates/overlay-core/src/runtime.rs`, `crates/overlay-cli/src/main.rs`, and
+  `crates/overlay-cli/src/devnet.rs`, with bounded stale-state cleanup for the
+  replay cache, rendezvous expiry, service-open sessions, relay tunnels, and
+  expired path probes, a conservative degraded-runtime bootstrap retry policy,
+  runtime health/status snapshots plus `overlay-cli run --status-every ...`
+  dumps, and a logical long-run devnet soak path exposed through
+  `overlay-cli smoke --soak-seconds ...` / `devnet/run-soak.sh`. This is still
+  runtime/devnet hardening on top of the current local-only boundary and does
+  not advance the protocol stage marker beyond `milestone-9-hardening`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there

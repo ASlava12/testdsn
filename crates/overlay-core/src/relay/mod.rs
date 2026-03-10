@@ -375,6 +375,22 @@ pub struct RelayTunnel {
     pub opened_at_unix_s: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct RelayUsageSnapshot {
+    pub active_tunnels: usize,
+    pub recent_intro_requests: usize,
+    pub tracked_relay_peers: usize,
+    pub total_relayed_bytes_last_hour: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct RelayCleanupSummary {
+    pub stale_tunnels_pruned: usize,
+    pub expired_intro_requests_pruned: usize,
+    pub stale_peer_byte_windows_pruned: usize,
+    pub stale_total_byte_samples_pruned: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RelayManager {
     config: RelayConfig,
@@ -401,6 +417,42 @@ impl RelayManager {
 
     pub fn active_tunnel_count(&self) -> usize {
         self.active_tunnels.len()
+    }
+
+    pub fn usage_snapshot(&self) -> RelayUsageSnapshot {
+        RelayUsageSnapshot {
+            active_tunnels: self.active_tunnels.len(),
+            recent_intro_requests: self.intro_requests.len(),
+            tracked_relay_peers: self.peer_byte_windows.len(),
+            total_relayed_bytes_last_hour: self.used_total_bytes(),
+        }
+    }
+
+    pub fn prune_stale_state(
+        &mut self,
+        now_unix_s: u64,
+        max_tunnel_age_s: u64,
+    ) -> RelayCleanupSummary {
+        let intro_before = self.intro_requests.len();
+        prune_recent_timestamps(&mut self.intro_requests, now_unix_s, RELAY_INTRO_WINDOW_S);
+
+        let peer_windows_before = self.peer_byte_windows.len();
+        let total_samples_before = self.total_byte_window.len();
+        self.prune_byte_windows(now_unix_s);
+
+        let tunnels_before = self.active_tunnels.len();
+        self.active_tunnels.retain(|_, tunnel| {
+            now_unix_s.saturating_sub(tunnel.opened_at_unix_s) < max_tunnel_age_s
+        });
+
+        RelayCleanupSummary {
+            stale_tunnels_pruned: tunnels_before.saturating_sub(self.active_tunnels.len()),
+            expired_intro_requests_pruned: intro_before.saturating_sub(self.intro_requests.len()),
+            stale_peer_byte_windows_pruned: peer_windows_before
+                .saturating_sub(self.peer_byte_windows.len()),
+            stale_total_byte_samples_pruned: total_samples_before
+                .saturating_sub(self.total_byte_window.len()),
+        }
     }
 
     pub fn note_intro_request(&mut self, now_unix_s: u64) -> Result<(), RelayError> {
@@ -1277,6 +1329,44 @@ mod tests {
             .note_intro_request(1_700_000_000)
             .expect_err("standard profile defaults to relay mode disabled");
         assert!(matches!(error, RelayError::RelayDisabled));
+    }
+
+    #[test]
+    fn relay_cleanup_prunes_stale_tunnels_and_usage_windows() {
+        let relay_node_id = NodeId::from_bytes([20_u8; 32]);
+        let target_node_id = NodeId::from_bytes([21_u8; 32]);
+        let peer_node_id = NodeId::from_bytes([22_u8; 32]);
+        let mut manager = RelayManager::new(RelayConfig {
+            relay_mode: true,
+            role_policy: RelayRolePolicy::milestone6_default(),
+            max_concurrent_relay_tunnels: 2,
+            max_intro_requests_per_minute: 2,
+            max_bytes_relayed_per_peer_per_hour: 128,
+            max_total_relay_bytes_per_hour: 256,
+        })
+        .expect("relay config should be valid");
+
+        manager
+            .note_intro_request(1_700_000_000)
+            .expect("intro request should fit");
+        manager
+            .bind_tunnel(1, relay_node_id, target_node_id, 1_700_000_000)
+            .expect("tunnel should bind");
+        manager
+            .note_relayed_bytes(peer_node_id, 32, 1_700_000_000)
+            .expect("byte sample should fit");
+
+        let cleanup = manager.prune_stale_state(1_700_003_700, 120);
+        assert_eq!(cleanup.stale_tunnels_pruned, 1);
+        assert_eq!(cleanup.expired_intro_requests_pruned, 1);
+        assert_eq!(cleanup.stale_peer_byte_windows_pruned, 1);
+        assert_eq!(cleanup.stale_total_byte_samples_pruned, 1);
+
+        let usage = manager.usage_snapshot();
+        assert_eq!(usage.active_tunnels, 0);
+        assert_eq!(usage.recent_intro_requests, 0);
+        assert_eq!(usage.tracked_relay_peers, 0);
+        assert_eq!(usage.total_relayed_bytes_last_hour, 0);
     }
 
     #[test]

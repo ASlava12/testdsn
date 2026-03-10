@@ -1,4 +1,4 @@
-//! Minimal long-running node runtime orchestration for Milestone 10.
+//! Long-running node runtime orchestration with Milestone 12 launch hardening.
 
 use std::{
     collections::BTreeMap,
@@ -14,14 +14,16 @@ use crate::{
     bootstrap::{BootstrapProvider, BootstrapProviderError, BootstrapResponse},
     config::{ConfigError, OverlayConfig},
     crypto::sign::{Ed25519SigningKey, ED25519_SECRET_KEY_LEN},
+    error::{PresenceVerificationError, RecordEncodingError},
     identity::{derive_node_id, NodeId},
-    metrics::{LogComponent, LogContext, Observability},
+    metrics::{LogComponent, LogContext, MetricsSnapshot, Observability},
     peer::{PeerStore, PeerStoreError},
-    relay::{RelayError, RelayManager},
-    rendezvous::{RendezvousError, RendezvousStore, VerifiedPublishPresence},
+    relay::{RelayCleanupSummary, RelayError, RelayManager, RelayUsageSnapshot},
+    rendezvous::{PublishPresence, RendezvousError, RendezvousStore, VerifiedPublishPresence},
     routing::{
         HysteresisConfig, PathProbe, PathProbeTracker, PathState, RouteDecision, RouteSelector,
-        RoutingError,
+        RoutingError, DEFAULT_MAX_IN_FLIGHT_PATH_PROBES_PER_PATH,
+        DEFAULT_PATH_PROBE_TIMEOUT_MULTIPLIER,
     },
     service::{ServiceError, ServiceRegistry},
     session::{
@@ -32,6 +34,7 @@ use crate::{
 };
 
 const PRESENCE_REFRESH_DIVISOR: u64 = 2;
+const MIN_BOOTSTRAP_RETRY_INTERVAL_MS: u64 = 5_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -64,6 +67,12 @@ pub struct RuntimeTickSummary {
     pub scheduled_path_probes: Vec<PathProbe>,
     pub route_decision: Option<RouteDecision>,
     pub presence_refreshed: bool,
+    pub bootstrap_retry_attempted: bool,
+    pub bootstrap_sources_accepted: usize,
+    pub managed_sessions_reaped: usize,
+    pub stale_service_sessions_pruned: usize,
+    pub stale_relay_tunnels_pruned: usize,
+    pub stale_path_probes_pruned: usize,
     pub replay_entries_pruned: usize,
     pub stale_published_records_pruned: usize,
     pub stale_negative_cache_entries_pruned: usize,
@@ -82,6 +91,63 @@ pub struct NodeRuntimeSnapshot {
     pub open_service_sessions: usize,
     pub recent_logs: usize,
     pub last_tick_unix_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+pub struct RuntimeCleanupTotals {
+    pub replay_entries_pruned: u64,
+    pub stale_published_records_pruned: u64,
+    pub stale_negative_cache_entries_pruned: u64,
+    pub stale_service_sessions_pruned: u64,
+    pub stale_relay_tunnels_pruned: u64,
+    pub stale_path_probes_pruned: u64,
+    pub managed_sessions_reaped: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+pub struct BootstrapRuntimeStatus {
+    pub configured_sources: usize,
+    pub last_attempt_unix_ms: Option<u64>,
+    pub last_success_unix_ms: Option<u64>,
+    pub last_accepted_sources: usize,
+    pub total_attempts: u64,
+    pub total_successes: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct NodeRuntimeResourceLimits {
+    pub max_managed_sessions: usize,
+    pub max_tracked_paths: usize,
+    pub max_published_records: usize,
+    pub max_negative_cache_entries: usize,
+    pub max_registered_services: usize,
+    pub max_open_service_sessions: usize,
+    pub max_transport_buffer_bytes: usize,
+    pub max_relay_tunnels: usize,
+    pub max_relay_intro_requests_per_minute: usize,
+    pub max_replay_entries: usize,
+    pub max_log_entries: usize,
+    pub max_in_flight_path_probes_per_path: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct NodeRuntimeMaintenancePolicy {
+    pub bootstrap_retry_interval_ms: u64,
+    pub stale_service_session_age_ms: u64,
+    pub stale_relay_tunnel_age_s: u64,
+    pub path_probe_timeout_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct NodeRuntimeHealthSnapshot {
+    pub runtime: NodeRuntimeSnapshot,
+    pub total_peers: usize,
+    pub metrics: MetricsSnapshot,
+    pub relay: RelayUsageSnapshot,
+    pub resource_limits: NodeRuntimeResourceLimits,
+    pub maintenance_policy: NodeRuntimeMaintenancePolicy,
+    pub cleanup_totals: RuntimeCleanupTotals,
+    pub bootstrap: BootstrapRuntimeStatus,
 }
 
 #[derive(Debug, Error)]
@@ -122,6 +188,10 @@ pub enum NodeRuntimeError {
     #[error(transparent)]
     ConfigValidation(#[from] ConfigError),
     #[error(transparent)]
+    RecordEncoding(#[from] RecordEncodingError),
+    #[error(transparent)]
+    PresenceVerification(#[from] PresenceVerificationError),
+    #[error(transparent)]
     PeerStore(#[from] PeerStoreError),
     #[error(transparent)]
     Rendezvous(#[from] RendezvousError),
@@ -135,6 +205,8 @@ pub enum NodeRuntimeError {
     ReplayCache(#[from] ReplayCacheError),
     #[error(transparent)]
     Session(#[from] SessionError),
+    #[error("local presence refresh sequence exhausted for node {node_id}")]
+    LocalPresenceSequenceExhausted { node_id: NodeId },
 }
 
 #[derive(Clone)]
@@ -224,6 +296,10 @@ impl NodeContext {
         &self.relay_manager
     }
 
+    pub fn relay_manager_mut(&mut self) -> &mut RelayManager {
+        &mut self.relay_manager
+    }
+
     pub fn service_registry(&self) -> &ServiceRegistry {
         &self.service_registry
     }
@@ -261,11 +337,14 @@ pub struct NodeRuntime {
     max_managed_sessions: usize,
     next_correlation_id: u64,
     last_tick_unix_ms: Option<u64>,
+    cleanup_totals: RuntimeCleanupTotals,
+    bootstrap_status: BootstrapRuntimeStatus,
 }
 
 impl NodeRuntime {
     pub fn new(context: NodeContext) -> Self {
         let max_managed_sessions = context.config.max_total_neighbors;
+        let configured_sources = context.config.bootstrap_sources.len();
         let mut runtime = Self {
             state: NodeRuntimeState::Init,
             context,
@@ -274,6 +353,11 @@ impl NodeRuntime {
             max_managed_sessions,
             next_correlation_id: 1,
             last_tick_unix_ms: None,
+            cleanup_totals: RuntimeCleanupTotals::default(),
+            bootstrap_status: BootstrapRuntimeStatus {
+                configured_sources,
+                ..BootstrapRuntimeStatus::default()
+            },
         };
         runtime.log_state_transition(current_unix_ms(), NodeRuntimeState::Init);
         runtime
@@ -302,6 +386,7 @@ impl NodeRuntime {
         let context = NodeContext::new(config, signing_key)?;
         let mut runtime = Self::new(context);
         runtime.bootstrap_sources = bootstrap_sources;
+        runtime.bootstrap_status.configured_sources = runtime.bootstrap_sources.len();
         Ok(runtime)
     }
 
@@ -337,6 +422,19 @@ impl NodeRuntime {
         }
     }
 
+    pub fn health_snapshot(&self) -> NodeRuntimeHealthSnapshot {
+        NodeRuntimeHealthSnapshot {
+            runtime: self.snapshot(),
+            total_peers: self.context.peer_store.neighbor_count(),
+            metrics: self.context.observability.metrics().clone(),
+            relay: self.context.relay_manager.usage_snapshot(),
+            resource_limits: self.resource_limits(),
+            maintenance_policy: self.maintenance_policy(),
+            cleanup_totals: self.cleanup_totals,
+            bootstrap: self.bootstrap_status,
+        }
+    }
+
     pub fn startup_now(&mut self) -> Result<(), NodeRuntimeError> {
         self.startup(current_unix_ms())
     }
@@ -346,42 +444,9 @@ impl NodeRuntime {
         self.log_state_transition(timestamp_unix_ms, NodeRuntimeState::Bootstrapping);
 
         let now_unix_s = unix_ms_to_s(timestamp_unix_ms);
-        let node_id = self.context.node_id;
-        let mut accepted_sources = 0usize;
-
-        for source in &self.bootstrap_sources {
-            let response = source.fetch_validated_response_with_observability(
-                now_unix_s,
-                &mut self.context.observability,
-                allocate_log_context(&mut self.next_correlation_id, node_id, timestamp_unix_ms),
-            );
-            let Ok(response) = response else {
-                continue;
-            };
-
-            if self
-                .context
-                .peer_store
-                .ingest_bootstrap_response_with_observability(
-                    response,
-                    now_unix_s,
-                    &mut self.context.observability,
-                    allocate_log_context(&mut self.next_correlation_id, node_id, timestamp_unix_ms),
-                )
-                .is_ok()
-            {
-                accepted_sources = accepted_sources.saturating_add(1);
-            }
-        }
-
-        let next_state = if accepted_sources > 0
-            && self.context.peer_store.active_neighbors().next().is_some()
-        {
-            NodeRuntimeState::Running
-        } else {
-            NodeRuntimeState::Degraded
-        };
-        self.log_state_transition(timestamp_unix_ms, next_state);
+        self.refresh_bootstrap_sources(timestamp_unix_ms, now_unix_s)?;
+        self.sync_active_peer_gauge();
+        self.sync_operating_state(timestamp_unix_ms);
         Ok(())
     }
 
@@ -411,10 +476,22 @@ impl NodeRuntime {
         let published_after_cleanup = self.context.rendezvous.published_record_count();
         let negative_after_cleanup = self.context.rendezvous.negative_cache_len();
 
+        let stale_service_sessions_pruned = self.prune_stale_service_sessions(timestamp_unix_ms);
+        let relay_cleanup = self.prune_stale_relay_state(timestamp_unix_ms, now_unix_s);
+        let stale_path_probes_pruned = self.expire_stale_path_probes(timestamp_unix_ms);
+        let bootstrap_sources_accepted =
+            self.retry_bootstrap_if_due(timestamp_unix_ms, now_unix_s)?;
+        let bootstrap_retry_attempted = self.bootstrap_status.last_attempt_unix_ms
+            == Some(timestamp_unix_ms)
+            && self.bootstrap_status.total_attempts > 1;
+        self.sync_active_peer_gauge();
+        self.sync_operating_state(timestamp_unix_ms);
+
         let presence_refreshed = self.refresh_presence_if_due(timestamp_unix_ms, now_unix_s)?;
         let route_decision = self.evaluate_routes(timestamp_unix_ms, now_unix_s);
         let scheduled_path_probes = self.schedule_path_probes(timestamp_unix_ms)?;
-        let (session_events, session_io_actions) = self.poll_managed_sessions(timestamp_unix_ms)?;
+        let (session_events, session_io_actions, managed_sessions_reaped) =
+            self.poll_managed_sessions(timestamp_unix_ms)?;
 
         self.context.observability.push_log(
             allocate_log_context(
@@ -432,6 +509,40 @@ impl NodeRuntime {
         );
         self.last_tick_unix_ms = Some(timestamp_unix_ms);
 
+        let replay_entries_pruned = replay_before.saturating_sub(replay_after);
+        let stale_published_records_pruned =
+            published_before.saturating_sub(published_after_cleanup);
+        let stale_negative_cache_entries_pruned =
+            negative_before.saturating_sub(negative_after_cleanup);
+        self.cleanup_totals.replay_entries_pruned = self
+            .cleanup_totals
+            .replay_entries_pruned
+            .saturating_add(replay_entries_pruned as u64);
+        self.cleanup_totals.stale_published_records_pruned = self
+            .cleanup_totals
+            .stale_published_records_pruned
+            .saturating_add(stale_published_records_pruned as u64);
+        self.cleanup_totals.stale_negative_cache_entries_pruned = self
+            .cleanup_totals
+            .stale_negative_cache_entries_pruned
+            .saturating_add(stale_negative_cache_entries_pruned as u64);
+        self.cleanup_totals.stale_service_sessions_pruned = self
+            .cleanup_totals
+            .stale_service_sessions_pruned
+            .saturating_add(stale_service_sessions_pruned as u64);
+        self.cleanup_totals.stale_relay_tunnels_pruned = self
+            .cleanup_totals
+            .stale_relay_tunnels_pruned
+            .saturating_add(relay_cleanup.stale_tunnels_pruned as u64);
+        self.cleanup_totals.stale_path_probes_pruned = self
+            .cleanup_totals
+            .stale_path_probes_pruned
+            .saturating_add(stale_path_probes_pruned as u64);
+        self.cleanup_totals.managed_sessions_reaped = self
+            .cleanup_totals
+            .managed_sessions_reaped
+            .saturating_add(managed_sessions_reaped as u64);
+
         Ok(RuntimeTickSummary {
             timestamp_unix_ms,
             state: self.state,
@@ -440,11 +551,15 @@ impl NodeRuntime {
             scheduled_path_probes,
             route_decision,
             presence_refreshed,
-            replay_entries_pruned: replay_before.saturating_sub(replay_after),
-            stale_published_records_pruned: published_before
-                .saturating_sub(published_after_cleanup),
-            stale_negative_cache_entries_pruned: negative_before
-                .saturating_sub(negative_after_cleanup),
+            bootstrap_retry_attempted,
+            bootstrap_sources_accepted,
+            managed_sessions_reaped,
+            stale_service_sessions_pruned,
+            stale_relay_tunnels_pruned: relay_cleanup.stale_tunnels_pruned,
+            stale_path_probes_pruned,
+            replay_entries_pruned,
+            stale_published_records_pruned,
+            stale_negative_cache_entries_pruned,
         })
     }
 
@@ -551,6 +666,232 @@ impl NodeRuntime {
         Ok(())
     }
 
+    fn resource_limits(&self) -> NodeRuntimeResourceLimits {
+        let rendezvous = self.context.rendezvous.config();
+        let service = self.context.service_registry.config();
+        let relay = self.context.relay_manager.config();
+        let replay_cache = self.context.replay_cache.config();
+        NodeRuntimeResourceLimits {
+            max_managed_sessions: self.max_managed_sessions,
+            max_tracked_paths: self.max_managed_sessions,
+            max_published_records: rendezvous.max_published_records,
+            max_negative_cache_entries: rendezvous.max_negative_cache_entries,
+            max_registered_services: service.max_registered_services,
+            max_open_service_sessions: service.max_open_service_sessions,
+            max_transport_buffer_bytes: self.context.config.max_transport_buffer_bytes,
+            max_relay_tunnels: relay.max_concurrent_relay_tunnels,
+            max_relay_intro_requests_per_minute: relay.max_intro_requests_per_minute,
+            max_replay_entries: replay_cache.max_entries,
+            max_log_entries: self.context.observability.max_log_entries(),
+            max_in_flight_path_probes_per_path: DEFAULT_MAX_IN_FLIGHT_PATH_PROBES_PER_PATH,
+        }
+    }
+
+    fn maintenance_policy(&self) -> NodeRuntimeMaintenancePolicy {
+        NodeRuntimeMaintenancePolicy {
+            bootstrap_retry_interval_ms: self.bootstrap_retry_interval_ms(),
+            stale_service_session_age_ms: self.stale_service_session_age_ms(),
+            stale_relay_tunnel_age_s: self.stale_relay_tunnel_age_s(),
+            path_probe_timeout_ms: self.path_probe_timeout_ms(),
+        }
+    }
+
+    fn bootstrap_retry_interval_ms(&self) -> u64 {
+        let quarter_presence_ttl_ms = self.context.config.presence_ttl_s.saturating_mul(1_000) / 4;
+        MIN_BOOTSTRAP_RETRY_INTERVAL_MS
+            .max(self.context.config.path_probe_interval_ms)
+            .max(quarter_presence_ttl_ms)
+    }
+
+    fn stale_service_session_age_ms(&self) -> u64 {
+        self.context.config.presence_ttl_s.saturating_mul(1_000)
+    }
+
+    fn stale_relay_tunnel_age_s(&self) -> u64 {
+        self.context.config.presence_ttl_s
+    }
+
+    fn path_probe_timeout_ms(&self) -> u64 {
+        self.context
+            .path_probe_tracker
+            .config()
+            .path_probe_interval_ms
+            .saturating_mul(DEFAULT_PATH_PROBE_TIMEOUT_MULTIPLIER)
+    }
+
+    fn refresh_bootstrap_sources(
+        &mut self,
+        timestamp_unix_ms: u64,
+        now_unix_s: u64,
+    ) -> Result<usize, NodeRuntimeError> {
+        let node_id = self.context.node_id;
+        let mut accepted_sources = 0usize;
+        self.bootstrap_status.last_attempt_unix_ms = Some(timestamp_unix_ms);
+        self.bootstrap_status.total_attempts =
+            self.bootstrap_status.total_attempts.saturating_add(1);
+
+        for source in &self.bootstrap_sources {
+            let response = source.fetch_validated_response_with_observability(
+                now_unix_s,
+                &mut self.context.observability,
+                allocate_log_context(&mut self.next_correlation_id, node_id, timestamp_unix_ms),
+            );
+            let Ok(response) = response else {
+                continue;
+            };
+
+            if self
+                .context
+                .peer_store
+                .ingest_bootstrap_response_with_observability(
+                    response,
+                    now_unix_s,
+                    &mut self.context.observability,
+                    allocate_log_context(&mut self.next_correlation_id, node_id, timestamp_unix_ms),
+                )
+                .is_ok()
+            {
+                accepted_sources = accepted_sources.saturating_add(1);
+            }
+        }
+
+        self.bootstrap_status.last_accepted_sources = accepted_sources;
+        if accepted_sources > 0 {
+            self.bootstrap_status.last_success_unix_ms = Some(timestamp_unix_ms);
+            self.bootstrap_status.total_successes =
+                self.bootstrap_status.total_successes.saturating_add(1);
+        }
+
+        Ok(accepted_sources)
+    }
+
+    fn retry_bootstrap_if_due(
+        &mut self,
+        timestamp_unix_ms: u64,
+        now_unix_s: u64,
+    ) -> Result<usize, NodeRuntimeError> {
+        if self.state != NodeRuntimeState::Degraded {
+            return Ok(0);
+        }
+
+        let retry_due = self
+            .bootstrap_status
+            .last_attempt_unix_ms
+            .map(|last_attempt_unix_ms| {
+                timestamp_unix_ms.saturating_sub(last_attempt_unix_ms)
+                    >= self.bootstrap_retry_interval_ms()
+            })
+            .unwrap_or(true);
+        if !retry_due {
+            return Ok(0);
+        }
+
+        let accepted_sources = self.refresh_bootstrap_sources(timestamp_unix_ms, now_unix_s)?;
+        self.context.observability.push_log(
+            allocate_log_context(
+                &mut self.next_correlation_id,
+                self.context.node_id,
+                timestamp_unix_ms,
+            ),
+            LogComponent::Runtime,
+            "bootstrap_retry",
+            if accepted_sources > 0 {
+                "accepted"
+            } else {
+                "unavailable"
+            },
+        );
+        Ok(accepted_sources)
+    }
+
+    fn sync_active_peer_gauge(&mut self) {
+        self.context
+            .observability
+            .set_active_peers(self.context.peer_store.active_neighbors().count());
+    }
+
+    fn sync_operating_state(&mut self, timestamp_unix_ms: u64) {
+        let next_state = if self.context.peer_store.active_neighbors().next().is_some() {
+            NodeRuntimeState::Running
+        } else {
+            NodeRuntimeState::Degraded
+        };
+        if self.state != next_state {
+            self.log_state_transition(timestamp_unix_ms, next_state);
+        }
+    }
+
+    fn prune_stale_service_sessions(&mut self, timestamp_unix_ms: u64) -> usize {
+        let pruned = self
+            .context
+            .service_registry
+            .prune_stale_sessions(timestamp_unix_ms, self.stale_service_session_age_ms());
+        if pruned > 0 {
+            self.context.observability.push_log(
+                allocate_log_context(
+                    &mut self.next_correlation_id,
+                    self.context.node_id,
+                    timestamp_unix_ms,
+                ),
+                LogComponent::Service,
+                "cleanup_open_sessions",
+                "pruned",
+            );
+        }
+        pruned
+    }
+
+    fn prune_stale_relay_state(
+        &mut self,
+        timestamp_unix_ms: u64,
+        now_unix_s: u64,
+    ) -> RelayCleanupSummary {
+        let cleanup = self
+            .context
+            .relay_manager
+            .prune_stale_state(now_unix_s, self.stale_relay_tunnel_age_s());
+        if cleanup.stale_tunnels_pruned > 0 {
+            self.context.observability.push_log(
+                allocate_log_context(
+                    &mut self.next_correlation_id,
+                    self.context.node_id,
+                    timestamp_unix_ms,
+                ),
+                LogComponent::Relay,
+                "cleanup_relay_state",
+                "pruned",
+            );
+        }
+        cleanup
+    }
+
+    fn expire_stale_path_probes(&mut self, timestamp_unix_ms: u64) -> usize {
+        let expired = self
+            .context
+            .path_probe_tracker
+            .expire_stale_probes(timestamp_unix_ms);
+        for expired_probe in &expired {
+            if let Some(path_state) = self.context.path_states.get_mut(&expired_probe.path_id) {
+                path_state.observe_probe_feedback(expired_probe.feedback);
+            }
+            self.context.observability.observe_probe_feedback(
+                expired_probe.feedback.obs_rtt_ms,
+                expired_probe.feedback.loss_ppm,
+            );
+            self.context.observability.push_log(
+                allocate_log_context(
+                    &mut self.next_correlation_id,
+                    self.context.node_id,
+                    timestamp_unix_ms,
+                ),
+                LogComponent::Routing,
+                "probe_feedback",
+                "expired",
+            );
+        }
+        expired.len()
+    }
+
     fn ensure_state(
         &self,
         operation: &'static str,
@@ -595,7 +936,7 @@ impl NodeRuntime {
         self.context.next_presence_refresh_unix_s =
             Some(now_unix_s.saturating_add(self.context.presence_refresh_interval_s()));
 
-        let Some(record) = self.context.local_presence.clone() else {
+        let Some(record) = self.refreshed_local_presence(now_unix_s)? else {
             self.context.observability.push_log(
                 allocate_log_context(
                     &mut self.next_correlation_id,
@@ -610,7 +951,7 @@ impl NodeRuntime {
         };
 
         match self.context.rendezvous.publish_verified_with_observability(
-            record,
+            record.clone(),
             now_unix_s,
             &mut self.context.observability,
             allocate_log_context(
@@ -619,9 +960,38 @@ impl NodeRuntime {
                 timestamp_unix_ms,
             ),
         ) {
-            Ok(_) => Ok(true),
+            Ok(_) => {
+                self.context.local_presence = Some(record);
+                Ok(true)
+            }
             Err(error) => Err(error.into()),
         }
+    }
+
+    fn refreshed_local_presence(
+        &self,
+        now_unix_s: u64,
+    ) -> Result<Option<VerifiedPublishPresence>, NodeRuntimeError> {
+        let Some(record) = self.context.local_presence.clone() else {
+            return Ok(None);
+        };
+
+        let mut record = record.into_record();
+        if record.sequence == u64::MAX {
+            return Err(NodeRuntimeError::LocalPresenceSequenceExhausted {
+                node_id: self.context.node_id,
+            });
+        }
+
+        record.sequence += 1;
+        record.expires_at_unix_s = now_unix_s.saturating_add(self.context.config.presence_ttl_s);
+        let body = record.canonical_body_bytes()?;
+        record.signature = self.context.signing_key.sign(&body).as_bytes().to_vec();
+
+        PublishPresence { record }
+            .verify_with_public_key(&self.context.signing_key.public_key())
+            .map(Some)
+            .map_err(Into::into)
     }
 
     fn evaluate_routes(
@@ -700,7 +1070,7 @@ impl NodeRuntime {
     fn poll_managed_sessions(
         &mut self,
         timestamp_unix_ms: u64,
-    ) -> Result<(Vec<SessionEvent>, Vec<SessionIoAction>), NodeRuntimeError> {
+    ) -> Result<(Vec<SessionEvent>, Vec<SessionIoAction>, usize), NodeRuntimeError> {
         let mut session_events = Vec::new();
         let mut session_io_actions = Vec::new();
         let mut closed_ids = Vec::new();
@@ -759,6 +1129,7 @@ impl NodeRuntime {
             }
         }
 
+        let reaped_sessions = closed_ids.len();
         for correlation_id in closed_ids {
             self.managed_sessions.remove(&correlation_id);
         }
@@ -769,7 +1140,7 @@ impl NodeRuntime {
             &mut self.context.observability,
         );
 
-        Ok((session_events, session_io_actions))
+        Ok((session_events, session_io_actions, reaped_sessions))
     }
 }
 
@@ -979,10 +1350,11 @@ mod tests {
         },
         config::OverlayConfig,
         crypto::{aead::ChaCha20Poly1305Key, hash::Blake3Digest, sign::Ed25519SigningKey},
-        identity::{derive_node_id, NodeId},
-        records::PresenceRecord,
+        identity::{derive_app_id, derive_node_id, NodeId},
+        records::{PresenceRecord, ServiceRecord},
         rendezvous::VerifiedPublishPresence,
         routing::{PathMetrics, PathState, RouteDecision},
+        service::{LocalServicePolicy, OpenAppSession, OpenAppSessionStatus},
         session::{HandshakeOutcome, SessionIoActionKind},
         transport::{Transport, TransportClass, TransportPollEvent, TransportRunner},
         wire::MAX_FRAME_BODY_LEN,
@@ -1125,6 +1497,232 @@ mod tests {
     }
 
     #[test]
+    fn bootstrap_retry_recovers_degraded_runtime_once_source_is_available() {
+        let dir = unique_test_dir("runtime-bootstrap-retry");
+        let key_path = dir.join("node.key");
+        let config_path = dir.join("overlay-config.json");
+        let bootstrap_path = dir.join("bootstrap.json");
+        let signing_key = Ed25519SigningKey::from_seed([61_u8; 32]);
+        let mut config = sample_config("node.key", vec!["bootstrap.json".to_string()]);
+        config.presence_ttl_s = 20;
+
+        fs::write(&key_path, signing_key.as_bytes()).expect("key file should be written");
+        write_json(&config_path, &config).expect("config file should be written");
+
+        let mut runtime =
+            NodeRuntime::from_config_path(&config_path).expect("runtime should load from config");
+        runtime
+            .startup(START_UNIX_MS)
+            .expect("startup should degrade while bootstrap file is missing");
+        assert_eq!(runtime.state(), NodeRuntimeState::Degraded);
+
+        let early_retry = runtime
+            .tick(START_UNIX_MS + 4_999)
+            .expect("tick before retry window should succeed");
+        assert!(!early_retry.bootstrap_retry_attempted);
+        assert_eq!(runtime.state(), NodeRuntimeState::Degraded);
+
+        write_json(&bootstrap_path, &sample_bootstrap_response())
+            .expect("bootstrap file should be written before retry");
+        let recovered = runtime
+            .tick(START_UNIX_MS + 5_000)
+            .expect("retry tick should succeed");
+
+        assert!(recovered.bootstrap_retry_attempted);
+        assert_eq!(recovered.bootstrap_sources_accepted, 1);
+        assert_eq!(runtime.state(), NodeRuntimeState::Running);
+        assert_eq!(runtime.snapshot().active_peers, 3);
+        assert_eq!(runtime.health_snapshot().bootstrap.total_attempts, 2);
+        assert_eq!(runtime.health_snapshot().bootstrap.total_successes, 1);
+    }
+
+    #[test]
+    fn tick_prunes_stale_service_sessions_relay_tunnels_and_path_probes() {
+        let dir = unique_test_dir("runtime-cleanup");
+        let key_path = dir.join("node.key");
+        let config_path = dir.join("overlay-config.json");
+        let bootstrap_path = dir.join("bootstrap.json");
+        let signing_key = Ed25519SigningKey::from_seed([62_u8; 32]);
+        let mut config = sample_config("node.key", vec!["bootstrap.json".to_string()]);
+        config.relay_mode = true;
+
+        fs::write(&key_path, signing_key.as_bytes()).expect("key file should be written");
+        write_json(&bootstrap_path, &sample_bootstrap_response())
+            .expect("bootstrap file should be written");
+        write_json(&config_path, &config).expect("config file should be written");
+
+        let mut runtime =
+            NodeRuntime::from_config_path(&config_path).expect("runtime should load from config");
+        runtime
+            .startup(START_UNIX_MS)
+            .expect("startup should succeed with bootstrap file");
+        runtime
+            .upsert_path_state(sample_path_state(7))
+            .expect("path should be tracked");
+        let initial_tick = runtime
+            .tick(START_UNIX_MS + 1_000)
+            .expect("initial tick should schedule a probe");
+        assert_eq!(initial_tick.scheduled_path_probes.len(), 1);
+
+        let service_record = sample_signed_service_record(&signing_key, "terminal");
+        runtime
+            .context_mut()
+            .service_registry_mut()
+            .register_verified(
+                service_record
+                    .clone()
+                    .verify_with_public_key(&signing_key.public_key())
+                    .expect("service record should verify"),
+                LocalServicePolicy::allow_all(),
+            )
+            .expect("service should register");
+        let open = runtime
+            .context_mut()
+            .service_registry_mut()
+            .open_app_session(
+                OpenAppSession {
+                    app_id: service_record.app_id,
+                    reachability_ref: service_record.reachability_ref.clone(),
+                },
+                START_UNIX_MS + 2_000,
+            );
+        assert_eq!(open.status, OpenAppSessionStatus::Opened);
+        let local_node_id = runtime.context().node_id();
+        runtime
+            .context_mut()
+            .relay_manager_mut()
+            .bind_tunnel(
+                91,
+                local_node_id,
+                NodeId::from_bytes([99_u8; 32]),
+                unix_ms_to_s(START_UNIX_MS + 2_000),
+            )
+            .expect("relay tunnel should bind");
+
+        let cleanup_tick = runtime
+            .tick(START_UNIX_MS + 122_000)
+            .expect("cleanup tick should succeed");
+
+        assert_eq!(cleanup_tick.stale_service_sessions_pruned, 1);
+        assert_eq!(cleanup_tick.stale_relay_tunnels_pruned, 1);
+        assert_eq!(cleanup_tick.stale_path_probes_pruned, 1);
+        assert_eq!(runtime.context().service_registry().open_session_count(), 0);
+        assert_eq!(runtime.context().relay_manager().active_tunnel_count(), 0);
+        assert_eq!(
+            runtime.context().observability().metrics().probe_loss_ratio,
+            Some(1_000_000)
+        );
+        assert_eq!(
+            runtime
+                .health_snapshot()
+                .cleanup_totals
+                .stale_service_sessions_pruned,
+            1
+        );
+        assert_eq!(
+            runtime
+                .health_snapshot()
+                .cleanup_totals
+                .stale_relay_tunnels_pruned,
+            1
+        );
+    }
+
+    #[test]
+    fn timed_out_sessions_are_reaped_from_runtime() {
+        let signing_key = Ed25519SigningKey::from_seed([63_u8; 32]);
+        let mut runtime = NodeRuntime::new(
+            NodeContext::new(
+                sample_config("node.key", vec!["static:seed-a".to_string()]),
+                signing_key,
+            )
+            .expect("context should initialize"),
+        );
+        runtime
+            .startup(START_UNIX_MS)
+            .expect("startup should degrade, not fail");
+        runtime
+            .open_placeholder_session(23, Box::new(MockTransportRunner::default()), START_UNIX_MS)
+            .expect("session should open");
+        runtime
+            .managed_session_mut(23)
+            .expect("managed session should exist")
+            .mark_established(START_UNIX_MS + 10)
+            .expect("session should establish");
+
+        let degraded = runtime
+            .tick(START_UNIX_MS + 80_000)
+            .expect("idle timeout tick should succeed");
+        assert!(degraded
+            .session_events
+            .iter()
+            .any(|event| event.event == crate::session::SessionEventKind::Degraded));
+
+        let reaped = runtime
+            .tick(START_UNIX_MS + 110_000)
+            .expect("degraded timeout tick should succeed");
+        assert_eq!(reaped.managed_sessions_reaped, 1);
+        assert_eq!(runtime.managed_session_count(), 0);
+        assert_eq!(
+            runtime
+                .health_snapshot()
+                .cleanup_totals
+                .managed_sessions_reaped,
+            1
+        );
+    }
+
+    #[test]
+    fn local_presence_refresh_rolls_expiry_forward_past_original_ttl() {
+        let signing_key = Ed25519SigningKey::from_seed([64_u8; 32]);
+        let mut runtime = NodeRuntime::new(
+            NodeContext::new(
+                sample_config("node.key", vec!["static:seed-a".to_string()]),
+                signing_key.clone(),
+            )
+            .expect("context should initialize"),
+        );
+        runtime
+            .startup(START_UNIX_MS)
+            .expect("startup should degrade, not fail");
+
+        runtime.context_mut().set_local_presence(
+            verified_presence_record(
+                &signing_key,
+                4,
+                9,
+                unix_ms_to_s(START_UNIX_MS).saturating_add(60),
+            ),
+            unix_ms_to_s(START_UNIX_MS),
+        );
+
+        runtime
+            .tick(START_UNIX_MS + 1_000)
+            .expect("first refresh tick should succeed");
+        runtime
+            .tick(START_UNIX_MS + 121_000)
+            .expect("refresh should continue past the original expiry");
+
+        let mut lookup_state = runtime
+            .context()
+            .rendezvous()
+            .lookup_state(1)
+            .expect("lookup state should build");
+        let lookup = runtime.context_mut().rendezvous_mut().lookup(
+            crate::rendezvous::LookupNode {
+                node_id: derive_node_id(signing_key.public_key().as_bytes()),
+            },
+            unix_ms_to_s(START_UNIX_MS + 121_000),
+            &mut lookup_state,
+        );
+        let crate::rendezvous::LookupResponse::Result(result) = lookup else {
+            panic!("refreshed local presence should remain available");
+        };
+        assert!(result.record.expires_at_unix_s > unix_ms_to_s(START_UNIX_MS + 121_000));
+        assert!(result.record.sequence > 9);
+    }
+
+    #[test]
     fn shutdown_closes_managed_sessions_gracefully() {
         let signing_key = Ed25519SigningKey::from_seed([51_u8; 32]);
         let mut runtime = NodeRuntime::new(
@@ -1175,6 +1773,12 @@ mod tests {
     fn assert_tick_summary(summary: &RuntimeTickSummary) {
         assert_eq!(summary.state, NodeRuntimeState::Degraded);
         assert!(summary.presence_refreshed);
+        assert!(summary.bootstrap_retry_attempted);
+        assert_eq!(summary.bootstrap_sources_accepted, 0);
+        assert_eq!(summary.managed_sessions_reaped, 0);
+        assert_eq!(summary.stale_service_sessions_pruned, 0);
+        assert_eq!(summary.stale_relay_tunnels_pruned, 0);
+        assert_eq!(summary.stale_path_probes_pruned, 0);
         assert_eq!(summary.replay_entries_pruned, 1);
         assert_eq!(summary.stale_published_records_pruned, 1);
         assert_eq!(summary.stale_negative_cache_entries_pruned, 1);
@@ -1333,6 +1937,45 @@ mod tests {
         crate::rendezvous::PublishPresence { record }
             .verify_with_public_key(&signing_key.public_key())
             .expect("presence record should verify")
+    }
+
+    fn sample_path_state(path_id: u64) -> PathState {
+        PathState {
+            path_id,
+            metrics: PathMetrics {
+                est_rtt_ms: 40,
+                obs_rtt_ms: 40,
+                jitter_ms: 5,
+                loss_ppm: 0,
+                relay_hops: 0,
+                censorship_risk_level: 0,
+                diversity_bonus: 1,
+            },
+        }
+    }
+
+    fn sample_signed_service_record(
+        signing_key: &Ed25519SigningKey,
+        service_name: &str,
+    ) -> ServiceRecord {
+        let node_id = derive_node_id(signing_key.public_key().as_bytes());
+        let mut record = ServiceRecord {
+            version: 1,
+            node_id,
+            app_id: derive_app_id(&node_id, "devnet", service_name),
+            service_name: service_name.to_string(),
+            service_version: "1.0.0".to_string(),
+            auth_mode: "none".to_string(),
+            policy: vec![1_u8, 2, 3],
+            reachability_ref: b"runtime-reachability".to_vec(),
+            metadata_commitment: b"runtime-metadata".to_vec(),
+            signature: Vec::new(),
+        };
+        let body = record
+            .canonical_body_bytes()
+            .expect("service record should serialize");
+        record.signature = signing_key.sign(&body).as_bytes().to_vec();
+        record
     }
 
     fn sample_handshake_outcome() -> HandshakeOutcome {

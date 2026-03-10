@@ -25,6 +25,7 @@ pub const DEFAULT_MAX_SWITCHES_PER_MINUTE: usize = 2;
 pub const DEFAULT_PATH_PROBE_INTERVAL_MS: u64 = 5_000;
 pub const DEFAULT_MAX_IN_FLIGHT_PATH_PROBES_PER_PATH: usize = 4;
 pub const DEFAULT_PATH_PROBE_LOSS_WINDOW_SAMPLES: usize = 16;
+pub const DEFAULT_PATH_PROBE_TIMEOUT_MULTIPLIER: u64 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PathProbeConfig {
@@ -280,6 +281,13 @@ pub struct PathProbeTracker {
     paths: BTreeMap<u64, PathProbeState>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExpiredPathProbe {
+    pub path_id: u64,
+    pub probe_id: u64,
+    pub feedback: PathProbeFeedback,
+}
+
 impl PathProbeTracker {
     pub fn new(config: PathProbeConfig) -> Result<Self, RoutingError> {
         Ok(Self {
@@ -437,6 +445,44 @@ impl PathProbeTracker {
             .get(&path_id)
             .map(|state| state.in_flight.len())
             .unwrap_or(0)
+    }
+
+    pub fn expire_stale_probes(&mut self, now_unix_ms: u64) -> Vec<ExpiredPathProbe> {
+        let probe_timeout_ms = self
+            .config
+            .path_probe_interval_ms
+            .saturating_mul(DEFAULT_PATH_PROBE_TIMEOUT_MULTIPLIER);
+        let path_ids = self.paths.keys().copied().collect::<Vec<_>>();
+        let mut expired = Vec::new();
+
+        for path_id in path_ids {
+            let Some(state) = self.paths.get_mut(&path_id) else {
+                continue;
+            };
+
+            while let Some(probe) = state.in_flight.front().copied() {
+                if now_unix_ms.saturating_sub(probe.sent_at_unix_ms) < probe_timeout_ms {
+                    break;
+                }
+
+                let probe = state
+                    .in_flight
+                    .pop_front()
+                    .expect("front probe should exist while expiring stale probes");
+                note_probe_outcome(&mut state.recent_outcomes, false);
+                expired.push(ExpiredPathProbe {
+                    path_id,
+                    probe_id: probe.probe_id,
+                    feedback: PathProbeFeedback {
+                        obs_rtt_ms: None,
+                        loss_ppm: loss_ppm(&state.recent_outcomes),
+                        jitter_ms: None,
+                    },
+                });
+            }
+        }
+
+        expired
     }
 }
 
@@ -691,6 +737,7 @@ mod tests {
         PathProbeFeedback, PathProbeResult, PathProbeTracker, PathState, RouteDecision,
         RouteSelector, RoutingError, RoutingMessageError,
         DEFAULT_MAX_IN_FLIGHT_PATH_PROBES_PER_PATH, DEFAULT_PATH_PROBE_INTERVAL_MS,
+        DEFAULT_PATH_PROBE_TIMEOUT_MULTIPLIER,
     };
     use crate::{
         error::FrameError,
@@ -1017,6 +1064,42 @@ mod tests {
                 jitter_ms: None,
             }
         );
+    }
+
+    #[test]
+    fn stale_in_flight_probes_are_expired_as_losses() {
+        let mut tracker = PathProbeTracker::new(PathProbeConfig {
+            path_probe_interval_ms: DEFAULT_PATH_PROBE_INTERVAL_MS,
+        })
+        .expect("config should be valid");
+        let first = tracker
+            .begin_probe(12, 1_000)
+            .expect("probe scheduling should succeed")
+            .expect("probe should be due");
+
+        let expired = tracker.expire_stale_probes(
+            1_000 + (DEFAULT_PATH_PROBE_INTERVAL_MS * DEFAULT_PATH_PROBE_TIMEOUT_MULTIPLIER),
+        );
+        assert_eq!(
+            expired,
+            vec![super::ExpiredPathProbe {
+                path_id: first.path_id,
+                probe_id: first.probe_id,
+                feedback: PathProbeFeedback {
+                    obs_rtt_ms: None,
+                    loss_ppm: 1_000_000,
+                    jitter_ms: None,
+                },
+            }]
+        );
+        assert_eq!(tracker.in_flight_probe_count(12), 0);
+        assert!(tracker
+            .begin_probe(
+                12,
+                1_000 + (DEFAULT_PATH_PROBE_INTERVAL_MS * DEFAULT_PATH_PROBE_TIMEOUT_MULTIPLIER),
+            )
+            .expect("a fresh probe should be allowed after expiry")
+            .is_some());
     }
 
     #[test]

@@ -334,6 +334,10 @@ impl ServiceRegistry {
         })
     }
 
+    pub const fn config(&self) -> ServiceConfig {
+        self.config
+    }
+
     pub fn register_verified(
         &mut self,
         record: VerifiedServiceRecord,
@@ -397,6 +401,14 @@ impl ServiceRegistry {
 
     pub fn close_session(&mut self, session_id: u64) -> Option<OpenServiceSession> {
         self.open_sessions.remove(&session_id)
+    }
+
+    pub fn prune_stale_sessions(&mut self, now_unix_ms: u64, max_age_ms: u64) -> usize {
+        let before = self.open_sessions.len();
+        self.open_sessions.retain(|_, session| {
+            now_unix_ms.saturating_sub(session.opened_at_unix_ms) < max_age_ms
+        });
+        before.saturating_sub(self.open_sessions.len())
     }
 
     pub fn close_session_with_observability(
@@ -768,6 +780,38 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn stale_open_sessions_are_pruned() {
+        let signing_key = Ed25519SigningKey::from_seed([55_u8; 32]);
+        let record = sample_signed_service_record(&signing_key, "terminal");
+        let mut registry =
+            ServiceRegistry::new(ServiceConfig::default()).expect("default config should work");
+
+        registry
+            .register_verified(
+                record
+                    .clone()
+                    .verify_with_public_key(&signing_key.public_key())
+                    .expect("signed service record should verify"),
+                LocalServicePolicy::allow_all(),
+            )
+            .expect("verified service should register");
+
+        let opened = registry.open_app_session(
+            OpenAppSession {
+                app_id: record.app_id,
+                reachability_ref: record.reachability_ref.clone(),
+            },
+            1_700_000_000_123,
+        );
+        assert_eq!(opened.status, OpenAppSessionStatus::Opened);
+        assert_eq!(registry.open_session_count(), 1);
+
+        let pruned = registry.prune_stale_sessions(1_700_000_120_123, 60_000);
+        assert_eq!(pruned, 1);
+        assert_eq!(registry.open_session_count(), 0);
     }
 
     #[test]

@@ -7,8 +7,9 @@ use overlay_core::{
     crypto::{kex::X25519StaticSecret, sign::Ed25519SigningKey},
     identity::{derive_app_id, derive_node_id, AppId, NodeId},
     records::{IntroTicket, PresenceRecord, RelayHint, ServiceRecord},
-    relay::{build_reachability_plan, IntroResponseStatus, RelayManager, ResolveIntro},
+    relay::{build_reachability_plan, IntroResponseStatus, ResolveIntro},
     rendezvous::{LookupNode, LookupResponse, PublishDisposition, PublishPresence},
+    routing::{PathMetrics, PathState},
     runtime::{NodeRuntime, NodeRuntimeState},
     service::{
         GetServiceRecord, LocalServicePolicy, OpenAppSession, OpenAppSessionStatus,
@@ -30,10 +31,20 @@ const REQUESTER_BINDING: &[u8] = b"devnet-node-a";
 const SERVICE_NAMESPACE: &str = "devnet";
 const SERVICE_NAME: &str = "terminal";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct SmokeOptions {
+    pub soak_seconds: u64,
+    pub status_interval_seconds: Option<u64>,
+}
+
 pub fn run_smoke(devnet_dir: &Path) -> Result<(), String> {
+    run_smoke_with_options(devnet_dir, SmokeOptions::default())
+}
+
+pub fn run_smoke_with_options(devnet_dir: &Path, options: SmokeOptions) -> Result<(), String> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
-    run_smoke_with_writer(devnet_dir, &mut stdout).map(|_| ())
+    run_smoke_with_writer_and_options(devnet_dir, &mut stdout, options).map(|_| ())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,7 +63,16 @@ struct DevnetNode {
     runtime: NodeRuntime,
 }
 
+#[cfg(test)]
 fn run_smoke_with_writer(devnet_dir: &Path, writer: &mut dyn Write) -> Result<SmokeReport, String> {
+    run_smoke_with_writer_and_options(devnet_dir, writer, SmokeOptions::default())
+}
+
+fn run_smoke_with_writer_and_options(
+    devnet_dir: &Path,
+    writer: &mut dyn Write,
+    options: SmokeOptions,
+) -> Result<SmokeReport, String> {
     let mut node_a = load_node(devnet_dir, "node-a")?;
     let mut node_b = load_node(devnet_dir, "node-b")?;
     let mut node_c = load_node(devnet_dir, "node-c")?;
@@ -98,6 +118,10 @@ fn run_smoke_with_writer(devnet_dir: &Path, writer: &mut dyn Write) -> Result<Sm
             publish_ack.disposition
         ));
     }
+    node_b.runtime.context_mut().set_local_presence(
+        verified_presence.clone(),
+        unix_ms_to_s(START_UNIX_MS + 2_000),
+    );
     node_a
         .runtime
         .context_mut()
@@ -208,8 +232,10 @@ fn run_smoke_with_writer(devnet_dir: &Path, writer: &mut dyn Write) -> Result<Sm
         }),
     )?;
 
+    let relay_node_id = relay.runtime.context().node_id();
+    let node_b_id = node_b.runtime.context().node_id();
     let relay_hint = RelayHint {
-        relay_node_id: relay.runtime.context().node_id(),
+        relay_node_id,
         relay_transport_class: "tcp".to_string(),
         relay_score: 90,
         relay_policy: vec![1_u8],
@@ -260,34 +286,38 @@ fn run_smoke_with_writer(devnet_dir: &Path, writer: &mut dyn Write) -> Result<Sm
     }
     .verify_with_public_key(&node_b.runtime.context().signing_key().public_key())
     .map_err(|error| format!("resolve-intro verification failed: {error}"))?;
-    let mut relay_manager = RelayManager::new(relay.runtime.context().config().relay_config())
-        .map_err(|error| format!("relay manager init failed: {error}"))?;
-    let intro_response = relay_manager.process_resolve_intro(
-        relay.runtime.context().node_id(),
-        resolve_intro,
-        REQUESTER_BINDING,
-        unix_ms_to_s(START_UNIX_MS + 5_100),
-    );
+    let intro_response = relay
+        .runtime
+        .context_mut()
+        .relay_manager_mut()
+        .process_resolve_intro(
+            relay_node_id,
+            resolve_intro,
+            REQUESTER_BINDING,
+            unix_ms_to_s(START_UNIX_MS + 5_100),
+        );
     if intro_response.status != IntroResponseStatus::Forwarded {
         return Err(format!(
             "relay intro expected forwarded status, got {:?}",
             intro_response.status
         ));
     }
-    let tunnel = relay_manager
+    let tunnel = relay
+        .runtime
+        .context_mut()
+        .relay_manager_mut()
         .bind_tunnel(
             RELAY_TUNNEL_ID,
-            relay.runtime.context().node_id(),
-            node_b.runtime.context().node_id(),
+            relay_node_id,
+            node_b_id,
             unix_ms_to_s(START_UNIX_MS + 5_200),
         )
         .map_err(|error| format!("relay tunnel bind failed: {error}"))?;
-    relay_manager
-        .note_relayed_bytes(
-            relay.runtime.context().node_id(),
-            1_024,
-            unix_ms_to_s(START_UNIX_MS + 5_201),
-        )
+    relay
+        .runtime
+        .context_mut()
+        .relay_manager_mut()
+        .note_relayed_bytes(relay_node_id, 1_024, unix_ms_to_s(START_UNIX_MS + 5_201))
         .map_err(|error| format!("relay byte accounting failed: {error}"))?;
     write_step(
         writer,
@@ -313,6 +343,16 @@ fn run_smoke_with_writer(devnet_dir: &Path, writer: &mut dyn Write) -> Result<Sm
             "service_session_id": service_session_id,
             "relay_tunnel_id": tunnel.tunnel_id,
         }),
+    )?;
+
+    run_long_soak(
+        &mut node_a,
+        &mut node_b,
+        &mut node_c,
+        &mut relay,
+        START_UNIX_MS + 6_000,
+        options,
+        writer,
     )?;
 
     Ok(SmokeReport {
@@ -483,6 +523,129 @@ fn establish_placeholder_session(
     )
 }
 
+fn run_long_soak(
+    node_a: &mut DevnetNode,
+    node_b: &mut DevnetNode,
+    node_c: &mut DevnetNode,
+    relay: &mut DevnetNode,
+    start_unix_ms: u64,
+    options: SmokeOptions,
+    writer: &mut dyn Write,
+) -> Result<(), String> {
+    if options.soak_seconds == 0 {
+        return Ok(());
+    }
+
+    node_a
+        .runtime
+        .upsert_path_state(sample_soak_path_state())
+        .map_err(|error| format!("{} soak path setup failed: {error}", node_a.name))?;
+    write_step(
+        writer,
+        json!({
+            "step": "soak_started",
+            "soak_seconds": options.soak_seconds,
+            "status_interval_seconds": options.status_interval_seconds,
+        }),
+    )?;
+
+    for elapsed_s in 1..=options.soak_seconds {
+        let tick_unix_ms = start_unix_ms.saturating_add(elapsed_s.saturating_mul(1_000));
+        tick_node(node_a, tick_unix_ms, 0)?;
+        tick_node(node_b, tick_unix_ms, 10)?;
+        tick_node(node_c, tick_unix_ms, 20)?;
+        tick_node(relay, tick_unix_ms, 30)?;
+
+        if options
+            .status_interval_seconds
+            .map(|interval| elapsed_s % interval == 0)
+            .unwrap_or(false)
+        {
+            write_health_step(writer, node_a, elapsed_s)?;
+            write_health_step(writer, node_b, elapsed_s)?;
+            write_health_step(writer, node_c, elapsed_s)?;
+            write_health_step(writer, relay, elapsed_s)?;
+        }
+    }
+
+    let node_a_health = node_a.runtime.health_snapshot();
+    let node_b_health = node_b.runtime.health_snapshot();
+    let relay_health = relay.runtime.health_snapshot();
+    if node_a_health.runtime.managed_sessions != 0 || node_b_health.runtime.managed_sessions != 0 {
+        return Err(format!(
+            "stale sessions were not fully reaped: node-a={} node-b={}",
+            node_a_health.runtime.managed_sessions, node_b_health.runtime.managed_sessions
+        ));
+    }
+    if node_b_health.runtime.open_service_sessions != 0 {
+        return Err(format!(
+            "stale service sessions were not pruned on {}",
+            node_b.name
+        ));
+    }
+    if relay_health.relay.active_tunnels != 0 {
+        return Err(format!(
+            "stale relay tunnels were not pruned on {}",
+            relay.name
+        ));
+    }
+    if node_a_health.cleanup_totals.stale_path_probes_pruned == 0 {
+        return Err("path-probe cleanup did not prune any stale probes during soak".to_string());
+    }
+    if node_b_health.metrics.publish_presence_total == 0 {
+        return Err("presence refresh did not republish during soak".to_string());
+    }
+
+    write_step(
+        writer,
+        json!({
+            "step": "soak_complete",
+            "soak_seconds": options.soak_seconds,
+            "node_a_health": node_a_health,
+            "node_b_health": node_b_health,
+            "relay_health": relay_health,
+        }),
+    )
+}
+
+fn tick_node(node: &mut DevnetNode, base_unix_ms: u64, offset_ms: u64) -> Result<(), String> {
+    node.runtime
+        .tick(base_unix_ms.saturating_add(offset_ms))
+        .map(|_| ())
+        .map_err(|error| format!("{} soak tick failed: {error}", node.name))
+}
+
+fn write_health_step(
+    writer: &mut dyn Write,
+    node: &DevnetNode,
+    elapsed_s: u64,
+) -> Result<(), String> {
+    write_step(
+        writer,
+        json!({
+            "step": "runtime_status",
+            "node": node.name,
+            "elapsed_s": elapsed_s,
+            "health": node.runtime.health_snapshot(),
+        }),
+    )
+}
+
+fn sample_soak_path_state() -> PathState {
+    PathState {
+        path_id: 9_001,
+        metrics: PathMetrics {
+            est_rtt_ms: 45,
+            obs_rtt_ms: 45,
+            jitter_ms: 3,
+            loss_ppm: 0,
+            relay_hops: 0,
+            censorship_risk_level: 0,
+            diversity_bonus: 1,
+        },
+    }
+}
+
 fn build_signed_presence_record(
     signing_key: &Ed25519SigningKey,
     expires_at_unix_s: u64,
@@ -570,7 +733,9 @@ fn write_step(writer: &mut dyn Write, value: serde_json::Value) -> Result<(), St
 mod tests {
     use std::path::PathBuf;
 
-    use super::{run_smoke_with_writer, SERVICE_NAME};
+    use super::{
+        run_smoke_with_writer, run_smoke_with_writer_and_options, SmokeOptions, SERVICE_NAME,
+    };
 
     #[test]
     fn repo_devnet_smoke_flow_succeeds() {
@@ -590,6 +755,28 @@ mod tests {
         assert!(rendered.contains("\"step\":\"open_service\""));
         assert!(rendered.contains("\"step\":\"relay_fallback_bound\""));
         assert!(rendered.contains(SERVICE_NAME));
+    }
+
+    #[test]
+    fn repo_devnet_soak_exercises_runtime_health_and_cleanup() {
+        let mut output = Vec::new();
+        let report = run_smoke_with_writer_and_options(
+            &repo_devnet_dir(),
+            &mut output,
+            SmokeOptions {
+                soak_seconds: 660,
+                status_interval_seconds: Some(220),
+            },
+        )
+        .expect("sample devnet soak flow should succeed");
+        assert_ne!(report.service_session_id, 0);
+
+        let rendered = String::from_utf8(output).expect("smoke output should be utf-8");
+        assert!(rendered.contains("\"step\":\"soak_started\""));
+        assert!(rendered.contains("\"step\":\"runtime_status\""));
+        assert!(rendered.contains("\"step\":\"soak_complete\""));
+        assert!(rendered.contains("\"stale_path_probes_pruned\":"));
+        assert!(rendered.contains("\"open_service_sessions\":0"));
     }
 
     fn repo_devnet_dir() -> PathBuf {

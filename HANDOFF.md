@@ -19,6 +19,9 @@ A Codex-oriented handoff bundle containing:
   subsystem observability integration, and the current regression,
   stage-boundary, and Milestone 9 unit suites as the working validation
   boundary.
+- Local runtime/devnet follow-on work through Milestone 12 is also present on
+  top of that stage marker, including runtime cleanup/retry/status hardening
+  and the local devnet soak path, but it does not change `REPOSITORY_STAGE`.
 
 ## Recommended first Codex task
 

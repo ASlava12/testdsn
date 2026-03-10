@@ -830,6 +830,10 @@ For the minimal long-running runtime:
 - presence refresh runs only when an already verified local `PresenceRecord`
   has been installed into the runtime context;
 - the runtime does not synthesize signed presence records from config alone;
+- refresh may roll `expires_at_unix_s` forward to `now + presence_ttl_s` and
+  re-sign the installed local record template with a strictly higher
+  `sequence`, so long-running local runtime/devnet operation does not republish
+  already-expired presence state;
 - refresh is scheduled at half of `presence_ttl_s`, with a minimum interval of
   one second.
 
@@ -860,6 +864,34 @@ Rationale:
   already has full socket-level transport plumbing;
 - it exposes the local-only assumption explicitly instead of hiding it in test
   harness code.
+
+### 36. Conservative runtime launch-hardening defaults for Milestone 12
+
+For the current local-runtime/devnet hardening slice:
+
+- degraded runtime bootstrap retry stays local-file/provider based and runs only
+  from the existing runtime tick loop;
+- the retry interval is derived conservatively from existing config instead of a
+  new top-level knob:
+  `max(5000 ms, path_probe_interval_ms, presence_ttl_s / 4)`;
+- stale service-open sessions are pruned after `presence_ttl_s`;
+- stale relay tunnels are pruned after `presence_ttl_s`;
+- expired path probes are treated as local loss after
+  `3 * path_probe_interval_ms`, removed from the in-flight tracker, and fed back
+  through the existing loss-observation path;
+- operator health/status stays as local JSON snapshots emitted by the CLI/runtime
+  boundary and reports existing bounded counts, observability counters, cleanup
+  totals, relay usage, and effective local resource limits;
+- do not add a runtime control socket, external metrics backend, persistence
+  layer, or listener-specific accept policy until real listener surfaces are
+  explicitly specified.
+
+Rationale:
+- this keeps Milestone 12 focused on launch resilience for the current local
+  runtime instead of inventing a new deployment/control-plane architecture;
+- it reuses existing bounded config surfaces and subsystem limits;
+- it gives node operators enough local status to run the devnet without
+  broadening protocol scope.
 
 ## Rule
 

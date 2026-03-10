@@ -14,6 +14,8 @@ Nodes:
 - `keys/*.key`: deterministic Ed25519 seed files in hex form.
 - `bootstrap/*.json`: local bootstrap seed files used by the runtime startup path.
 - `run-smoke.sh`: wrapper around `overlay-cli smoke`.
+- `run-soak.sh`: wrapper around `overlay-cli smoke --soak-seconds ...` for the
+  logical long-run runtime soak.
 
 ## Run The Smoke Flow
 
@@ -39,6 +41,34 @@ To watch the existing runtime startup and tick logs for one config:
 ```bash
 TMPDIR=/tmp cargo run -p overlay-cli -- run --config devnet/configs/node-a.json --max-ticks 2
 ```
+
+To emit periodic runtime health snapshots while the node ticks:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- run --config devnet/configs/node-a.json --max-ticks 120 --status-every 30
+```
+
+Each status dump includes:
+- runtime state plus peer/session/path/service counts;
+- publish/lookup/session/relay/probe observability counters;
+- relay usage, cleanup totals, and the effective local resource limits.
+
+## Long-Run Soak
+
+For a logical 30-minute local soak without wall-clock sleeps:
+
+```bash
+./devnet/run-soak.sh
+```
+
+This drives the same 4-node in-process devnet, advances logical time through
+repeated runtime ticks, and checks that:
+- stale placeholder sessions are reaped after timeout;
+- stale service-open sessions are pruned;
+- relay tunnels are cleaned up after the local retention window;
+- expired path probes are converted into bounded local loss observations;
+- node-b keeps refreshing its installed local presence with rolled freshness
+  during the soak.
 
 ## Relay Fallback Scenario
 

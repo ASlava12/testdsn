@@ -140,6 +140,10 @@ impl PeerStore {
         self.neighbors.values()
     }
 
+    pub fn neighbor_count(&self) -> usize {
+        self.neighbors.len()
+    }
+
     pub fn active_neighbors(&self) -> impl Iterator<Item = &NeighborStateEntry> {
         self.neighbors
             .values()
