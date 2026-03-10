@@ -14,6 +14,9 @@ Nodes:
 - `keys/*.key`: deterministic Ed25519 seed files in hex form.
 - `bootstrap/*.json`: local bootstrap seed files used by the runtime startup path.
 - `run-smoke.sh`: wrapper around `overlay-cli smoke`.
+- `run-restart-smoke.sh`: wrapper that runs the same checked-in service-host
+  config twice for a bounded restart smoke.
+- `run-launch-gate.sh`: wrapper around the full Milestone 14 pilot launch gate.
 - `run-soak.sh`: wrapper around `overlay-cli smoke --soak-seconds ...` for the
   logical long-run runtime soak.
 
@@ -69,6 +72,35 @@ repeated runtime ticks, and checks that:
 - expired path probes are converted into bounded local loss observations;
 - node-b keeps refreshing its installed local presence with rolled freshness
   during the soak.
+
+## Restart Smoke
+
+For the bounded restart smoke:
+
+```bash
+./devnet/run-restart-smoke.sh
+```
+
+This runs the same checked-in service-host config twice with `overlay-cli run
+--max-ticks 0 --status-every 1` so the current in-memory runtime restart path
+is covered by a reproducible local command.
+
+## Full Launch Gate
+
+For the full Milestone 14 pilot gate:
+
+```bash
+./devnet/run-launch-gate.sh
+```
+
+This executes the required launch-order checks:
+- `cargo fmt --all --check`
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- `cargo check --workspace`
+- `cargo test --workspace`
+- the stage-boundary integration tests
+- the devnet smoke
+- the restart smoke
 
 ## Relay Fallback Scenario
 

@@ -12,33 +12,30 @@ A Codex-oriented handoff bundle containing:
 
 ## Current repository stage
 
-- `REPOSITORY_STAGE` is `milestone-9-hardening`.
-- Milestones 0-8 are a closed baseline in this repository.
-- Milestone 9 hardening and polish is the active stage with
-  observability/config groundwork, a bounded handshake replay cache, explicit
-  subsystem observability integration, and the current regression,
-  stage-boundary, and Milestone 9 unit suites as the working validation
-  boundary.
-- Local runtime/devnet follow-on work through Milestone 12 is also present on
-  top of that stage marker, including runtime cleanup/retry/status hardening
-  and the local devnet soak path, but it does not change `REPOSITORY_STAGE`.
+- `REPOSITORY_STAGE` is `milestone-14-launch-gate`.
+- Milestones 0-12 are a closed baseline in this repository.
+- Milestone 14 launch gate and pilot tag is the current stage with a frozen
+  pilot launch surface, `docs/LAUNCH_CHECKLIST.md`,
+  `docs/PILOT_RELEASE_TEMPLATE.md`, the documented green-path validation and
+  launch flow, and explicit pilot-only limitations.
 
 ## Recommended first Codex task
 
-Use `prompts/codex-milestone-9.md` as the first task prompt for the current
-`milestone-9-hardening` stage. It assumes the repository already has a closed
-Milestone 1-8 baseline and does not need to restart from Milestone 0/1/2.
+Use `prompts/codex-milestone-14.md` as the first task prompt for the current
+`milestone-14-launch-gate` stage. It assumes the repository already has a
+closed Milestone 1-12 baseline and does not need to restart from Milestone
+0/1/2.
 
 ## Recommended workflow
 
 1. Confirm from `README.md`, `AGENTS.md`, and `IMPLEMENT.md` that the current
-   stage is `milestone-9-hardening`.
-2. Do not restart from Milestone 0/1/2; treat Milestones 1-8 as
-   regression-fix, vector-maintenance, and validation-maintenance territory
-   only unless the task explicitly reopens them.
-3. Scope Milestone 9 work narrowly from the current hardening boundary instead
-   of treating it as a broad umbrella task.
-4. Keep simulation-focused expansion and broader protocol scope out of work
-   until Milestone 9 is materially complete.
+   stage is `milestone-14-launch-gate`.
+2. Do not restart from Milestone 0/1/2; treat Milestones 1-12 as
+   regression-fix, vector-maintenance, validation-maintenance, and
+   launch-maintenance territory only unless the task explicitly reopens them.
+3. Scope work narrowly from the pilot launch-gate boundary instead of treating
+   the stage as a feature umbrella.
+4. Keep broader protocol scope, public-production claims, and redesign work out
+   of current-stage tasks unless explicitly requested.
 5. Keep status docs, milestone prompts, and `docs/OPEN_QUESTIONS.md` aligned as
    the repository stage evolves.

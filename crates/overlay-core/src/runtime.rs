@@ -1386,7 +1386,7 @@ mod tests {
             .startup(START_UNIX_MS)
             .expect("startup should succeed");
 
-        assert_eq!(REPOSITORY_STAGE, "milestone-9-hardening");
+        assert_eq!(REPOSITORY_STAGE, "milestone-14-launch-gate");
         assert_eq!(runtime.state(), NodeRuntimeState::Running);
         assert_eq!(
             runtime.context().node_id(),

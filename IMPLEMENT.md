@@ -4,8 +4,9 @@ This file is the execution plan for Codex.
 
 ## Current repository stage
 
-The repository has a closed Milestone 1-8 baseline.
-The current repository stage marker is `milestone-9-hardening`.
+The repository has a closed Milestone 1-12 baseline plus a frozen Milestone 14
+pilot launch gate.
+The current repository stage marker is `milestone-14-launch-gate`.
 
 - Milestone 0 bootstrap is complete.
 - Milestone 1 foundations are implemented, vectorized, and validated in
@@ -57,7 +58,7 @@ The current repository stage marker is `milestone-9-hardening`.
   integration coverage in
   `crates/overlay-core/tests/integration_service_open.rs`. Milestone 8 is
   considered closed.
-- Milestone 9 hardening and polish is now active with initial bounded
+- Milestone 9 hardening and polish is implemented with initial bounded
   observability groundwork in `crates/overlay-core/src/metrics/mod.rs` and a
   validated top-level config baseline in `crates/overlay-core/src/config.rs`
   with explicit transport-buffer projection in
@@ -74,11 +75,8 @@ The current repository stage marker is `milestone-9-hardening`.
   handling, rendezvous response-shape validation, and relay, routing, and
   service wire-body rejection paths.
   Session observability now also has an explicit established-session gauge sync
-  helper while keeping aggregation caller-invoked. The remaining active
-  Milestone 9 work is broader stale/malformed-input expansion, validation
-  maintenance, and any remaining explicit observability aggregation
-  boundaries, and the current validation boundary is the existing regression
-  suites,
+  helper while keeping aggregation caller-invoked, and the current validation
+  boundary is the existing regression suites,
   stage-boundary integration tests, and Milestone 9 unit coverage in
   `bootstrap::tests`, `config::tests`, `metrics::tests`, `peer::tests`,
   `rendezvous::tests`, `relay::tests`, `routing::tests`, `service::tests`, and
@@ -92,8 +90,7 @@ The current repository stage marker is `milestone-9-hardening`.
   deterministic key material, local bootstrap seed files, a reproducible
   smoke flow, and one documented relay-fallback path. This remains a
   local-only orchestration layer on top of the existing runtime and subsystem
-  boundaries; it does not advance the protocol stage marker beyond
-  `milestone-9-hardening`.
+  boundaries; it did not advance the protocol stage marker before Milestone 14.
 - Milestone 12 launch-hardening work is now implemented in
   `crates/overlay-core/src/runtime.rs`, `crates/overlay-cli/src/main.rs`, and
   `crates/overlay-cli/src/devnet.rs`, with bounded stale-state cleanup for the
@@ -102,8 +99,15 @@ The current repository stage marker is `milestone-9-hardening`.
   runtime health/status snapshots plus `overlay-cli run --status-every ...`
   dumps, and a logical long-run devnet soak path exposed through
   `overlay-cli smoke --soak-seconds ...` / `devnet/run-soak.sh`. This is still
-  runtime/devnet hardening on top of the current local-only boundary and does
-  not advance the protocol stage marker beyond `milestone-9-hardening`.
+  runtime/devnet hardening on top of the current local-only boundary and did
+  not advance the protocol stage marker before Milestone 14.
+- Milestone 14 launch-gate and pilot-tag work is now implemented with
+  `docs/LAUNCH_CHECKLIST.md`, `docs/PILOT_RELEASE_TEMPLATE.md`,
+  `devnet/run-launch-gate.sh`, `devnet/run-restart-smoke.sh`, the documented
+  green-path validation and launch sequence in `docs/RUNBOOK.md` /
+  `docs/DEVNET.md`, a frozen current MVP launch surface, and explicit pilot-only
+  limitations. The repository stage marker now advances to
+  `milestone-14-launch-gate`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -111,22 +115,20 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Use `prompts/codex-milestone-9.md` as the recommended next-task prompt for the
-current `milestone-9-hardening` stage and continue Milestone 9 conservatively
-from the current hardening boundary:
+Use `prompts/codex-milestone-14.md` as the recommended next-task prompt for the
+current `milestone-14-launch-gate` stage and keep work conservative from the
+pilot launch-gate boundary:
 
-1. keep hardening work aligned with `spec/observability.md`,
-   `spec/threat-model.md`, `spec/config.md`, and `docs/OPEN_QUESTIONS.md`;
-2. do not treat Milestone 9 as a broad umbrella task; take one concrete
-   hardening slice at a time around local rate limits, byte budgets,
-   replay-risk mitigation, structured metrics/logs, stale or malformed input
-   coverage, or validation maintenance;
-3. keep Milestones 1-8 limited to regression fixes, vector maintenance, or
-   validation maintenance;
-4. update status docs, prompts, and `docs/OPEN_QUESTIONS.md` whenever the
-   documented baseline changes;
-5. keep simulation-focused expansion or broader protocol scope out of work
-   until Milestone 9 is materially complete.
+1. preserve the frozen launch surface documented in
+   `docs/LAUNCH_CHECKLIST.md`, `docs/RUNBOOK.md`, and `docs/DEVNET.md`;
+2. keep Milestones 1-12 limited to regression fixes, launch-maintenance
+   updates, vector maintenance, or conservative spec-conformance fixes;
+3. prefer pilot-readiness fixes, validation maintenance, and documentation sync
+   over feature expansion;
+4. rerun the documented launch gate whenever `REPOSITORY_STAGE`, launch docs,
+   or launch scripts change;
+5. keep public-production claims, protocol redesign, and scope expansion out of
+   work unless explicitly requested.
 
 ## Milestone 0 — repository bootstrap
 
@@ -388,8 +390,8 @@ Open an application session after node reachability is resolved.
 
 ## Milestone 9 — hardening and polish
 
-Status: active with observability/config groundwork, bounded replay-cache
-hardening, and expanded malformed-input coverage landed in this repository.
+Status: closed in this repository; use only for regression fixes, validation
+maintenance, or conservative hardening repairs.
 
 ### Goal
 Close the highest-risk gaps before larger-scale simulation.
@@ -418,3 +420,33 @@ Close the highest-risk gaps before larger-scale simulation.
 - malformed/stale record tests pass
 - validation commands are stable
 - repository is ready for simulation-focused work
+
+---
+
+## Milestone 14 — launch gate and pilot tag
+
+Status: current repository stage and considered closed for the current baseline.
+
+### Goal
+Freeze a reproducible pilot launch gate without claiming public-production
+readiness.
+
+### Tasks
+1. Add a reproducible launch checklist.
+2. Add a pilot release note and tag template.
+3. Freeze the current launchable MVP surface.
+4. Document the green-path validation and launch sequence.
+5. Keep status docs, prompts, and launch-facing docs synchronized to the new
+   stage marker.
+
+### Important constraints
+- Do not add major new features in this milestone.
+- Do not redesign protocol layers in this milestone.
+- Do not describe the result as GA or public hostile-environment ready.
+
+### Done when
+- the launch checklist and pilot release template exist
+- the documented launch gate has one reproducible command order
+- the current network can be raised and checked through the documented green
+  path
+- status docs and prompts report the same Milestone 14 stage marker

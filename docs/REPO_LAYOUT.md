@@ -7,7 +7,11 @@ overlay/
 ├─ IMPLEMENT.md
 ├─ VALIDATION.md
 ├─ devnet/
+│  ├─ run-launch-gate.sh
+│  └─ run-restart-smoke.sh
 ├─ docs/
+│  ├─ LAUNCH_CHECKLIST.md
+│  ├─ PILOT_RELEASE_TEMPLATE.md
 │  ├─ REPO_LAYOUT.md
 │  └─ OPEN_QUESTIONS.md
 ├─ prompts/
@@ -20,7 +24,8 @@ overlay/
 │  ├─ codex-milestone-6.md
 │  ├─ codex-milestone-7.md
 │  ├─ codex-milestone-8.md
-│  └─ codex-milestone-9.md
+│  ├─ codex-milestone-9.md
+│  └─ codex-milestone-14.md
 ├─ spec/
 │  ├─ architecture.md
 │  ├─ threat-model.md

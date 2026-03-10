@@ -4,11 +4,11 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `README.md`, `HANDOFF.md`, `VALIDATION.md`,
 relevant modules under `crates/overlay-core/src/`.
 
 Goal:
-Work only within the current repository stage, `milestone-9-hardening`, from
-the closed Milestone 1-8 baseline.
+Audit or repair the Milestone 9 hardening baseline only if a task explicitly
+reopens it from the current `milestone-14-launch-gate` repository stage.
 
 Current repository baseline:
-- The current repository stage marker is `milestone-9-hardening`.
+- The current repository stage marker is `milestone-14-launch-gate`.
 - Milestone 0 is complete.
 - Milestone 1 identities, records, and wire foundations are implemented,
   vectorized, and validated.
@@ -26,11 +26,12 @@ Current repository baseline:
   closed.
 - Milestone 8 service-layer work is implemented, validated, and considered
   closed.
-- Milestone 9 hardening and polish is active with observability/config
+- Milestone 9 hardening and polish is implemented with observability/config
   groundwork, a bounded replay cache in `session::manager`, broad explicit
   subsystem observability integration, expanded malformed-input coverage, and
   the current regression suites, stage-boundary integration tests, and
   Milestone 9 unit coverage as its working boundary.
+- Milestone 14 launch gate and pilot tag is the active repository stage.
 
 Requirements:
 - do not treat Milestone 9 as a broad umbrella task; take one concrete
@@ -43,8 +44,7 @@ Requirements:
   replay-risk mitigation, structured metrics/logs, stale/malformed input
   tests, and validation maintenance;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
-  `docs/OPEN_QUESTIONS.md` synchronized if the `milestone-9-hardening`
-  baseline changes.
+  `docs/OPEN_QUESTIONS.md` synchronized if the Milestone 9 baseline changes.
 
 Constraints:
 - do not restart from Milestone 0/1/2;

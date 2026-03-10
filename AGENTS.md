@@ -74,15 +74,28 @@ Do not add by default:
   bounded local service registry and open-session store, exact `app_id`
   resolution, `reachability_ref` binding checks, and integration coverage.
 - Milestone 8 is considered closed.
-- The current repository stage marker is `milestone-9-hardening`.
-- Milestone 9 hardening and polish is now the active feature stage with the
-  current regression suites and stage-boundary integration tests as the entry
-  boundary until Milestone 9-specific hardening work lands.
+- Milestone 9 hardening and polish is implemented with bounded observability
+  surfaces, validated config projection, a bounded handshake replay cache,
+  explicit subsystem observability hooks, and the current regression plus
+  stage-boundary validation suites.
+- Milestone 10 minimal runtime is implemented with `overlay-cli run`, local
+  config loading, local bootstrap-file startup, and bounded runtime ticks.
+- Milestone 11 local devnet is implemented with the checked-in four-node
+  `devnet/` and `overlay-cli smoke`.
+- Milestone 12 launch hardening is implemented with bounded cleanup,
+  conservative bootstrap retry, runtime health snapshots, status dumps, and the
+  logical soak path.
+- The current repository stage marker is `milestone-14-launch-gate`.
+- Milestone 14 launch gate and pilot tag is the current stage with
+  `docs/LAUNCH_CHECKLIST.md`, `docs/PILOT_RELEASE_TEMPLATE.md`, the documented
+  green-path validation and launch sequence, a frozen current MVP launch
+  surface, and explicit pilot-only limitations. This stage does not claim
+  public-production readiness.
 
-For normal work, touch Milestones 1-8 only for regression fixes, spec
-mismatches, vector maintenance, or validation maintenance unless the task
-explicitly reopens that stage. Treat current-stage work as narrow
-`milestone-9-hardening` work, not as a restart from earlier milestones.
+For normal work, touch Milestones 1-12 only for regression fixes, spec
+mismatches, vector maintenance, validation maintenance, or launch-maintenance
+updates unless the task explicitly reopens that stage. Treat current-stage work as narrow
+`milestone-14-launch-gate` work, not as a restart from earlier milestones.
 
 ## 3. Change policy
 

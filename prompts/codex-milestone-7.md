@@ -29,8 +29,8 @@ Current repository baseline:
   wire bodies, verified `ServiceRecord` registration, exact `app_id`
   resolution, `reachability_ref` binding checks, and `integration_service_open`
   coverage.
-- The current repository stage is `milestone-9-hardening` (Milestone 9
-  hardening and polish).
+- The current repository stage is `milestone-14-launch-gate` (Milestone 14
+  launch gate and pilot tag).
 
 Requirements:
 - keep explicit layering between routing, relay, transport/session,
@@ -39,7 +39,7 @@ Requirements:
   `spec/routing.md` and `docs/OPEN_QUESTIONS.md`;
 - keep Milestone 7 limited to regression fixes, validation maintenance,
   vectors, or conservative spec-conformance fixes without broadening into
-  active Milestone 9 hardening behavior;
+  broader launch-surface or protocol behavior;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the Milestone 7 baseline changes;
 - stop before adding Milestone 9 hardening behavior beyond regression repair.
@@ -51,4 +51,4 @@ Constraints:
 
 Validation:
 - run the applicable commands from `VALIDATION.md`;
-- keep the Milestone 1-8 regression runs clean while Milestone 9 lands.
+- keep the Milestone 1-8 regression runs clean under the current launch gate.

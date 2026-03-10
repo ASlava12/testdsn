@@ -67,6 +67,28 @@ cargo test -p overlay-core --test integration_routing
 cargo test -p overlay-core --test integration_service_open
 ```
 
+## Milestone 14 pilot launch gate
+
+```bash
+./devnet/run-launch-gate.sh
+```
+
+Equivalent explicit command order:
+
+```bash
+cargo fmt --all --check
+TMPDIR=/tmp cargo clippy --workspace --all-targets --all-features -- -D warnings
+TMPDIR=/tmp cargo check --workspace
+TMPDIR=/tmp cargo test --workspace
+TMPDIR=/tmp cargo test -p overlay-core --test integration_bootstrap
+TMPDIR=/tmp cargo test -p overlay-core --test integration_publish_lookup
+TMPDIR=/tmp cargo test -p overlay-core --test integration_relay_fallback
+TMPDIR=/tmp cargo test -p overlay-core --test integration_routing
+TMPDIR=/tmp cargo test -p overlay-core --test integration_service_open
+./devnet/run-smoke.sh
+./devnet/run-restart-smoke.sh
+```
+
 ## Milestone 11 local devnet smoke
 
 ```bash
@@ -143,19 +165,20 @@ cargo test -p overlay-core --test integration_service_open
 
 ## Notes
 
-- Milestone 8 is considered closed, and the active repository stage marker is
-  `milestone-9-hardening` (Milestone 9 hardening and polish).
-- Use the Milestone 1-8 regression runs above as the primary checks for
-  baseline regressions while Milestone 9 continues to land.
+- Milestones 1-12 are considered implemented baseline work, and the current
+  repository stage marker is `milestone-14-launch-gate` (Milestone 14 launch
+  gate and pilot tag).
+- Use the Milestone 1-12 regression runs, stage-boundary smoke tests, and the
+  Milestone 14 pilot launch gate as the primary checks for the frozen pilot
+  baseline.
 - If `REPOSITORY_STAGE`, `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, milestone
   prompts, or other status markers change, rerun the stage-boundary smoke
   tests so code and docs stay aligned.
 - `integration_publish_lookup` remains the real Milestone 5 integration path; `integration_relay_fallback` is the real Milestone 6 integration path; `integration_routing` is the real Milestone 7 integration path; `integration_service_open` is now the real Milestone 8 integration path.
-- Milestone 9 currently extends the closed-baseline regression runs and
-  stage-boundary smoke tests with `bootstrap::tests`, `config::tests`,
-  `metrics::tests`, `peer::tests`, `rendezvous::tests`, and
-  `session::manager::tests`, plus `transport::tests`, while broader hardening
-  coverage continues to land.
+- Milestone 9 hardening coverage remains part of the frozen baseline through
+  `bootstrap::tests`, `config::tests`, `metrics::tests`, `peer::tests`,
+  `rendezvous::tests`, `relay::tests`, `routing::tests`, `service::tests`,
+  `session::manager::tests`, and `transport::tests`.
 - `bootstrap::tests` now also covers bootstrap provider fetch/validation
   observability for accepted, rejected, and unavailable provider outcomes.
 - `transport::tests` now also covers bounded transport-buffer config
@@ -188,6 +211,9 @@ cargo test -p overlay-core --test integration_service_open
   session establishment, verified presence publish handoff, exact lookup,
   service open, and one relay-fallback path without introducing real network
   listeners.
+- The Milestone 14 launch gate adds a bounded restart smoke and freezes the
+  required command order for pilot tags, but it does not replace the Milestone
+  12 logical soak as an optional supporting hardening check.
 - The Milestone 12 soak path also stays in-process and advances logical time
   through repeated runtime ticks so stale-session/service/relay/probe cleanup,
   bootstrap retry, and health snapshots can be exercised without a separate

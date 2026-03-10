@@ -23,8 +23,8 @@ Current repository baseline:
 - Milestone 6 relay intro/fallback work is closed.
 - Milestone 7 routing work is closed.
 - Milestone 8 service-layer work is closed.
-- The current repository stage is `milestone-9-hardening` (Milestone 9
-  hardening and polish).
+- The current repository stage is `milestone-14-launch-gate` (Milestone 14
+  launch gate and pilot tag).
 
 Requirements:
 - keep the current `publish_verified` contract intact: signature verification
@@ -37,7 +37,8 @@ Requirements:
   bootstrap, transport/session, relay, and routing baselines;
 - keep status docs, prompts, fixtures, and `docs/OPEN_QUESTIONS.md` aligned if
   the documented baseline changes;
-- stop before adding Milestone 6+ behavior beyond regression repair.
+- stop before adding Milestone 6+ behavior beyond regression repair or
+  broadening the frozen launch surface.
 
 Constraints:
 - do not rework Milestones 1-4 except for a concrete regression or spec mismatch;
@@ -46,4 +47,4 @@ Constraints:
 
 Validation:
 - run the applicable commands from `VALIDATION.md`;
-- keep the Milestone 1-8 regression runs clean while Milestone 9 lands.
+- keep the Milestone 1-8 regression runs clean under the current launch gate.

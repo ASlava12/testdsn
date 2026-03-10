@@ -29,21 +29,21 @@ Current repository baseline:
   resolution, `reachability_ref` binding checks, allow/deny local policy
   enforcement, deterministic message vectors, and
   `integration_service_open` coverage.
-- The current repository stage is `milestone-9-hardening` (Milestone 9
-  hardening and polish).
+- The current repository stage is `milestone-14-launch-gate` (Milestone 14
+  launch gate and pilot tag).
 
 Requirements:
 - keep exact `app_id` service resolution aligned with `spec/service-layer.md`,
   `spec/wire-protocol.md`, and `spec/records.md`;
 - keep Milestone 8 limited to regression fixes, validation maintenance,
   vectors, or conservative spec-conformance fixes without broadening into
-  active Milestone 9 hardening work;
+  broader launch-surface or protocol work;
 - preserve the separation between node reachability and service access;
 - keep explicit layering between service, routing, relay, rendezvous,
   transport/session, and identity code;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the Milestone 8 baseline changes;
-- stop before adding Milestone 9 hardening behavior beyond regression repair.
+- stop before adding broader current-stage behavior beyond regression repair.
 
 Constraints:
 - no global service enumeration;
@@ -55,4 +55,4 @@ Constraints:
 
 Validation:
 - run the applicable commands from `VALIDATION.md`;
-- keep the Milestone 1-8 regression runs clean while Milestone 9 lands.
+- keep the Milestone 1-8 regression runs clean under the current launch gate.

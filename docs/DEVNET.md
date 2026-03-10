@@ -18,6 +18,8 @@ It is the operator-facing proof path for the current runtime surface.
 - [devnet/keys](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/keys): deterministic seed files in hex form.
 - [devnet/bootstrap](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/bootstrap): local bootstrap seed JSON files.
 - [devnet/run-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-smoke.sh): wrapper for the smoke flow.
+- [devnet/run-restart-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-restart-smoke.sh): wrapper for the bounded restart smoke.
+- [devnet/run-launch-gate.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-launch-gate.sh): wrapper for the full Milestone 14 launch gate.
 - [devnet/run-soak.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-soak.sh): wrapper for the logical soak.
 
 ## Smoke flow
@@ -74,6 +76,37 @@ The soak currently checks that:
 - relay tunnels age out and are removed;
 - stale path probes become bounded loss observations;
 - `node-b` refreshes its local presence during the run.
+
+## Restart smoke
+
+Run:
+
+```bash
+./devnet/run-restart-smoke.sh
+```
+
+This performs two consecutive bounded `overlay-cli run` startups against the
+same checked-in service-host config. The goal is to prove the current in-memory
+runtime can be restarted reproducibly with the same config, key, and bootstrap
+files.
+
+## Full launch gate
+
+Run:
+
+```bash
+./devnet/run-launch-gate.sh
+```
+
+This executes the Milestone 14 pilot gate in documented order:
+
+- `fmt`
+- `clippy`
+- `check`
+- `test`
+- stage-boundary smoke tests
+- devnet smoke
+- restart smoke
 
 ## Single-node inspection
 

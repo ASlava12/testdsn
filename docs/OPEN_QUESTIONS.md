@@ -246,23 +246,28 @@ For current work, treat the repository stage as:
   open-session store, exact `app_id` resolution, `reachability_ref` binding
   checks, allow/deny local policy enforcement, and integration coverage.
   Milestone 8 is considered closed;
-- the current repository stage marker is `milestone-9-hardening`;
-- Milestone 9 hardening and polish is now the current feature stage, with
-  bounded observability groundwork in `crates/overlay-core/src/metrics/mod.rs`,
-  a validated top-level config baseline in `crates/overlay-core/src/config.rs`
-  with explicit transport-buffer projection in
-  `crates/overlay-core/src/transport/mod.rs`, a bounded handshake transcript
-  replay cache in `crates/overlay-core/src/session/manager.rs`, explicit
-  observability hooks in bootstrap provider fetch/validation, peer/bootstrap ingest, rendezvous
+- Milestone 9 hardening and polish is implemented with bounded observability
+  groundwork in `crates/overlay-core/src/metrics/mod.rs`, a validated top-level
+  config baseline in `crates/overlay-core/src/config.rs` with explicit
+  transport-buffer projection in `crates/overlay-core/src/transport/mod.rs`, a
+  bounded handshake transcript replay cache in
+  `crates/overlay-core/src/session/manager.rs`, explicit observability hooks in
+  bootstrap provider fetch/validation, peer/bootstrap ingest, rendezvous
   publish/lookup, relay bind and rate-limit handling, routing probe/switch
   paths, service registry flows, and session event export, with malformed-input
-  coverage now explicitly exercising relay, routing, and service wire-body
-  rejection paths, and the current regression suites, stage-boundary
-  integration tests, plus `bootstrap::tests` / `config::tests` /
-  `metrics::tests` / `peer::tests` / `rendezvous::tests` / `relay::tests` /
-  `routing::tests` / `service::tests` / `session::manager::tests` /
-  `transport::tests` as the active boundary while broader hardening work
-  continues;
+  coverage explicitly exercising relay, routing, and service wire-body
+  rejection paths;
+- Milestone 10 minimal runtime is implemented in
+  `crates/overlay-core/src/runtime.rs` and `crates/overlay-cli/src/main.rs`;
+- Milestone 11 local devnet is implemented in `devnet/` and
+  `crates/overlay-cli/src/devnet.rs`;
+- Milestone 12 launch hardening is implemented with bounded cleanup, degraded
+  bootstrap retry, runtime health snapshots, and the logical soak path;
+- the current repository stage marker is `milestone-14-launch-gate`;
+- Milestone 14 launch gate and pilot tag is now the current stage, with
+  `docs/LAUNCH_CHECKLIST.md`, `docs/PILOT_RELEASE_TEMPLATE.md`, the documented
+  green-path validation and launch sequence, a frozen current MVP launch
+  surface, and explicit pilot-only limitations;
 
 That means:
 
@@ -280,7 +285,9 @@ That means:
   vectors, or spec mismatches;
 - Milestone 8 is closed and should be touched only for regressions,
   vectors, or spec mismatches;
-- Milestone 9 is active in code and remains the current feature stage;
+- Milestone 14 is the current stage and should stay limited to pilot launch
+  maintenance, regression fixes, validation maintenance, and documentation
+  synchronization unless a task explicitly reopens scope;
 - simulation-focused expansion remains out of scope for current work.
 
 ### 9. Final encoding of `supported_kex` and `supported_signatures`

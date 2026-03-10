@@ -3,6 +3,9 @@
 This runbook is for the repository's current local or pilot launch surface, not
 for hostile-Internet or public-production deployment.
 
+Use [docs/LAUNCH_CHECKLIST.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/LAUNCH_CHECKLIST.md)
+as the release gate and this runbook as the operator flow behind that gate.
+
 ## Current boundary
 
 What exists today:
@@ -80,8 +83,14 @@ Wrapper scripts:
 
 ```bash
 ./devnet/run-smoke.sh
+./devnet/run-restart-smoke.sh
+./devnet/run-launch-gate.sh
 ./devnet/run-soak.sh
 ```
+
+`./devnet/run-launch-gate.sh` is the CI-friendly Milestone 14 pilot gate. It
+runs formatting, lint, build, workspace tests, the stage-boundary integration
+tests, the devnet smoke, and the restart smoke in the documented order.
 
 ## What healthy output looks like
 
@@ -126,7 +135,7 @@ Use the same key and config files, then rerun `overlay-cli run ...`.
 For a bounded restart check:
 
 ```bash
-TMPDIR=/tmp cargo run -p overlay-cli -- run --config docs/config-examples/service-host-node.json --max-ticks 0 --status-every 1
+./devnet/run-restart-smoke.sh
 ```
 
 ## Shutdown notes

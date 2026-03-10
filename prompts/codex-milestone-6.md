@@ -24,8 +24,8 @@ Current repository baseline:
   direct-first fallback planning.
 - Milestone 7 routing work is closed in `overlay-core` (`routing`).
 - Milestone 8 service-layer work is closed in `overlay-core` (`service`).
-- The current repository stage is `milestone-9-hardening` (Milestone 9
-  hardening and polish).
+- The current repository stage is `milestone-14-launch-gate` (Milestone 14
+  launch gate and pilot tag).
 
 Requirements:
 - keep direct transport attempts first and use relay only as bounded fallback;
@@ -35,7 +35,7 @@ Requirements:
   and rendezvous;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the Milestone 6 baseline changes;
-- stop before broadening into active Milestone 9 behavior.
+- stop before broadening beyond the frozen launch surface.
 
 Constraints:
 - do not rework Milestones 1-5 except for a concrete regression or spec mismatch;
@@ -44,4 +44,4 @@ Constraints:
 
 Validation:
 - run the applicable commands from `VALIDATION.md`;
-- keep the Milestone 1-8 regression runs clean while Milestone 9 lands.
+- keep the Milestone 1-8 regression runs clean under the current launch gate.

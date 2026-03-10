@@ -3,11 +3,11 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `VALIDATION.md`, `docs/OPEN_QUESTIONS.md`,
 `spec/threat-model.md`, and `spec/config.md`.
 
 Goal:
-Synchronize on the current repository stage, `milestone-9-hardening`, and use
-the dedicated Milestone 9 prompt for the next concrete current-stage task.
+Synchronize on the current repository stage, `milestone-14-launch-gate`, and
+use the dedicated Milestone 14 prompt for the next concrete current-stage task.
 
 Current repository baseline:
-- The current repository stage is `milestone-9-hardening`.
+- The current repository stage is `milestone-14-launch-gate`.
 - Milestone 0 is already complete.
 - Milestone 1 foundations are already implemented, vectorized, and validated in
   `overlay-core` (`identity`, `records`, `wire`).
@@ -33,12 +33,13 @@ Current repository baseline:
   bounded local service registry and open-session store, exact `app_id`
   resolution, `reachability_ref` binding checks, allow/deny local policy
   enforcement, and `integration_service_open` coverage.
-- Milestone 9 hardening and polish is now active with initial observability
-  and config groundwork plus broad explicit subsystem observability
-  integration landed, and with the current regression suites,
-  stage-boundary integration tests, plus `config::tests` / `metrics::tests` /
-  `peer::tests` / `rendezvous::tests` / `service::tests` /
-  `session::manager::tests` as its working boundary.
+- Milestone 9 hardening, Milestone 10 minimal runtime, Milestone 11 local
+  devnet, and Milestone 12 launch hardening are implemented as part of the
+  frozen baseline.
+- Milestone 14 launch gate and pilot tag is now active with a frozen current
+  MVP launch surface, `docs/LAUNCH_CHECKLIST.md`,
+  `docs/PILOT_RELEASE_TEMPLATE.md`, a documented green-path launch sequence,
+  and explicit pilot-only limitations.
 
 Constraints:
 - do not restart the repository from Milestone 0;
@@ -48,12 +49,13 @@ Constraints:
 
 Tasks:
 - confirm the repository already sits at the closed Milestone 1-8 baseline;
-- use `prompts/codex-milestone-9.md` for the next concrete
-  `milestone-9-hardening` task;
+- use `prompts/codex-milestone-14.md` for the next concrete
+  `milestone-14-launch-gate` task;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the repository baseline changes;
-- treat Milestones 1-8 as closed baseline work, touching them only for
-  regression fixes, vector maintenance, or validation maintenance;
+- treat Milestones 1-12 as closed baseline work, touching them only for
+  regression fixes, vector maintenance, validation maintenance, or launch
+  maintenance;
 - run the applicable Milestone 1-8 and stage-boundary validation from
   `VALIDATION.md`;
 - stop before adding simulation-focused work or broader protocol scope.

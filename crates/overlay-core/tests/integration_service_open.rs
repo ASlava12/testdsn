@@ -37,7 +37,7 @@ fn service_open_flow_tracks_current_stage_boundary() {
         now_unix_ms,
     );
 
-    assert_eq!(REPOSITORY_STAGE, "milestone-9-hardening");
+    assert_eq!(REPOSITORY_STAGE, "milestone-14-launch-gate");
     assert_eq!(response.status, ServiceRecordResponseStatus::Found);
     assert_eq!(response.record, Some(record.clone()));
     assert_eq!(opened.status, OpenAppSessionStatus::Opened);
