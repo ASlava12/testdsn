@@ -112,7 +112,13 @@ impl BootstrapResponse {
             });
         }
 
+        let mut seen_peer_node_ids = BTreeSet::new();
         for peer in &mut self.peers {
+            if !seen_peer_node_ids.insert(peer.node_id) {
+                return Err(BootstrapValidationError::DuplicatePeerNodeId {
+                    node_id: peer.node_id,
+                });
+            }
             peer.transport_classes = canonicalize_transport_classes(&peer.transport_classes)?;
             peer.capabilities = canonicalize_capabilities(&peer.capabilities)?;
             canonicalize_dial_hints(&mut peer.dial_hints)?;
@@ -128,10 +134,17 @@ impl BootstrapResponse {
             }
         }
 
+        let mut seen_bridge_hints = BTreeSet::new();
         for hint in &mut self.bridge_hints {
             hint.transport_class = canonicalize_transport_class(&hint.transport_class)?.to_string();
             hint.capabilities = canonicalize_capabilities(&hint.capabilities)?;
             canonicalize_single_dial_hint(&mut hint.dial_hint, "bridge_hints[].dial_hint")?;
+            if !seen_bridge_hints.insert((hint.transport_class.clone(), hint.dial_hint.clone())) {
+                return Err(BootstrapValidationError::DuplicateBridgeHint {
+                    transport_class: hint.transport_class.clone(),
+                    dial_hint: hint.dial_hint.clone(),
+                });
+            }
             if hint.expires_at_unix_s <= now_unix_s {
                 return Err(BootstrapValidationError::ExpiredBridgeHint {
                     expires_at_unix_s: hint.expires_at_unix_s,
@@ -177,12 +190,21 @@ pub enum BootstrapValidationError {
     UnknownTransportClass { value: String },
     #[error("unknown capability in bootstrap response: {value}")]
     UnknownCapability { value: String },
+    #[error("bootstrap response contains duplicate peer entry for node {node_id}")]
+    DuplicatePeerNodeId { node_id: NodeId },
     #[error("bootstrap peer {node_id} has no transport classes")]
     PeerWithoutTransportClasses { node_id: NodeId },
     #[error("bootstrap peer {node_id} has no dial hints")]
     PeerWithoutDialHints { node_id: NodeId },
     #[error("{field} must not be empty")]
     EmptyDialHint { field: &'static str },
+    #[error(
+        "bootstrap response contains duplicate bridge hint for transport {transport_class} and dial hint {dial_hint}"
+    )]
+    DuplicateBridgeHint {
+        transport_class: String,
+        dial_hint: String,
+    },
     #[error("bridge hint expired at {expires_at_unix_s}, now is {now_unix_s}")]
     ExpiredBridgeHint {
         expires_at_unix_s: u64,
@@ -365,6 +387,29 @@ mod tests {
     }
 
     #[test]
+    fn rejects_duplicate_bootstrap_peer_node_ids() {
+        let mut response = sample_response();
+        response.peers.push(BootstrapPeer {
+            node_id: response.peers[0].node_id,
+            transport_classes: vec!["tcp".to_string()],
+            capabilities: vec![],
+            dial_hints: vec!["tcp://node-a-shadow".to_string()],
+            observed_role: BootstrapPeerRole::Standard,
+        });
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("duplicate bootstrap peers must be rejected");
+
+        assert_eq!(
+            error,
+            BootstrapValidationError::DuplicatePeerNodeId {
+                node_id: NodeId::from_bytes([1_u8; 32]),
+            }
+        );
+    }
+
+    #[test]
     fn rejects_zero_bootstrap_max_frame_body_len() {
         let mut response = sample_response();
         response.max_frame_body_len = 0;
@@ -412,6 +457,29 @@ mod tests {
             BootstrapValidationError::ExpiredBridgeHint {
                 expires_at_unix_s: 1_700_000_100,
                 now_unix_s: 1_700_000_100,
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_bridge_hints_after_canonicalization() {
+        let mut response = sample_response();
+        response.bridge_hints.push(BridgeHint {
+            transport_class: "ws".to_string(),
+            dial_hint: "https://bridge-a".to_string(),
+            capabilities: vec!["bridge".to_string()],
+            expires_at_unix_s: 1_700_000_850,
+        });
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("duplicate bridge hints must be rejected");
+
+        assert_eq!(
+            error,
+            BootstrapValidationError::DuplicateBridgeHint {
+                transport_class: "ws".to_string(),
+                dial_hint: "https://bridge-a".to_string(),
             }
         );
     }

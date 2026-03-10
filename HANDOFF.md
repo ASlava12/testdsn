@@ -17,8 +17,9 @@ It assumes the repository already has a closed Milestone 1-8 baseline and that
 Milestone 9 hardening and polish is now active with observability/config
 groundwork, a bounded replay cache, and broad explicit subsystem
 observability integration landed, plus expanded malformed-input coverage in the
-wire-helper tests, and with the current regression, stage-boundary, and
-Milestone 9 unit suites as its working boundary.
+wire-helper tests and an explicit established-session gauge sync helper, and
+with the current regression, stage-boundary, and Milestone 9 unit suites as
+its working boundary.
 
 ## Recommended workflow
 

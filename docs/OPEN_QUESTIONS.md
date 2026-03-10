@@ -460,6 +460,11 @@ Rules:
 - bootstrap responses must be fresh when validated;
 - `handshake_version` must match the current MVP handshake version;
 - `max_frame_body_len` must not exceed the wire-layer MVP body limit;
+- duplicate `BootstrapPeer.node_id` entries are rejected during local
+  bootstrap-response validation instead of being merged implicitly;
+- duplicate bridge hints with the same canonical `transport_class` and
+  `dial_hint` are rejected during local bootstrap-response validation instead
+  of being merged implicitly;
 - peer and bridge transport classes use the same lowercase string enums as the
   record layer;
 - bootstrap capabilities use the same lowercase string enums as the record layer;
@@ -753,7 +758,10 @@ Rules:
 - session observability stays as explicit event-export helpers over
   `SessionEvent` values instead of implicit state-machine side effects;
 - `established_sessions` remains a caller-managed gauge until broader session
-  aggregation lands.
+  aggregation lands, but callers may now sync it explicitly from session
+  states through the session-manager helper;
+- the explicit established-session gauge counts `Established` and `Degraded`
+  sessions, and excludes `Idle`, `Opening`, `Closing`, and `Closed`.
 
 ### 31. Conservative replay-cache defaults for the current Milestone 9 baseline
 

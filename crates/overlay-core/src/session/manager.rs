@@ -469,6 +469,22 @@ impl SessionManager {
         std::mem::take(&mut self.io_actions)
     }
 
+    pub fn sync_established_session_gauge<'a, I>(sessions: I, observability: &mut Observability)
+    where
+        I: IntoIterator<Item = &'a SessionManager>,
+    {
+        let established_sessions = sessions
+            .into_iter()
+            .filter(|session| {
+                matches!(
+                    session.state,
+                    SessionState::Established | SessionState::Degraded
+                )
+            })
+            .count();
+        observability.set_established_sessions(established_sessions);
+    }
+
     pub fn begin_open(
         &mut self,
         timestamp_unix_ms: u64,
@@ -1723,6 +1739,53 @@ mod tests {
         let latest = observability.latest_log().expect("log should be present");
         assert_eq!(latest.event, "keepalive_due");
         assert_eq!(latest.result, "ok");
+    }
+
+    #[test]
+    fn established_session_gauge_can_be_synced_explicitly() {
+        let idle =
+            SessionManager::with_timing(27, TEST_TIMING).expect("timing config should be valid");
+        let mut established =
+            SessionManager::with_timing(28, TEST_TIMING).expect("timing config should be valid");
+        let mut degraded =
+            SessionManager::with_timing(29, TEST_TIMING).expect("timing config should be valid");
+        let mut closing =
+            SessionManager::with_timing(30, TEST_TIMING).expect("timing config should be valid");
+        let mut observability = Observability::default();
+
+        established
+            .begin_open(100, &TcpTransport)
+            .expect("open should transition from idle to opening");
+        established
+            .mark_established(120)
+            .expect("opening should transition to established");
+
+        degraded
+            .begin_open(100, &TcpTransport)
+            .expect("open should transition from idle to opening");
+        degraded
+            .mark_established(120)
+            .expect("opening should transition to established");
+        degraded
+            .mark_degraded(140, "temporary path loss")
+            .expect("established session should degrade");
+
+        closing
+            .begin_open(100, &TcpTransport)
+            .expect("open should transition from idle to opening");
+        closing
+            .mark_established(120)
+            .expect("opening should transition to established");
+        closing
+            .begin_close(150, Some("operator requested close".to_string()))
+            .expect("established session should begin closing");
+
+        SessionManager::sync_established_session_gauge(
+            [&idle, &established, &degraded, &closing],
+            &mut observability,
+        );
+
+        assert_eq!(observability.metrics().established_sessions, 2);
     }
 
     #[test]

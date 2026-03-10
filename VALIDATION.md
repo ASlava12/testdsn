@@ -125,13 +125,13 @@ cargo test -p overlay-core --test integration_service_open
   stage-boundary smoke tests with `config::tests`, `metrics::tests`,
   `peer::tests`, `rendezvous::tests`, and `session::manager::tests` while
   broader hardening coverage continues to land.
-- `bootstrap::tests` now also covers zero `max_frame_body_len`, blank peer dial-hint rejection after trimming, and expired bridge hints.
+- `bootstrap::tests` now also covers zero `max_frame_body_len`, duplicate peer-node rejection, duplicate bridge-hint rejection, blank peer dial-hint rejection after trimming, and expired bridge hints.
 - `rendezvous::tests` now also covers deterministic publish/lookup message vectors in `tests/vectors/rendezvous_messages.json`, derived placement-key validation on `PublishAck` / `LookupResult` / `LookupNotFound`, and `LookupResult.record.node_id` shape validation.
 - `relay::tests` now also covers deterministic relay intro message vectors in `tests/vectors/relay_intro_messages.json` and oversize relay wire-body rejection.
 - `routing::tests` now covers deterministic path-probe message vectors, bounded local probe tracking, the deterministic path-score formula, integer EWMA updates, hysteresis thresholds, switch-rate caps, and oversize probe-body rejection.
 - `service::tests` now covers deterministic service message vectors in `tests/vectors/service_messages.json`, verified `ServiceRecord` registration, exact `app_id` resolution, `reachability_ref` binding checks, local open-session limits, policy denials, invalid response/result wire shapes, and oversize service wire-body rejection.
 - `peer::tests` now also covers rejected bootstrap ingest observability without clobbering the active-peer gauge.
-- `session::manager::tests` now also covers bounded handshake transcript replay-cache validation, rejection, pruning, and oldest-entry eviction.
+- `session::manager::tests` now also covers bounded handshake transcript replay-cache validation, rejection, pruning, oldest-entry eviction, and explicit established-session gauge synchronization.
 - routing probe message vectors live in `tests/vectors/path_probe_messages.json`.
 - If the default temp directory is not writable in your environment, prefix the build, lint, and test commands with `TMPDIR=/tmp`.
 

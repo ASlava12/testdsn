@@ -28,9 +28,10 @@ Current repository baseline:
 - Milestone 9 hardening and polish is active with observability/config
   groundwork, a bounded replay cache in `session::manager`, and broad explicit
   subsystem observability integration landed, plus expanded malformed-input
-  coverage in relay/routing/service wire helpers, and with the current
-  regression suites, stage-boundary integration tests, and Milestone 9 unit
-  coverage as its working boundary.
+  coverage in relay/routing/service wire helpers, an explicit
+  established-session gauge sync helper, and with the current regression
+  suites, stage-boundary integration tests, and Milestone 9 unit coverage as
+  its working boundary.
 
 Requirements:
 - keep hardening work aligned with `spec/observability.md`,

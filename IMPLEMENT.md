@@ -65,12 +65,15 @@ The repository has a closed Milestone 1-8 baseline.
   rendezvous publish/lookup, relay bind and rate-limit handling, routing
   probe/switch paths, service registry flows, and session event export, and
   malformed-input coverage now explicitly exercises bootstrap schema
-  validation, peer ingest rejection handling, rendezvous response-shape
-  validation, and relay, routing, and service wire-body rejection paths. The
-  remaining active Milestone 9 work is broader stale/malformed-input
-  expansion, validation maintenance, and any remaining explicit observability
-  aggregation boundaries, and the current validation boundary is the existing
-  regression suites,
+  validation, duplicate peer/bridge-hint rejection, peer ingest rejection
+  handling, rendezvous response-shape validation, and relay, routing, and
+  service wire-body rejection paths.
+  Session observability now also has an explicit established-session gauge sync
+  helper while keeping aggregation caller-invoked. The remaining active
+  Milestone 9 work is broader stale/malformed-input expansion, validation
+  maintenance, and any remaining explicit observability aggregation
+  boundaries, and the current validation boundary is the existing regression
+  suites,
   stage-boundary integration tests, and Milestone 9 unit coverage in
   `config::tests`, `metrics::tests`, `peer::tests`, `rendezvous::tests`,
   `relay::tests`, `routing::tests`, `service::tests`, and
@@ -362,6 +365,16 @@ hardening, and expanded malformed-input coverage landed in this repository.
 
 ### Goal
 Close the highest-risk gaps before larger-scale simulation.
+
+### Closeout path
+1. Finish the remaining explicit observability aggregation helpers and keep
+   them caller-invoked, starting with the established-session gauge.
+2. Complete stale/malformed rejection coverage across the remaining boundary
+   message shapes and bounded local stores.
+3. Keep replay-risk mitigation, bounded quotas, and bounded stores aligned with
+   the regression and stage-boundary suites.
+4. Stabilize the documented validation commands and rerun the stage-boundary
+   smoke tests whenever status markers or hardening baselines move.
 
 ### Tasks
 1. Add rate limits and byte budgets.
