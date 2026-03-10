@@ -790,6 +790,55 @@ Rules:
   through the existing replay-cache wrapper instead of adding implicit
   cross-layer state.
 
+### 32. Conservative runtime config and node-key loading defaults for Milestone 10
+
+For the minimal Milestone 10 runtime:
+
+- runtime config files use UTF-8 JSON matching `OverlayConfig`;
+- relative `node_key_path` values resolve relative to the config file
+  directory;
+- node key files may be either:
+- raw 32-byte Ed25519 seed bytes; or
+- 64 hex characters representing the same 32-byte seed.
+
+Rationale:
+- this stays aligned with the existing serde-based config surface;
+- it avoids inventing PEM or keystore semantics that are not specified yet;
+- it keeps key loading explicit and portable.
+
+### 33. Conservative runtime bootstrap source handling for Milestone 10
+
+Until network-backed runtime providers land:
+
+- startup bootstrap accepts local bootstrap sources expressed as:
+- `file:<path>`; or
+- direct paths ending in `.json`;
+- relative bootstrap paths resolve relative to the config file directory;
+- unsupported bootstrap source strings are treated as unavailable local inputs,
+  logged through observability, and do not abort startup on their own.
+
+Rationale:
+- the bootstrap provider abstraction already exists;
+- local-file bootstrap is the smallest conservative runtime integration;
+- degraded startup is preferable to inventing placeholder network fetch
+  behavior.
+
+### 34. Conservative presence refresh defaults for Milestone 10 runtime ticks
+
+For the minimal long-running runtime:
+
+- presence refresh runs only when an already verified local `PresenceRecord`
+  has been installed into the runtime context;
+- the runtime does not synthesize signed presence records from config alone;
+- refresh is scheduled at half of `presence_ttl_s`, with a minimum interval of
+  one second.
+
+Rationale:
+- current top-level config does not specify enough endpoint material to build a
+  fresh signed presence record on its own;
+- half-TTL refresh is the smallest conservative choice that refreshes before
+  expiry without changing rendezvous semantics.
+
 ## Rule
 
 If a task requires an area still not fully specified:

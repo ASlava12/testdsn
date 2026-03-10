@@ -476,6 +476,13 @@ impl RendezvousStore {
         self.negative_cache.get(&placement_key)
     }
 
+    pub fn prune_expired(&mut self, now_unix_s: u64) {
+        self.published
+            .retain(|_, entry| entry.record.is_fresh(now_unix_s));
+        self.negative_cache
+            .retain(|_, entry| entry.expires_at_unix_s > now_unix_s);
+    }
+
     pub fn publish_verified(
         &mut self,
         publish: VerifiedPublishPresence,
@@ -652,13 +659,6 @@ impl RendezvousStore {
             }
         }
         response
-    }
-
-    fn prune_expired(&mut self, now_unix_s: u64) {
-        self.published
-            .retain(|_, entry| entry.record.is_fresh(now_unix_s));
-        self.negative_cache
-            .retain(|_, entry| entry.expires_at_unix_s > now_unix_s);
     }
 
     fn insert_published_record(&mut self, placement_key: PlacementKey, stored: StoredPresence) {

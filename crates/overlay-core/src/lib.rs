@@ -9,6 +9,7 @@ pub mod records;
 pub mod relay;
 pub mod rendezvous;
 pub mod routing;
+pub mod runtime;
 pub mod service;
 pub mod session;
 pub mod transport;

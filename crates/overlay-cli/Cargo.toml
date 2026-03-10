@@ -7,3 +7,4 @@ authors.workspace = true
 
 [dependencies]
 overlay-core = { path = "../overlay-core" }
+serde_json.workspace = true

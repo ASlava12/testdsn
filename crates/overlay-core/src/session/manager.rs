@@ -207,6 +207,10 @@ impl ReplayCache {
         self.entries.len()
     }
 
+    pub fn prune_expired_entries(&mut self, now_unix_ms: u64) {
+        self.prune_expired(now_unix_ms);
+    }
+
     pub fn observe_outcome(
         &mut self,
         outcome: &HandshakeOutcome,

@@ -51,6 +51,7 @@ pub struct LogContext {
 #[serde(rename_all = "snake_case")]
 pub enum LogComponent {
     Identity,
+    Runtime,
     Bootstrap,
     Peer,
     Session,
