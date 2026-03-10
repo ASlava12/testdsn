@@ -232,11 +232,20 @@ For current work, treat the repository stage as:
   vectors, intro/tunnel/byte quota enforcement, verified `IntroTicket` usage,
   direct-first/relay-second reachability planning, and relay fallback
   integration coverage. Milestone 6 is considered closed;
-- Milestone 7 routing metrics and path switching work is active in
+- Milestone 7 routing metrics and path switching work is implemented in
   `crates/overlay-core/src/routing/mod.rs` with deterministic path-score
   weights, integer EWMA observation updates, hysteresis-gated route selection,
-  anti-flapping unit coverage, and routing stage-boundary integration coverage;
-- Milestone 8+ not started beyond placeholders and remaining stage-boundary smoke tests.
+  anti-flapping unit coverage, and routing stage-boundary integration coverage.
+  Milestone 7 is considered closed;
+- Milestone 8 service-layer work is implemented in
+  `crates/overlay-core/src/service/mod.rs` with canonical service wire bodies,
+  verified `ServiceRecord` registration, a bounded local service registry and
+  open-session store, exact `app_id` resolution, `reachability_ref` binding
+  checks, allow/deny local policy enforcement, and integration coverage.
+  Milestone 8 is considered closed;
+- Milestone 9 hardening and polish is now the current feature stage, with the
+  current regression suites and stage-boundary integration tests as the active
+  boundary until Milestone 9-specific hardening work lands.
 
 That means:
 
@@ -250,8 +259,12 @@ That means:
   vectors, or spec mismatches;
 - Milestone 6 is closed and should be touched only for regressions,
   vectors, or spec mismatches;
-- Milestone 7 is active in code and remains the current feature stage;
-- Milestone 8+ remains out of scope for current work.
+- Milestone 7 is closed and should be touched only for regressions,
+  vectors, or spec mismatches;
+- Milestone 8 is closed and should be touched only for regressions,
+  vectors, or spec mismatches;
+- Milestone 9 is active in code and remains the current feature stage;
+- simulation-focused expansion remains out of scope for current work.
 
 ### 9. Final encoding of `supported_kex` and `supported_signatures`
 
@@ -571,9 +584,9 @@ Rules:
 - keep relay intro message bodies on the same canonical JSON UTF-8 encoding
   rules and MVP frame-size limit as other current protocol bodies.
 
-### 25. Conservative routing selector defaults for the current Milestone 7 baseline
+### 25. Conservative routing selector defaults for the closed Milestone 7 baseline
 
-For the current Milestone 7 baseline, route selection stays deterministic and local.
+For the closed Milestone 7 baseline, route selection stays deterministic and local.
 
 Rules:
 - `PathMetrics.score()` uses the integer score formula locked in section 5,
@@ -586,9 +599,9 @@ Rules:
 - if the current path disappears from the candidate set, switch immediately to
   the best remaining candidate and record that switch in local history.
 
-### 26. Conservative path probe message schema and local defaults for the current Milestone 7 baseline
+### 26. Conservative path probe message schema and local defaults for the closed Milestone 7 baseline
 
-For the current Milestone 7 baseline, active probes stay small and bounded.
+For the closed Milestone 7 baseline, active probes stay small and bounded.
 
 `PathProbe`:
 - `path_id`
@@ -614,6 +627,69 @@ Rules:
   assignment order;
 - keep routing probe message bodies on the same canonical JSON UTF-8 encoding
   rules and MVP frame-size limit as other current protocol bodies.
+
+### 27. Conservative service registry and open-session defaults for the closed Milestone 8 baseline
+
+For the closed Milestone 8 baseline, service access stays exact, local, and bounded.
+
+`GetServiceRecord`:
+- `app_id`
+
+`ServiceRecordResponse`:
+- `app_id`
+- `status`
+- `record`
+
+`OpenAppSession`:
+- `app_id`
+- `reachability_ref`
+
+`OpenAppSessionResult`:
+- `app_id`
+- `status`
+- `session_id`
+
+Defaults:
+- `max_registered_services = 256`
+- `max_open_service_sessions = 1024`
+
+Rules:
+- `GetServiceRecord` operates on a full `app_id` only;
+- no prefix scan, range scan, wildcard lookup, or global service enumeration;
+- the local registry stores only `ServiceRecord` values that have already been
+  signature-verified before `register_verified`;
+- `ServiceRecord.policy` remains opaque signed bytes at this stage; local
+  allow/deny access checks are enforced separately at the registry boundary;
+- `ServiceRecordResponse.status` values are `found` and `not_found`;
+- `ServiceRecordResponse.record` is present only when status is `found`, and
+  its `app_id` must match the response `app_id`;
+- `OpenAppSession` must echo the exact resolved
+  `ServiceRecord.reachability_ref` or be rejected as
+  `rejected_reachability_mismatch`;
+- `OpenAppSessionResult.status` values are `opened`, `rejected_not_found`,
+  `rejected_policy`, `rejected_reachability_mismatch`, and
+  `rejected_session_limit`;
+- `OpenAppSessionResult.session_id` is present only when status is `opened`;
+- successful opens allocate monotonically increasing local `session_id` values
+  from the bounded open-session store;
+- keep service-layer message bodies on the same canonical JSON UTF-8 encoding
+  rules and MVP frame-size limit as other current protocol bodies.
+
+### 28. Conservative hardening scope for the current Milestone 9 baseline
+
+For the current Milestone 9 baseline, hardening should stay local, bounded, and layered.
+
+Rules:
+- prefer extending existing bounded stores, quotas, and validation paths over
+  adding new protocol scope;
+- prefer explicit rejection of replay-risk, stale, malformed, or over-budget
+  inputs over silent fallback;
+- keep hardening changes within the existing identity, session, relay, routing,
+  rendezvous, and service boundaries instead of collapsing layers together;
+- when adding observability, use structured logs and metric names consistent
+  with `spec/observability.md`;
+- do not broaden into simulation-focused work until the Milestone 9 hardening
+  checklist in `IMPLEMENT.md` is materially complete.
 
 ## Rule
 

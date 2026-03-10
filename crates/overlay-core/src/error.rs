@@ -91,6 +91,27 @@ pub enum PresenceVerificationError {
 }
 
 #[derive(Debug, Error)]
+pub enum ServiceVerificationError {
+    #[error(
+        "trusted signer node_id {signer_node_id} does not match service record node_id {record_node_id}"
+    )]
+    SignerNodeIdMismatch {
+        record_node_id: NodeId,
+        signer_node_id: NodeId,
+    },
+    #[error("service record signature must be {expected} bytes, got {actual}")]
+    InvalidSignatureLength { expected: usize, actual: usize },
+    #[error("trusted signer public key must be {expected} bytes, got {actual}")]
+    InvalidPublicKeyLength { expected: usize, actual: usize },
+    #[error(transparent)]
+    RecordValidation(#[from] RecordValidationError),
+    #[error(transparent)]
+    RecordEncoding(#[from] RecordEncodingError),
+    #[error(transparent)]
+    Crypto(#[from] CryptoError),
+}
+
+#[derive(Debug, Error)]
 pub enum IntroTicketVerificationError {
     #[error(
         "trusted signer node_id {signer_node_id} does not match intro ticket target_node_id {ticket_target_node_id}"

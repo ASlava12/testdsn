@@ -7,3 +7,11 @@
 
 ## Rule
 No global service enumeration in MVP.
+
+## Current Milestone 8 baseline
+- `GetServiceRecord` is exact-by-`app_id` only.
+- Service registration stays local, bounded, and signature-verified before the
+  registry stores a signed `ServiceRecord`.
+- `OpenAppSession` binds to the advertised `ServiceRecord.reachability_ref`
+  instead of bypassing the existing node-reachability flow.
+- Local service access policy is allow-or-deny only for the current baseline.

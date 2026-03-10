@@ -26,7 +26,7 @@ fn bootstrap_smoke_tracks_current_stage_boundary() {
         .ingest_bootstrap_response(response, 1_700_000_100)
         .expect("validated bootstrap response should seed the peer store");
 
-    assert_eq!(REPOSITORY_STAGE, "milestone-7-routing");
+    assert_eq!(REPOSITORY_STAGE, "milestone-9-hardening");
     assert_eq!(active.len(), 3);
     assert_eq!(store.active_neighbors().count(), 3);
     assert_eq!(

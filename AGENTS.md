@@ -65,15 +65,22 @@ Do not add by default:
   direct-first fallback planning.
 - Milestone 6 is considered closed.
 - Milestone 7 path metrics, deterministic scoring, and switch hysteresis work
-  is now active with canonical path-probe wire bodies, a bounded local probe
-  tracker, integer EWMA observation updates, and anti-flapping route selection
-  tests.
-- Milestone 8 and later remain placeholder modules or smoke-test stubs unless
-  the task explicitly begins those milestones.
+  is implemented, vectorized, and validated with canonical path-probe wire
+  bodies, a bounded local probe tracker, integer EWMA observation updates, and
+  anti-flapping route selection tests.
+- Milestone 7 is considered closed.
+- Milestone 8 service-layer work is implemented, vectorized, and validated
+  with canonical service wire bodies, verified `ServiceRecord` registration, a
+  bounded local service registry and open-session store, exact `app_id`
+  resolution, `reachability_ref` binding checks, and integration coverage.
+- Milestone 8 is considered closed.
+- Milestone 9 hardening and polish is now the active feature stage with the
+  current regression suites and stage-boundary integration tests as the entry
+  boundary until Milestone 9-specific hardening work lands.
 
-For normal work, touch Milestones 1-6 only for regression fixes, spec
+For normal work, touch Milestones 1-8 only for regression fixes, spec
 mismatches, vector maintenance, or validation maintenance unless the task
-explicitly reopens that stage. Milestone 7 is now the next active feature
+explicitly reopens that stage. Milestone 9 is now the next active feature
 stage.
 
 ## 3. Change policy

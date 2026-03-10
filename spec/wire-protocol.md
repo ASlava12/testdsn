@@ -98,6 +98,30 @@ Relay intro rules for the current Milestone 6 baseline:
 
 ### Service
 - `GetServiceRecord`
+  - `app_id`
 - `ServiceRecordResponse`
+  - `app_id`
+  - `status`
+  - `record`
 - `OpenAppSession`
+  - `app_id`
+  - `reachability_ref`
 - `OpenAppSessionResult`
+  - `app_id`
+  - `status`
+  - `session_id`
+
+Service rules for the current Milestone 8 baseline:
+- `GetServiceRecord` stays exact-by-`app_id` only;
+- `ServiceRecordResponse.status` values are `found` and `not_found`;
+- `ServiceRecordResponse.record` carries the exact matching `ServiceRecord`
+  only when status is `found`;
+- `OpenAppSession.reachability_ref` echoes the resolved
+  `ServiceRecord.reachability_ref` for the target service binding;
+- `OpenAppSessionResult.status` values are `opened`, `rejected_not_found`,
+  `rejected_policy`, `rejected_reachability_mismatch`, and
+  `rejected_session_limit`;
+- `OpenAppSessionResult.session_id` is present only when status is `opened`;
+- these message bodies use the same canonical JSON UTF-8 body rules as the rest
+  of the MVP body encoding;
+- a service-layer body must still fit within the MVP frame body limit.

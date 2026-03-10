@@ -4,8 +4,8 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `spec/mvp-scope.md`, `spec/architecture.md`,
 
 Goal:
 Audit or repair the closed Milestone 4 peer/bootstrap baseline from
-`IMPLEMENT.md` without broadening scope into closed Milestone 5 rendezvous work
-or active Milestone 6+ feature work.
+`IMPLEMENT.md` without broadening scope into closed Milestone 5-8 work or
+active Milestone 9 feature work.
 
 Current repository baseline:
 - Milestone 0 is complete.
@@ -18,7 +18,7 @@ Current repository baseline:
 - Milestone 4 peer/bootstrap work is implemented, validated, and considered
   closed.
 - Milestone 5 presence/lookup work is closed; Milestone 6 is closed; Milestone 7
-  is active; Milestone 8 and later are still placeholders.
+  is closed; Milestone 8 is closed; Milestone 9 is active.
 
 Requirements:
 - touch Milestone 4 only for regression fixes, fixture maintenance,

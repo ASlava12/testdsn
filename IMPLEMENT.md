@@ -4,7 +4,7 @@ This file is the execution plan for Codex.
 
 ## Current repository stage
 
-The repository has a closed Milestone 1-6 baseline.
+The repository has a closed Milestone 1-8 baseline.
 
 - Milestone 0 bootstrap is complete.
 - Milestone 1 foundations are implemented, vectorized, and validated in
@@ -39,32 +39,47 @@ The repository has a closed Milestone 1-6 baseline.
   intro message vectors, intro/tunnel/byte quota enforcement, verified
   `IntroTicket` usage, direct-first/relay-second reachability planning, and
   relay fallback integration coverage. Milestone 6 is considered closed.
-- Milestone 7 routing metrics and path switching work is now active in
+- Milestone 7 routing metrics and path switching work is implemented in
   `crates/overlay-core/src/routing/mod.rs`, including deterministic path
   scoring, canonical `PathProbe` / `PathProbeResult` wire-body helpers with
   deterministic path-probe message vectors, a bounded local path probe tracker,
   integer EWMA updates for observed path metrics and probe feedback,
   hysteresis-gated route selection, anti-flapping unit coverage, and a routing
-  stage-boundary integration scenario.
-- Milestone 8 and later are still placeholder modules and stage-boundary smoke tests.
+  stage-boundary integration scenario. Milestone 7 is considered closed.
+- Milestone 8 service-layer work is implemented in
+  `crates/overlay-core/src/service/mod.rs`, with canonical
+  `GetServiceRecord` / `ServiceRecordResponse` and
+  `OpenAppSession` / `OpenAppSessionResult` wire-body helpers, deterministic
+  service message vectors, verified `ServiceRecord` registration, a bounded
+  local service registry and open-session store, exact `app_id` resolution,
+  `reachability_ref` binding checks, allow/deny local policy enforcement, and
+  integration coverage in
+  `crates/overlay-core/tests/integration_service_open.rs`. Milestone 8 is
+  considered closed.
+- Milestone 9 hardening and polish is now active with the current regression
+  suites and stage-boundary integration tests as the entry boundary until
+  Milestone 9-specific hardening work lands.
 
-Treat Milestones 0-6 as a closed baseline. Prefer regression fixes,
+Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
 over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Continue Milestone 7 conservatively from the current routing baseline:
+Use `prompts/codex-milestone-9.md` as the recommended next-task prompt and
+continue Milestone 9 conservatively from the current hardening boundary:
 
-1. keep the current path-score formula, integer EWMA updates, and switch
-   hysteresis aligned with `spec/routing.md` and `docs/OPEN_QUESTIONS.md`;
-2. broaden Milestone 7 only around path metrics, probes, routing validation, or
-   conservative wire/config maintenance;
-3. keep Milestones 1-6 limited to regression fixes, vector maintenance, or
+1. keep hardening work aligned with `spec/observability.md`,
+   `spec/threat-model.md`, `spec/config.md`, and `docs/OPEN_QUESTIONS.md`;
+2. broaden Milestone 9 only around local rate limits, byte budgets, replay-risk
+   mitigation, structured metrics/logs, stale or malformed input coverage, or
+   validation maintenance;
+3. keep Milestones 1-8 limited to regression fixes, vector maintenance, or
    validation maintenance;
 4. update status docs, prompts, and `docs/OPEN_QUESTIONS.md` whenever the
    documented baseline changes;
-5. keep Milestone 8+ behavior out of scope until Milestone 7 is materially complete.
+5. keep simulation-focused expansion or broader protocol scope out of work
+   until Milestone 9 is materially complete.
 
 ## Milestone 0 — repository bootstrap
 
@@ -275,7 +290,8 @@ Allow nodes to reach each other when direct transport is unavailable.
 
 ## Milestone 7 — routing metrics and path switching
 
-Status: active and partially implemented in this repository.
+Status: closed in this repository. Reopen only for regression fixes, vector
+maintenance, validation maintenance, or conservative spec-conformance fixes.
 
 ### Goal
 Add path quality measurement and stable route selection.
@@ -300,6 +316,9 @@ Add path quality measurement and stable route selection.
 
 ## Milestone 8 — service layer
 
+Status: closed in this repository. Reopen only for regression fixes, vector
+maintenance, validation maintenance, or conservative spec-conformance fixes.
+
 ### Goal
 Open an application session after node reachability is resolved.
 
@@ -321,6 +340,8 @@ Open an application session after node reachability is resolved.
 ---
 
 ## Milestone 9 — hardening and polish
+
+Status: active and still at the stage-entry boundary in this repository.
 
 ### Goal
 Close the highest-risk gaps before larger-scale simulation.

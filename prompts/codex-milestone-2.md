@@ -8,7 +8,7 @@ Current repository baseline:
 - crypto wrappers already exist in `crates/overlay-core/src/crypto/*`;
 - `ClientHello`, `ServerHello`, and `ClientFinish` handling already exists;
 - transcript hashing, key derivation, handshake vectors, and negative tests already exist;
-- Milestone 2 is considered closed, and current new feature work is within Milestone 3.
+- Milestone 2 is considered closed, and current new feature work is within Milestone 9.
 
 Requirements:
 - audit the existing handshake code against the spec and `docs/OPEN_QUESTIONS.md`;

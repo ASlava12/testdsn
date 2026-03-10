@@ -8,7 +8,7 @@ use crate::{
     },
     error::{
         IntroTicketVerificationError, PresenceVerificationError, RecordEncodingError,
-        RecordValidationError,
+        RecordValidationError, ServiceVerificationError,
     },
     identity::{derive_node_id, AppId, NodeId},
 };
@@ -197,6 +197,72 @@ impl ServiceRecord {
             metadata_commitment: &self.metadata_commitment,
         })
         .map_err(Into::into)
+    }
+
+    pub fn verify_with_public_key(
+        self,
+        signer_public_key: &Ed25519PublicKey,
+    ) -> Result<VerifiedServiceRecord, ServiceVerificationError> {
+        let signer_node_id = derive_node_id(signer_public_key.as_bytes());
+        if self.node_id != signer_node_id {
+            return Err(ServiceVerificationError::SignerNodeIdMismatch {
+                record_node_id: self.node_id,
+                signer_node_id,
+            });
+        }
+
+        let body = self.canonical_body_bytes()?;
+        signer_public_key.verify(&body, &self.ed25519_signature()?)?;
+        Ok(VerifiedServiceRecord(self))
+    }
+
+    pub fn verify_with_trusted_node_record(
+        self,
+        node_record: &NodeRecord,
+    ) -> Result<VerifiedServiceRecord, ServiceVerificationError> {
+        node_record.validate_node_id()?;
+        let actual = node_record.node_public_key.len();
+        let bytes = node_record
+            .node_public_key
+            .as_slice()
+            .try_into()
+            .map_err(|_| ServiceVerificationError::InvalidPublicKeyLength {
+                expected: ED25519_PUBLIC_KEY_LEN,
+                actual,
+            })?;
+        self.verify_with_public_key(&Ed25519PublicKey::from_bytes(bytes))
+    }
+
+    fn ed25519_signature(&self) -> Result<Ed25519Signature, ServiceVerificationError> {
+        let actual = self.signature.len();
+        let bytes = self.signature.as_slice().try_into().map_err(|_| {
+            ServiceVerificationError::InvalidSignatureLength {
+                expected: ED25519_SIGNATURE_LEN,
+                actual,
+            }
+        })?;
+        Ok(Ed25519Signature::from_bytes(bytes))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedServiceRecord(ServiceRecord);
+
+impl VerifiedServiceRecord {
+    pub fn into_inner(self) -> ServiceRecord {
+        self.0
+    }
+}
+
+impl AsRef<ServiceRecord> for VerifiedServiceRecord {
+    fn as_ref(&self) -> &ServiceRecord {
+        &self.0
+    }
+}
+
+impl From<VerifiedServiceRecord> for ServiceRecord {
+    fn from(record: VerifiedServiceRecord) -> Self {
+        record.into_inner()
     }
 }
 
@@ -557,7 +623,7 @@ mod tests {
         crypto::sign::Ed25519SigningKey,
         error::{
             IntroTicketVerificationError, PresenceVerificationError, RecordEncodingError,
-            RecordValidationError,
+            RecordValidationError, ServiceVerificationError,
         },
         identity::{derive_app_id, derive_node_id, AppId, NodeId},
     };
@@ -733,6 +799,114 @@ mod tests {
         let trusted_node_record = NodeRecord {
             version: 1,
             node_id: derive_node_id(public_key.as_bytes()),
+            node_public_key: public_key.as_bytes().to_vec(),
+            created_at_unix_s: 1,
+            flags: 0,
+            supported_transports: vec!["tcp".to_string()],
+            supported_kex: vec!["x25519".to_string()],
+            supported_signatures: vec!["ed25519".to_string()],
+            anti_sybil_proof: vec![],
+            signature: vec![1, 2, 3],
+        };
+
+        let verified = record
+            .clone()
+            .verify_with_trusted_node_record(&trusted_node_record)
+            .expect("trusted node record should supply signer public key");
+
+        assert_eq!(verified.into_inner(), record);
+    }
+
+    #[test]
+    fn service_record_verifies_with_matching_public_key() {
+        let signing_key = Ed25519SigningKey::from_seed([19_u8; 32]);
+        let public_key = signing_key.public_key();
+        let node_id = derive_node_id(public_key.as_bytes());
+        let mut record = ServiceRecord {
+            version: 1,
+            node_id,
+            app_id: derive_app_id(&node_id, "chat", "terminal"),
+            service_name: "terminal".to_string(),
+            service_version: "1.0.0".to_string(),
+            auth_mode: "none".to_string(),
+            policy: vec![1, 2, 3],
+            reachability_ref: vec![0xAA, 0xBB],
+            metadata_commitment: vec![0xCC, 0xDD],
+            signature: Vec::new(),
+        };
+        let body = record
+            .canonical_body_bytes()
+            .expect("service body should serialize");
+        record.signature = signing_key.sign(&body).as_bytes().to_vec();
+
+        let verified = record
+            .clone()
+            .verify_with_public_key(&public_key)
+            .expect("service signature should verify");
+
+        assert_eq!(verified.into_inner(), record);
+    }
+
+    #[test]
+    fn service_record_rejects_mismatched_signer_public_key() {
+        let signing_key = Ed25519SigningKey::from_seed([19_u8; 32]);
+        let wrong_public_key = Ed25519SigningKey::from_seed([20_u8; 32]).public_key();
+        let node_id = derive_node_id(signing_key.public_key().as_bytes());
+        let mut record = ServiceRecord {
+            version: 1,
+            node_id,
+            app_id: derive_app_id(&node_id, "chat", "terminal"),
+            service_name: "terminal".to_string(),
+            service_version: "1.0.0".to_string(),
+            auth_mode: "none".to_string(),
+            policy: vec![1, 2, 3],
+            reachability_ref: vec![0xAA, 0xBB],
+            metadata_commitment: vec![0xCC, 0xDD],
+            signature: Vec::new(),
+        };
+        let body = record
+            .canonical_body_bytes()
+            .expect("service body should serialize");
+        record.signature = signing_key.sign(&body).as_bytes().to_vec();
+
+        let error = record
+            .verify_with_public_key(&wrong_public_key)
+            .expect_err("mismatched signer should be rejected");
+
+        assert!(matches!(
+            error,
+            ServiceVerificationError::SignerNodeIdMismatch {
+                record_node_id,
+                signer_node_id,
+            } if record_node_id == node_id
+                && signer_node_id == derive_node_id(wrong_public_key.as_bytes())
+        ));
+    }
+
+    #[test]
+    fn service_record_verifies_with_trusted_node_record() {
+        let signing_key = Ed25519SigningKey::from_seed([19_u8; 32]);
+        let public_key = signing_key.public_key();
+        let node_id = derive_node_id(public_key.as_bytes());
+        let mut record = ServiceRecord {
+            version: 1,
+            node_id,
+            app_id: derive_app_id(&node_id, "chat", "terminal"),
+            service_name: "terminal".to_string(),
+            service_version: "1.0.0".to_string(),
+            auth_mode: "none".to_string(),
+            policy: vec![1, 2, 3],
+            reachability_ref: vec![0xAA, 0xBB],
+            metadata_commitment: vec![0xCC, 0xDD],
+            signature: Vec::new(),
+        };
+        let body = record
+            .canonical_body_bytes()
+            .expect("service body should serialize");
+        record.signature = signing_key.sign(&body).as_bytes().to_vec();
+        let trusted_node_record = NodeRecord {
+            version: 1,
+            node_id,
             node_public_key: public_key.as_bytes().to_vec(),
             created_at_unix_s: 1,
             flags: 0,
