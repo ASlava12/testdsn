@@ -3,7 +3,12 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{identity::NodeId, session::HANDSHAKE_VERSION, wire::MAX_FRAME_BODY_LEN};
+use crate::{
+    identity::NodeId,
+    metrics::{LogComponent, LogContext, Observability},
+    session::HANDSHAKE_VERSION,
+    wire::MAX_FRAME_BODY_LEN,
+};
 
 pub const BOOTSTRAP_SCHEMA_VERSION: u8 = 1;
 
@@ -233,6 +238,38 @@ pub trait BootstrapProvider {
             .validated(now_unix_s)
             .map_err(Into::into)
     }
+
+    fn fetch_validated_response_with_observability(
+        &self,
+        now_unix_s: u64,
+        observability: &mut Observability,
+        context: LogContext,
+    ) -> Result<BootstrapResponse, BootstrapProviderError> {
+        match self.fetch_validated_response(now_unix_s) {
+            Ok(response) => {
+                observability.push_log(
+                    context,
+                    LogComponent::Bootstrap,
+                    "bootstrap_fetch",
+                    "accepted",
+                );
+                Ok(response)
+            }
+            Err(error) => {
+                observability.push_log(
+                    context,
+                    LogComponent::Bootstrap,
+                    "bootstrap_fetch",
+                    if matches!(&error, BootstrapProviderError::Unavailable(_)) {
+                        "unavailable"
+                    } else {
+                        "rejected"
+                    },
+                );
+                Err(error)
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -333,7 +370,12 @@ mod tests {
         BootstrapProviderError, BootstrapResponse, BootstrapValidationError, BridgeHint,
         StaticBootstrapProvider, BOOTSTRAP_SCHEMA_VERSION,
     };
-    use crate::{identity::NodeId, session::HANDSHAKE_VERSION, wire::MAX_FRAME_BODY_LEN};
+    use crate::{
+        identity::NodeId,
+        metrics::{LogComponent, LogContext, Observability},
+        session::HANDSHAKE_VERSION,
+        wire::MAX_FRAME_BODY_LEN,
+    };
 
     #[test]
     fn validates_and_canonicalizes_bootstrap_response() {
@@ -511,6 +553,102 @@ mod tests {
                 BootstrapValidationError::UnsupportedHandshakeVersion { .. }
             )
         ));
+    }
+
+    #[test]
+    fn bootstrap_provider_observability_logs_accepted_fetch() {
+        let provider = StaticBootstrapProvider::new(sample_response());
+        let node_id = NodeId::from_bytes([9_u8; 32]);
+        let mut observability = Observability::default();
+
+        let response = provider
+            .fetch_validated_response_with_observability(
+                1_700_000_100,
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_700_000_100_000,
+                    node_id,
+                    correlation_id: 51,
+                },
+            )
+            .expect("bootstrap response should validate");
+
+        assert_eq!(response.version, BOOTSTRAP_SCHEMA_VERSION);
+        let log = observability.latest_log().expect("log should be present");
+        assert_eq!(log.component, LogComponent::Bootstrap);
+        assert_eq!(log.event, "bootstrap_fetch");
+        assert_eq!(log.result, "accepted");
+    }
+
+    #[test]
+    fn bootstrap_provider_observability_logs_rejected_validation_error() {
+        let mut response = sample_response();
+        response.handshake_version = 99;
+        let provider = StaticBootstrapProvider::new(response);
+        let node_id = NodeId::from_bytes([10_u8; 32]);
+        let mut observability = Observability::default();
+
+        let error = provider
+            .fetch_validated_response_with_observability(
+                1_700_000_100,
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_700_000_100_000,
+                    node_id,
+                    correlation_id: 52,
+                },
+            )
+            .expect_err("invalid bootstrap response must be rejected");
+
+        assert!(matches!(
+            error,
+            BootstrapProviderError::Validation(
+                BootstrapValidationError::UnsupportedHandshakeVersion { .. }
+            )
+        ));
+        let log = observability.latest_log().expect("log should be present");
+        assert_eq!(log.component, LogComponent::Bootstrap);
+        assert_eq!(log.event, "bootstrap_fetch");
+        assert_eq!(log.result, "rejected");
+    }
+
+    #[test]
+    fn bootstrap_provider_observability_logs_unavailable_fetch() {
+        struct UnavailableBootstrapProvider;
+
+        impl BootstrapProvider for UnavailableBootstrapProvider {
+            fn provider_name(&self) -> &'static str {
+                "unavailable"
+            }
+
+            fn fetch_response(&self) -> Result<BootstrapResponse, BootstrapProviderError> {
+                Err(BootstrapProviderError::Unavailable(
+                    "provider offline".to_string(),
+                ))
+            }
+        }
+
+        let provider = UnavailableBootstrapProvider;
+        let node_id = NodeId::from_bytes([11_u8; 32]);
+        let mut observability = Observability::default();
+
+        let error = provider
+            .fetch_validated_response_with_observability(
+                1_700_000_100,
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_700_000_100_000,
+                    node_id,
+                    correlation_id: 53,
+                },
+            )
+            .expect_err("unavailable provider must surface an error");
+
+        assert!(matches!(error, BootstrapProviderError::Unavailable(_)));
+        let log = observability.latest_log().expect("log should be present");
+        assert_eq!(log.component, LogComponent::Bootstrap);
+        assert_eq!(log.event, "bootstrap_fetch");
+        assert_eq!(log.result, "unavailable");
     }
 
     fn sample_response() -> BootstrapResponse {

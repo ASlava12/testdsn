@@ -4,6 +4,7 @@ use overlay_core::{
         BootstrapResponse, StaticBootstrapProvider, BOOTSTRAP_SCHEMA_VERSION,
     },
     identity::NodeId,
+    metrics::{LogContext, Observability},
     peer::{PeerStore, PeerStoreConfig},
     session::HANDSHAKE_VERSION,
     wire::MAX_FRAME_BODY_LEN,
@@ -13,8 +14,18 @@ use overlay_core::{
 #[test]
 fn bootstrap_smoke_tracks_current_stage_boundary() {
     let provider = StaticBootstrapProvider::new(sample_response());
+    let node_id = NodeId::from_bytes([99_u8; 32]);
+    let mut observability = Observability::default();
     let response = provider
-        .fetch_validated_response(1_700_000_100)
+        .fetch_validated_response_with_observability(
+            1_700_000_100,
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_100_000,
+                node_id,
+                correlation_id: 71,
+            },
+        )
         .expect("bootstrap response should validate");
     let mut store = PeerStore::new(PeerStoreConfig {
         max_neighbors: 3,
@@ -23,12 +34,27 @@ fn bootstrap_smoke_tracks_current_stage_boundary() {
     })
     .expect("peer store config should be valid");
     let active = store
-        .ingest_bootstrap_response(response, 1_700_000_100)
+        .ingest_bootstrap_response_with_observability(
+            response,
+            1_700_000_100,
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_100_100,
+                node_id,
+                correlation_id: 72,
+            },
+        )
         .expect("validated bootstrap response should seed the peer store");
 
     assert_eq!(REPOSITORY_STAGE, "milestone-9-hardening");
     assert_eq!(active.len(), 3);
     assert_eq!(store.active_neighbors().count(), 3);
+    assert_eq!(observability.metrics().active_peers, 3);
+    assert_eq!(observability.logs().len(), 2);
+    assert_eq!(observability.logs()[0].event, "bootstrap_fetch");
+    assert_eq!(observability.logs()[0].result, "accepted");
+    assert_eq!(observability.logs()[1].event, "bootstrap_ingest");
+    assert_eq!(observability.logs()[1].result, "accepted");
     assert_eq!(
         store
             .active_neighbors()

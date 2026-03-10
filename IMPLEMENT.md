@@ -58,16 +58,19 @@ The repository has a closed Milestone 1-8 baseline.
   considered closed.
 - Milestone 9 hardening and polish is now active with initial bounded
   observability groundwork in `crates/overlay-core/src/metrics/mod.rs` and a
-  validated top-level config baseline in `crates/overlay-core/src/config.rs`,
+  validated top-level config baseline in `crates/overlay-core/src/config.rs`
+  with explicit transport-buffer projection in
+  `crates/overlay-core/src/transport/mod.rs` and runner-boundary
+  `TransportPollEvent` validation in `crates/overlay-core/src/session/manager.rs`,
   with a bounded handshake transcript replay cache now landed in
   `crates/overlay-core/src/session/manager.rs`.
-  Observability integration is now explicitly wired into peer bootstrap ingest,
-  rendezvous publish/lookup, relay bind and rate-limit handling, routing
-  probe/switch paths, service registry flows, and session event export, and
-  malformed-input coverage now explicitly exercises bootstrap schema
-  validation, duplicate peer/bridge-hint rejection, peer ingest rejection
-  handling, rendezvous response-shape validation, and relay, routing, and
-  service wire-body rejection paths.
+  Observability integration is now explicitly wired into bootstrap provider
+  fetch/validation, peer bootstrap ingest, rendezvous publish/lookup, relay
+  bind and rate-limit handling, routing probe/switch paths, service registry
+  flows, and session event export, and malformed-input coverage now explicitly
+  exercises bootstrap schema validation, duplicate peer/bridge-hint rejection,
+  peer ingest rejection handling, rendezvous response-shape validation, and
+  relay, routing, and service wire-body rejection paths.
   Session observability now also has an explicit established-session gauge sync
   helper while keeping aggregation caller-invoked. The remaining active
   Milestone 9 work is broader stale/malformed-input expansion, validation
@@ -75,9 +78,9 @@ The repository has a closed Milestone 1-8 baseline.
   boundaries, and the current validation boundary is the existing regression
   suites,
   stage-boundary integration tests, and Milestone 9 unit coverage in
-  `config::tests`, `metrics::tests`, `peer::tests`, `rendezvous::tests`,
-  `relay::tests`, `routing::tests`, `service::tests`, and
-  `session::manager::tests`.
+  `bootstrap::tests`, `config::tests`, `metrics::tests`, `peer::tests`,
+  `rendezvous::tests`, `relay::tests`, `routing::tests`, `service::tests`, and
+  `session::manager::tests`, plus `transport::tests`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -368,7 +371,8 @@ Close the highest-risk gaps before larger-scale simulation.
 
 ### Closeout path
 1. Finish the remaining explicit observability aggregation helpers and keep
-   them caller-invoked, starting with the established-session gauge.
+   them caller-invoked beyond the landed bootstrap fetch/validation logging and
+   established-session gauge sync helper.
 2. Complete stale/malformed rejection coverage across the remaining boundary
    message shapes and bounded local stores.
 3. Keep replay-risk mitigation, bounded quotas, and bounded stores aligned with

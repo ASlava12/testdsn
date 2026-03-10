@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use thiserror::Error;
 
+pub const DEFAULT_MAX_TRANSPORT_BUFFER_BYTES: usize = 65_536;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TransportClass {
@@ -45,6 +47,63 @@ pub enum TransportRunnerError {
     UnsupportedOperation {
         adapter_name: &'static str,
         operation: &'static str,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TransportBufferConfig {
+    pub max_buffer_bytes: usize,
+}
+
+impl Default for TransportBufferConfig {
+    fn default() -> Self {
+        Self {
+            max_buffer_bytes: DEFAULT_MAX_TRANSPORT_BUFFER_BYTES,
+        }
+    }
+}
+
+impl TransportBufferConfig {
+    pub fn validate(self) -> Result<Self, TransportBufferError> {
+        if self.max_buffer_bytes == 0 {
+            return Err(TransportBufferError::ZeroLimit {
+                field: "max_buffer_bytes",
+            });
+        }
+
+        Ok(self)
+    }
+
+    pub fn validate_poll_event(
+        self,
+        event: &TransportPollEvent,
+    ) -> Result<(), TransportBufferError> {
+        self.validate()?;
+
+        if let TransportPollEvent::FrameReceived { bytes } = event {
+            let byte_len = bytes.len();
+            if byte_len > self.max_buffer_bytes {
+                return Err(TransportBufferError::FrameExceedsBuffer {
+                    byte_len,
+                    max_buffer_bytes: self.max_buffer_bytes,
+                });
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
+pub enum TransportBufferError {
+    #[error("transport buffer limit {field} must be non-zero")]
+    ZeroLimit { field: &'static str },
+    #[error(
+        "transport frame length {byte_len} exceeds max_transport_buffer_bytes {max_buffer_bytes}"
+    )]
+    FrameExceedsBuffer {
+        byte_len: usize,
+        max_buffer_bytes: usize,
     },
 }
 
@@ -164,7 +223,8 @@ impl TransportRunner for RelayTransport {}
 #[cfg(test)]
 mod tests {
     use super::{
-        QuicTransport, RelayTransport, TcpTransport, Transport, TransportClass, TransportRunner,
+        QuicTransport, RelayTransport, TcpTransport, Transport, TransportBufferConfig,
+        TransportBufferError, TransportClass, TransportPollEvent, TransportRunner,
         TransportRunnerError, WsTunnelTransport,
     };
 
@@ -220,5 +280,64 @@ mod tests {
                 None
             );
         }
+    }
+
+    #[test]
+    fn transport_buffer_config_rejects_zero_limit() {
+        let error = TransportBufferConfig {
+            max_buffer_bytes: 0,
+        }
+        .validate()
+        .expect_err("zero transport buffer must be rejected");
+
+        assert_eq!(
+            error,
+            TransportBufferError::ZeroLimit {
+                field: "max_buffer_bytes",
+            }
+        );
+    }
+
+    #[test]
+    fn transport_buffer_config_accepts_non_frame_events_and_bounded_frames() {
+        let config = TransportBufferConfig {
+            max_buffer_bytes: 8,
+        }
+        .validate()
+        .expect("config should be valid");
+
+        assert_eq!(
+            config.validate_poll_event(&TransportPollEvent::Opened),
+            Ok(())
+        );
+        assert_eq!(
+            config.validate_poll_event(&TransportPollEvent::FrameReceived {
+                bytes: vec![1_u8; 8],
+            }),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn transport_buffer_config_rejects_oversized_received_frames() {
+        let config = TransportBufferConfig {
+            max_buffer_bytes: 8,
+        }
+        .validate()
+        .expect("config should be valid");
+
+        let error = config
+            .validate_poll_event(&TransportPollEvent::FrameReceived {
+                bytes: vec![1_u8; 9],
+            })
+            .expect_err("oversized received frames must be rejected");
+
+        assert_eq!(
+            error,
+            TransportBufferError::FrameExceedsBuffer {
+                byte_len: 9,
+                max_buffer_bytes: 8,
+            }
+        );
     }
 }

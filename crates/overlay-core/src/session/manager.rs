@@ -7,7 +7,9 @@ use crate::{
     crypto::hash::Blake3Digest,
     identity::NodeId,
     metrics::{LogComponent, LogContext, Observability},
-    transport::{Transport, TransportClass},
+    transport::{
+        Transport, TransportBufferConfig, TransportBufferError, TransportClass, TransportPollEvent,
+    },
 };
 
 use super::handshake::{HandshakeOutcome, SessionKeys};
@@ -380,6 +382,24 @@ pub enum SessionRunnerInput {
     HandshakeSucceeded { outcome: HandshakeOutcome },
     TransportClosed { detail: Option<String> },
     TransportFailed { detail: String },
+}
+
+impl SessionRunnerInput {
+    pub fn from_transport_poll_event(
+        event: TransportPollEvent,
+        buffer_config: TransportBufferConfig,
+    ) -> Result<Option<Self>, TransportBufferError> {
+        buffer_config.validate_poll_event(&event)?;
+
+        Ok(match event {
+            TransportPollEvent::Opened => None,
+            TransportPollEvent::FrameReceived { bytes } => Some(Self::FrameReceived {
+                byte_len: bytes.len(),
+            }),
+            TransportPollEvent::Closed => Some(Self::TransportClosed { detail: None }),
+            TransportPollEvent::Failed { detail } => Some(Self::TransportFailed { detail }),
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1079,7 +1099,10 @@ mod tests {
         identity::NodeId,
         metrics::Observability,
         session::{HandshakeOutcome, SessionKeys},
-        transport::{TcpTransport, TransportClass},
+        transport::{
+            TcpTransport, TransportBufferConfig, TransportBufferError, TransportClass,
+            TransportPollEvent,
+        },
     };
 
     const TEST_TIMING: SessionTimingConfig = SessionTimingConfig {
@@ -1561,6 +1584,64 @@ mod tests {
         assert_eq!(
             observed.detail.as_deref(),
             Some("runner delivered 128 bytes")
+        );
+    }
+
+    #[test]
+    fn transport_poll_event_can_convert_into_runner_input_with_buffer_validation() {
+        let frame_input = SessionRunnerInput::from_transport_poll_event(
+            TransportPollEvent::FrameReceived {
+                bytes: vec![7_u8; 128],
+            },
+            TransportBufferConfig {
+                max_buffer_bytes: 128,
+            },
+        )
+        .expect("bounded frame should convert");
+        let closed_input = SessionRunnerInput::from_transport_poll_event(
+            TransportPollEvent::Closed,
+            TransportBufferConfig {
+                max_buffer_bytes: 128,
+            },
+        )
+        .expect("closed event should convert");
+        let opened_input = SessionRunnerInput::from_transport_poll_event(
+            TransportPollEvent::Opened,
+            TransportBufferConfig {
+                max_buffer_bytes: 128,
+            },
+        )
+        .expect("opened event should be accepted");
+
+        assert_eq!(
+            frame_input,
+            Some(SessionRunnerInput::FrameReceived { byte_len: 128 })
+        );
+        assert_eq!(
+            closed_input,
+            Some(SessionRunnerInput::TransportClosed { detail: None })
+        );
+        assert_eq!(opened_input, None);
+    }
+
+    #[test]
+    fn transport_poll_event_conversion_rejects_oversized_frame() {
+        let error = SessionRunnerInput::from_transport_poll_event(
+            TransportPollEvent::FrameReceived {
+                bytes: vec![9_u8; 129],
+            },
+            TransportBufferConfig {
+                max_buffer_bytes: 128,
+            },
+        )
+        .expect_err("oversized frame must be rejected at runner boundary");
+
+        assert_eq!(
+            error,
+            TransportBufferError::FrameExceedsBuffer {
+                byte_len: 129,
+                max_buffer_bytes: 128,
+            }
         );
     }
 

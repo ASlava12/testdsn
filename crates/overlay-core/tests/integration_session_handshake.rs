@@ -4,7 +4,7 @@ use overlay_core::{
         ClientHandshake, HandshakeConfig, ServerHandshake, SessionEventKind, SessionIoActionKind,
         SessionManager, SessionRunnerInput, SessionState,
     },
-    transport::TcpTransport,
+    transport::{TcpTransport, TransportBufferConfig, TransportPollEvent},
 };
 
 #[test]
@@ -50,16 +50,29 @@ fn handshake_outcome_can_flow_into_session_manager_runner_boundary() {
             },
         )
         .expect("runner handshake success should establish the session");
+    let observed_input = SessionRunnerInput::from_transport_poll_event(
+        TransportPollEvent::FrameReceived {
+            bytes: vec![1_u8; 96],
+        },
+        TransportBufferConfig {
+            max_buffer_bytes: 96,
+        },
+    )
+    .expect("bounded frame should translate into runner input")
+    .expect("frame event should produce runner input");
     let observed = manager
-        .handle_runner_input(140, SessionRunnerInput::FrameReceived { byte_len: 96 })
+        .handle_runner_input(140, observed_input)
         .expect("runner frame delivery should refresh the session");
+    let closed_input = SessionRunnerInput::from_transport_poll_event(
+        TransportPollEvent::Closed,
+        TransportBufferConfig {
+            max_buffer_bytes: 96,
+        },
+    )
+    .expect("closed event should translate into runner input")
+    .expect("closed event should produce runner input");
     let closed = manager
-        .handle_runner_input(
-            180,
-            SessionRunnerInput::TransportClosed {
-                detail: Some("peer closed transport".to_string()),
-            },
-        )
+        .handle_runner_input(180, closed_input)
         .expect("runner close should close the session");
 
     assert_eq!(established.event, SessionEventKind::OpenSucceeded);

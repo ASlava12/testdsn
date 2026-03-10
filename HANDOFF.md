@@ -16,10 +16,12 @@ Use the contents of `prompts/codex-milestone-9.md` as the first task.
 It assumes the repository already has a closed Milestone 1-8 baseline and that
 Milestone 9 hardening and polish is now active with observability/config
 groundwork, a bounded replay cache, and broad explicit subsystem
-observability integration landed, plus expanded malformed-input coverage in the
-wire-helper tests and an explicit established-session gauge sync helper, and
-with the current regression, stage-boundary, and Milestone 9 unit suites as
-its working boundary.
+observability integration landed, including bootstrap provider fetch/validation
+logging, explicit transport-buffer config projection from top-level node
+config and runner-boundary transport frame validation, plus expanded
+malformed-input coverage in the wire-helper tests and an explicit
+established-session gauge sync helper, and with the current regression,
+stage-boundary, and Milestone 9 unit suites as its working boundary.
 
 ## Recommended workflow
 

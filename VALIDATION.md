@@ -99,6 +99,7 @@ cargo test -p overlay-core --test integration_service_open
 ## Milestone 9 hardening runs
 
 ```bash
+cargo test -p overlay-core bootstrap::tests
 cargo test -p overlay-core config::tests
 cargo test -p overlay-core metrics::tests
 cargo test -p overlay-core peer::tests
@@ -108,6 +109,7 @@ cargo test -p overlay-core relay::tests
 cargo test -p overlay-core routing::tests
 cargo test -p overlay-core service::tests
 cargo test -p overlay-core session::manager::tests
+cargo test -p overlay-core transport::tests
 cargo test -p overlay-core --test integration_bootstrap
 cargo test -p overlay-core --test integration_publish_lookup
 cargo test -p overlay-core --test integration_relay_fallback
@@ -122,9 +124,17 @@ cargo test -p overlay-core --test integration_service_open
 - If `REPOSITORY_STAGE`, milestone prompts, or other status markers change, rerun the stage-boundary smoke tests so code and docs stay aligned.
 - `integration_publish_lookup` remains the real Milestone 5 integration path; `integration_relay_fallback` is the real Milestone 6 integration path; `integration_routing` is the real Milestone 7 integration path; `integration_service_open` is now the real Milestone 8 integration path.
 - Milestone 9 currently extends the closed-baseline regression runs and
-  stage-boundary smoke tests with `config::tests`, `metrics::tests`,
-  `peer::tests`, `rendezvous::tests`, and `session::manager::tests` while
-  broader hardening coverage continues to land.
+  stage-boundary smoke tests with `bootstrap::tests`, `config::tests`,
+  `metrics::tests`, `peer::tests`, `rendezvous::tests`, and
+  `session::manager::tests`, plus `transport::tests`, while broader hardening
+  coverage continues to land.
+- `bootstrap::tests` now also covers bootstrap provider fetch/validation
+  observability for accepted, rejected, and unavailable provider outcomes.
+- `transport::tests` now also covers bounded transport-buffer config
+  validation and oversized received-frame rejection.
+- `session::manager::tests` now also covers converting bounded
+  `TransportPollEvent` values into runner inputs and rejecting oversized
+  transport frames at that boundary.
 - `bootstrap::tests` now also covers zero `max_frame_body_len`, duplicate peer-node rejection, duplicate bridge-hint rejection, blank peer dial-hint rejection after trimming, and expired bridge hints.
 - `rendezvous::tests` now also covers deterministic publish/lookup message vectors in `tests/vectors/rendezvous_messages.json`, derived placement-key validation on `PublishAck` / `LookupResult` / `LookupNotFound`, and `LookupResult.record.node_id` shape validation.
 - `relay::tests` now also covers deterministic relay intro message vectors in `tests/vectors/relay_intro_messages.json` and oversize relay wire-body rejection.

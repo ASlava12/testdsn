@@ -11,6 +11,7 @@ use crate::{
     rendezvous::{RendezvousConfig, RendezvousError},
     routing::{PathProbeConfig, RoutingError},
     service::{ServiceConfig, ServiceError},
+    transport::{TransportBufferConfig, TransportBufferError},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -77,6 +78,7 @@ impl OverlayConfig {
         self.rendezvous_config().validate()?;
         self.service_config().validate()?;
         self.path_probe_config().validate()?;
+        self.transport_buffer_config().validate()?;
         self.relay_config().validate()?;
 
         Ok(self)
@@ -113,6 +115,12 @@ impl OverlayConfig {
         }
     }
 
+    pub fn transport_buffer_config(&self) -> TransportBufferConfig {
+        TransportBufferConfig {
+            max_buffer_bytes: self.max_transport_buffer_bytes,
+        }
+    }
+
     pub fn relay_config(&self) -> RelayConfig {
         RelayConfig::default().with_relay_mode(self.relay_mode)
     }
@@ -134,6 +142,8 @@ pub enum ConfigError {
     Service(#[from] ServiceError),
     #[error(transparent)]
     Routing(#[from] RoutingError),
+    #[error(transparent)]
+    Transport(#[from] TransportBufferError),
     #[error(transparent)]
     Relay(#[from] RelayError),
 }
@@ -184,6 +194,9 @@ mod tests {
 
         let routing = config.path_probe_config();
         assert_eq!(routing.path_probe_interval_ms, 5_000);
+
+        let transport = config.transport_buffer_config();
+        assert_eq!(transport.max_buffer_bytes, 65_536);
 
         let relay = config.relay_config();
         assert!(!relay.relay_mode);
