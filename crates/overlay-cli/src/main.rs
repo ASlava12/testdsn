@@ -1,3 +1,5 @@
+mod devnet;
+
 use std::{env, ffi::OsString, path::PathBuf, process::ExitCode, thread, time::Duration};
 
 use overlay_core::{runtime::NodeRuntime, REPOSITORY_STAGE};
@@ -27,6 +29,7 @@ fn try_main() -> Result<(), String> {
             tick_ms,
             max_ticks,
         } => run_command(config_path, tick_ms, max_ticks),
+        Command::Smoke { devnet_dir } => devnet::run_smoke(&devnet_dir),
     }
 }
 
@@ -38,6 +41,9 @@ enum Command {
         config_path: PathBuf,
         tick_ms: u64,
         max_ticks: Option<u64>,
+    },
+    Smoke {
+        devnet_dir: PathBuf,
     },
 }
 
@@ -51,6 +57,7 @@ fn parse_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, St
     match command.to_string_lossy().as_ref() {
         "-h" | "--help" => Ok(Command::Help),
         "run" => parse_run_command(args),
+        "smoke" => parse_smoke_command(args),
         other => Err(format!("unknown command '{other}'")),
     }
 }
@@ -95,6 +102,26 @@ fn parse_run_command(args: impl IntoIterator<Item = OsString>) -> Result<Command
         tick_ms,
         max_ticks,
     })
+}
+
+fn parse_smoke_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, String> {
+    let mut devnet_dir = PathBuf::from("devnet");
+    let mut args = args.into_iter();
+
+    while let Some(arg) = args.next() {
+        match arg.to_string_lossy().as_ref() {
+            "--devnet-dir" => {
+                let Some(value) = args.next() else {
+                    return Err("--devnet-dir requires a path".to_string());
+                };
+                devnet_dir = PathBuf::from(value);
+            }
+            "-h" | "--help" => return Ok(Command::Help),
+            other => return Err(format!("unknown smoke flag '{other}'")),
+        }
+    }
+
+    Ok(Command::Smoke { devnet_dir })
 }
 
 fn parse_u64_flag(flag: &str, value: &OsString) -> Result<u64, String> {
@@ -142,4 +169,58 @@ fn print_usage() {
     println!("usage:");
     println!("  overlay-cli");
     println!("  overlay-cli run --config <path> [--tick-ms <ms>] [--max-ticks <count>]");
+    println!("  overlay-cli smoke [--devnet-dir <path>]");
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{ffi::OsString, path::PathBuf};
+
+    use super::{parse_command, Command};
+
+    #[test]
+    fn parse_command_defaults_to_stage() {
+        assert_eq!(
+            parse_command([OsString::from("overlay-cli")]).unwrap(),
+            Command::Stage
+        );
+    }
+
+    #[test]
+    fn parse_command_parses_run_flags() {
+        assert_eq!(
+            parse_command([
+                OsString::from("overlay-cli"),
+                OsString::from("run"),
+                OsString::from("--config"),
+                OsString::from("devnet/configs/node-a.json"),
+                OsString::from("--tick-ms"),
+                OsString::from("250"),
+                OsString::from("--max-ticks"),
+                OsString::from("3"),
+            ])
+            .unwrap(),
+            Command::Run {
+                config_path: PathBuf::from("devnet/configs/node-a.json"),
+                tick_ms: 250,
+                max_ticks: Some(3),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_command_parses_smoke_flags() {
+        assert_eq!(
+            parse_command([
+                OsString::from("overlay-cli"),
+                OsString::from("smoke"),
+                OsString::from("--devnet-dir"),
+                OsString::from("fixtures/devnet"),
+            ])
+            .unwrap(),
+            Command::Smoke {
+                devnet_dir: PathBuf::from("fixtures/devnet"),
+            }
+        );
+    }
 }

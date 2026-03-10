@@ -67,6 +67,18 @@ cargo test -p overlay-core --test integration_routing
 cargo test -p overlay-core --test integration_service_open
 ```
 
+## Milestone 11 local devnet smoke
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- smoke --devnet-dir devnet
+```
+
+or
+
+```bash
+./devnet/run-smoke.sh
+```
+
 ## Milestone 5 regression runs
 
 ```bash
@@ -159,6 +171,11 @@ cargo test -p overlay-core --test integration_service_open
 - `peer::tests` now also covers rejected bootstrap ingest observability without clobbering the active-peer gauge.
 - `session::manager::tests` now also covers bounded handshake transcript replay-cache validation, rejection, pruning, oldest-entry eviction, and explicit established-session gauge synchronization.
 - routing probe message vectors live in `tests/vectors/path_probe_messages.json`.
+- The local devnet smoke flow is intentionally in-process and local-file based:
+  it validates the sample configs, runtime startup, handshake-backed placeholder
+  session establishment, verified presence publish handoff, exact lookup,
+  service open, and one relay-fallback path without introducing real network
+  listeners.
 - If the default temp directory is not writable in your environment, prefix the build, lint, and test commands with `TMPDIR=/tmp`.
 
 If a command fails, report exactly which command failed and whether it failed because:

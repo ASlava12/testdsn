@@ -83,6 +83,17 @@ The current repository stage marker is `milestone-9-hardening`.
   `bootstrap::tests`, `config::tests`, `metrics::tests`, `peer::tests`,
   `rendezvous::tests`, `relay::tests`, `routing::tests`, `service::tests`, and
   `session::manager::tests`, plus `transport::tests`.
+- Milestone 10 minimal runtime work is also implemented in
+  `crates/overlay-core/src/runtime.rs` and `crates/overlay-cli/src/main.rs`,
+  with config-path loading, local bootstrap-file startup, and a bounded
+  runtime tick loop exposed as `overlay-cli run`.
+- Milestone 11 local-devnet work is now implemented in `devnet/` and
+  `crates/overlay-cli/src/devnet.rs`, with four sample node configs,
+  deterministic key material, local bootstrap seed files, a reproducible
+  smoke flow, and one documented relay-fallback path. This remains a
+  local-only orchestration layer on top of the existing runtime and subsystem
+  boundaries; it does not advance the protocol stage marker beyond
+  `milestone-9-hardening`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there

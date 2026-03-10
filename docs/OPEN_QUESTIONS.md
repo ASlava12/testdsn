@@ -839,6 +839,28 @@ Rationale:
 - half-TTL refresh is the smallest conservative choice that refreshes before
   expiry without changing rendezvous semantics.
 
+### 35. Conservative local-devnet orchestration defaults for Milestone 11
+
+For the minimal Milestone 11 local devnet:
+
+- sample nodes are started from on-disk `OverlayConfig` JSON files and local
+  bootstrap seed files only;
+- the smoke flow may drive multiple `NodeRuntime` instances in-process instead
+  of requiring real network listeners or container orchestration;
+- the session step should use the existing placeholder transport boundary with a
+  real handshake outcome, not a fabricated established-session state;
+- verified presence records and service requests may be handed to peer runtimes
+  in-process after signature verification so the smoke flow exercises publish,
+  exact lookup, service open, and relay fallback without inventing new runtime
+  networking surfaces.
+
+Rationale:
+- this stays aligned with the existing runtime and subsystem boundaries;
+- it keeps the devnet runnable on one machine without pretending Milestone 10
+  already has full socket-level transport plumbing;
+- it exposes the local-only assumption explicitly instead of hiding it in test
+  harness code.
+
 ## Rule
 
 If a task requires an area still not fully specified:
