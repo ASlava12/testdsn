@@ -65,8 +65,9 @@ Do not add by default:
   direct-first fallback planning.
 - Milestone 6 is considered closed.
 - Milestone 7 path metrics, deterministic scoring, and switch hysteresis work
-  is now active with integer EWMA observation updates and anti-flapping route
-  selection tests.
+  is now active with canonical path-probe wire bodies, a bounded local probe
+  tracker, integer EWMA observation updates, and anti-flapping route selection
+  tests.
 - Milestone 8 and later remain placeholder modules or smoke-test stubs unless
   the task explicitly begins those milestones.
 

@@ -66,7 +66,23 @@ Presence / lookup rules for the current Milestone 5 baseline:
 
 ### Routing
 - `PathProbe`
+  - `path_id`
+  - `probe_id`
+  - `sent_at_unix_ms`
 - `PathProbeResult`
+  - `path_id`
+  - `probe_id`
+
+Routing probe rules for the current Milestone 7 baseline:
+- `PathProbeResult` acknowledges an in-flight `PathProbe` by `path_id` and
+  `probe_id`;
+- the local sender computes RTT from the matching in-flight probe timestamp and
+  its own receive time for `PathProbeResult`;
+- loss is derived locally from missing or expired probe results rather than
+  being encoded in `PathProbeResult`;
+- these message bodies use the same canonical JSON UTF-8 body rules as the rest
+  of the MVP body encoding;
+- a routing probe body must still fit within the MVP frame body limit.
 
 Relay intro rules for the current Milestone 6 baseline:
 - `ResolveIntro.intro_ticket` carries a full `IntroTicket`;

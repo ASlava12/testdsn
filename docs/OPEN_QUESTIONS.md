@@ -586,6 +586,35 @@ Rules:
 - if the current path disappears from the candidate set, switch immediately to
   the best remaining candidate and record that switch in local history.
 
+### 26. Conservative path probe message schema and local defaults for the current Milestone 7 baseline
+
+For the current Milestone 7 baseline, active probes stay small and bounded.
+
+`PathProbe`:
+- `path_id`
+- `probe_id`
+- `sent_at_unix_ms`
+
+`PathProbeResult`:
+- `path_id`
+- `probe_id`
+
+Defaults:
+- `path_probe_interval_ms = 5_000`
+- max in-flight probes per path: `4`
+- loss window samples: `16`
+
+Rules:
+- issue at most one new probe for a path per local `path_probe_interval_ms`;
+- derive RTT locally from the matching in-flight `PathProbe.sent_at_unix_ms`
+  and the local receive time of `PathProbeResult`;
+- derive loss locally from missing or expired probe results rather than from a
+  field encoded in `PathProbeResult`;
+- keep probe bookkeeping bounded per path and preserve deterministic `probe_id`
+  assignment order;
+- keep routing probe message bodies on the same canonical JSON UTF-8 encoding
+  rules and MVP frame-size limit as other current protocol bodies.
+
 ## Rule
 
 If a task requires an area still not fully specified:

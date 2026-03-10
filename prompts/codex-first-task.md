@@ -24,7 +24,9 @@ Current repository baseline:
   `IntroResponse` bodies, verified `IntroTicket` usage, and direct-first
   fallback planning.
 - Milestone 7 routing work is active in `overlay-core` (`routing`) with
-  deterministic path metrics, integer EWMA updates, and switch hysteresis.
+  canonical `PathProbe` / `PathProbeResult` bodies, a bounded local probe
+  tracker, deterministic path metrics, integer EWMA updates, and switch
+  hysteresis.
 - Milestone 8 and later are still placeholders.
 
 Constraints:

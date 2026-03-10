@@ -41,9 +41,11 @@ The repository has a closed Milestone 1-6 baseline.
   relay fallback integration coverage. Milestone 6 is considered closed.
 - Milestone 7 routing metrics and path switching work is now active in
   `crates/overlay-core/src/routing/mod.rs`, including deterministic path
-  scoring, integer EWMA updates for observed path metrics, hysteresis-gated
-  route selection, anti-flapping unit coverage, and a routing stage-boundary
-  integration scenario.
+  scoring, canonical `PathProbe` / `PathProbeResult` wire-body helpers with
+  deterministic path-probe message vectors, a bounded local path probe tracker,
+  integer EWMA updates for observed path metrics and probe feedback,
+  hysteresis-gated route selection, anti-flapping unit coverage, and a routing
+  stage-boundary integration scenario.
 - Milestone 8 and later are still placeholder modules and stage-boundary smoke tests.
 
 Treat Milestones 0-6 as a closed baseline. Prefer regression fixes,

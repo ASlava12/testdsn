@@ -21,8 +21,9 @@ Current repository baseline:
 - Milestone 6 relay intro/fallback work is implemented, validated, and
   considered closed.
 - Milestone 7 routing/path work is active in `overlay-core` (`routing`) with
-  deterministic path metrics, integer EWMA observation updates, path scoring,
-  switch hysteresis, and anti-flapping tests.
+  canonical `PathProbe` / `PathProbeResult` bodies, a bounded local probe
+  tracker, deterministic path metrics, integer EWMA observation updates, path
+  scoring, switch hysteresis, and anti-flapping tests.
 - Milestone 8 and later are still placeholders.
 
 Requirements:
