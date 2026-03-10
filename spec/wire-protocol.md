@@ -46,7 +46,13 @@
   - `reason`
   - `remaining_budget`
 - `ResolveIntro`
+  - `relay_node_id`
+  - `intro_ticket`
 - `IntroResponse`
+  - `relay_node_id`
+  - `target_node_id`
+  - `ticket_id`
+  - `status`
 
 Presence / lookup rules for the current Milestone 5 baseline:
 - `PublishPresence.record` carries a full `PresenceRecord`;
@@ -61,6 +67,18 @@ Presence / lookup rules for the current Milestone 5 baseline:
 ### Routing
 - `PathProbe`
 - `PathProbeResult`
+
+Relay intro rules for the current Milestone 6 baseline:
+- `ResolveIntro.intro_ticket` carries a full `IntroTicket`;
+- `ResolveIntro` must be verified against the target node signing key before the
+  local relay handler uses it;
+- `IntroResponse.status` values are `forwarded`, `rejected_relay_disabled`,
+  `rejected_relay_mismatch`, `rejected_role_disabled`,
+  `rejected_ticket_expired`, `rejected_requester_binding`,
+  `rejected_rate_limited`;
+- these message bodies use the same canonical JSON UTF-8 body rules as the rest
+  of the MVP body encoding;
+- a relay-intro body must still fit within the MVP frame body limit.
 
 ### Service
 - `GetServiceRecord`

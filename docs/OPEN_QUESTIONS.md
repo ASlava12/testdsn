@@ -227,8 +227,10 @@ For current work, treat the repository stage as:
   handoff at the store boundary;
 - Milestone 6 relay intro and fallback work started in
   `crates/overlay-core/src/relay/mod.rs` with profile-based bounded relay quota
-  defaults, local intro/tunnel/byte quota enforcement, verified `IntroTicket`
-  usage, direct-first/relay-second reachability planning, and relay fallback
+  defaults, an explicit local relay role model, canonical `ResolveIntro` /
+  `IntroResponse` wire-body helpers with deterministic relay intro message
+  vectors, intro/tunnel/byte quota enforcement, verified `IntroTicket` usage,
+  direct-first/relay-second reachability planning, and relay fallback
   integration coverage;
 - Milestone 7+ not started beyond placeholders and remaining stage-boundary smoke tests.
 
@@ -519,10 +521,49 @@ Rules:
   node and whose `requester_binding` matches the local requester binding;
 - build direct attempts first from non-`relay` transport classes on the target
   `PresenceRecord`;
+- reject relay hints whose relay-dial transport class is `relay`; recursive
+  relay-on-relay fallback remains out of scope for the current baseline;
 - keep relay candidates as fallback only, sorted by higher `relay_score` first
   with deterministic tie-breaking;
 - preserve secondary relay candidates instead of collapsing to one mandatory
   relay.
+
+### 23. Conservative local relay role defaults for the current Milestone 6 baseline
+
+For the current Milestone 6 baseline, the local relay role model stays minimal.
+
+Rules:
+- when `relay_mode` is disabled, all relay roles are disabled locally;
+- when `relay_mode` is enabled for the current Milestone 6 baseline, enable only
+  `forward` and `intro` roles by default;
+- keep `rendezvous` and `bridge` roles disabled until a later milestone
+  explicitly implements them;
+- intro request handling requires the local `intro` role;
+- relay tunnel binding and relayed-byte accounting require the local `forward`
+  role.
+
+### 24. Conservative relay intro message schema for the current Milestone 6 baseline
+
+For the current Milestone 6 baseline, the relay intro wire surface stays small.
+
+`ResolveIntro`:
+- `relay_node_id`
+- `intro_ticket`
+
+`IntroResponse`:
+- `relay_node_id`
+- `target_node_id`
+- `ticket_id`
+- `status`
+
+Rules:
+- verify `ResolveIntro.intro_ticket` before local relay handling;
+- use `IntroResponse.status` values `forwarded`, `rejected_relay_disabled`,
+  `rejected_relay_mismatch`, `rejected_role_disabled`,
+  `rejected_ticket_expired`, `rejected_requester_binding`, and
+  `rejected_rate_limited`;
+- keep relay intro message bodies on the same canonical JSON UTF-8 encoding
+  rules and MVP frame-size limit as other current protocol bodies.
 
 ## Rule
 

@@ -20,7 +20,9 @@ Current repository baseline:
 - Milestone 5 rendezvous/presence publish and exact lookup work is closed in
   `overlay-core` (`rendezvous`).
 - Milestone 6 relay intro/fallback work is active in `overlay-core` (`relay`)
-  with bounded local quota and fallback-planning state.
+  with a minimal local relay role model, canonical `ResolveIntro` /
+  `IntroResponse` bodies, verified `IntroTicket` usage, and direct-first
+  fallback planning.
 - Milestone 7 and later are still placeholders.
 
 Constraints:
@@ -32,6 +34,7 @@ Constraints:
 Tasks:
 - continue Milestone 6 relay intro/fallback work from the current relay
   baseline;
+- keep recursive relay-on-relay fallback out of scope unless the spec changes;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the repository baseline changes;
 - treat Milestones 1-5 as closed baseline work, touching them only for

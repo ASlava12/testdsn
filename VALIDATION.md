@@ -88,6 +88,7 @@ cargo test -p overlay-core --test integration_relay_fallback
 - If `REPOSITORY_STAGE`, milestone prompts, or other status markers change, rerun the stage-boundary smoke tests so code and docs stay aligned.
 - `integration_publish_lookup` remains the real Milestone 5 integration path; `integration_relay_fallback` is now a real Milestone 6 integration path; `integration_service_open` remains a stage-boundary smoke test until its later milestone lands.
 - `rendezvous::tests` now also covers deterministic publish/lookup message vectors in `tests/vectors/rendezvous_messages.json`.
+- `relay::tests` now also covers deterministic relay intro message vectors in `tests/vectors/relay_intro_messages.json`.
 - If the default temp directory is not writable in your environment, prefix the build, lint, and test commands with `TMPDIR=/tmp`.
 
 If a command fails, report exactly which command failed and whether it failed because:

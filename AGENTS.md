@@ -60,7 +60,8 @@ Do not add by default:
   vectorized, and validated.
 - Milestone 5 is considered closed.
 - Milestone 6 relay intro and fallback work is now active with local quota
-  enforcement, verified intro-ticket usage, and direct-first fallback planning.
+  enforcement, an explicit local role model, canonical relay-intro wire bodies,
+  verified intro-ticket usage, and direct-first fallback planning.
 - Milestone 7 and later remain placeholder modules or smoke-test stubs unless
   the task explicitly begins those milestones.
 

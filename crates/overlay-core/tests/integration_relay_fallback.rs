@@ -2,7 +2,9 @@ use overlay_core::{
     crypto::sign::Ed25519SigningKey,
     identity::derive_node_id,
     records::{IntroTicket, PresenceRecord, RelayHint},
-    relay::{build_reachability_plan, RelayConfig, RelayManager},
+    relay::{
+        build_reachability_plan, IntroResponseStatus, RelayConfig, RelayManager, ResolveIntro,
+    },
     REPOSITORY_STAGE,
 };
 
@@ -57,9 +59,20 @@ fn relay_fallback_plan_tracks_current_stage_boundary() {
         relay_hints[1].relay_node_id
     );
 
-    relay_manager
-        .note_intro_request(now_unix_s)
-        .expect("intro request should fit quota");
+    let resolve_intro = ResolveIntro {
+        relay_node_id: plan.relay_fallbacks[0].relay_node_id,
+        intro_ticket: verified_ticket.into_inner(),
+    }
+    .verify_with_public_key(&target_signing_key.public_key())
+    .expect("resolve intro request should verify before relay handling");
+    let intro_response = relay_manager.process_resolve_intro(
+        plan.relay_fallbacks[0].relay_node_id,
+        resolve_intro,
+        requester_binding,
+        now_unix_s,
+    );
+
+    assert_eq!(intro_response.status, IntroResponseStatus::Forwarded);
     let tunnel = relay_manager
         .bind_tunnel(
             7,

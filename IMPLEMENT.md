@@ -34,7 +34,9 @@ The repository has a closed Milestone 1-5 baseline.
   handoff at the store boundary, and publish/lookup integration coverage.
 - Milestone 6 relay intro and fallback work is now active in
   `crates/overlay-core/src/relay/mod.rs`, including profile-based bounded relay
-  quota defaults, local intro/tunnel/byte quota enforcement, verified
+  quota defaults, an explicit local relay role model, canonical
+  `ResolveIntro` / `IntroResponse` wire-body helpers with deterministic relay
+  intro message vectors, intro/tunnel/byte quota enforcement, verified
   `IntroTicket` usage, direct-first/relay-second reachability planning, and
   relay fallback integration coverage.
 - Milestone 7 and later are still placeholder modules and stage-boundary smoke tests.

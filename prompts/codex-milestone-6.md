@@ -19,7 +19,8 @@ Current repository baseline:
 - Milestone 5 rendezvous/presence publish and exact lookup work is implemented,
   validated, and considered closed.
 - Milestone 6 relay intro/fallback work is active in `overlay-core` (`relay`)
-  with bounded local quota enforcement, verified `IntroTicket` usage, and
+  with a minimal local relay role model, bounded quota enforcement, canonical
+  `ResolveIntro` / `IntroResponse` bodies, verified `IntroTicket` usage, and
   direct-first fallback planning.
 - Milestone 7 and later are still placeholders.
 

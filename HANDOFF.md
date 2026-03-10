@@ -14,7 +14,9 @@ A Codex-oriented handoff bundle containing:
 
 Use the contents of `prompts/codex-first-task.md` as the first task.
 It assumes the repository already has a closed Milestone 1-5 baseline and that
-Milestone 5 is closed and Milestone 6 relay work is now active in code.
+Milestone 5 is closed and Milestone 6 relay work is now active in code with an
+explicit relay role model, canonical relay-intro messages, and direct-first
+fallback planning.
 
 ## Recommended workflow
 
@@ -24,6 +26,7 @@ Milestone 5 is closed and Milestone 6 relay work is now active in code.
 3. Treat Milestone 5 rendezvous/presence work as a closed baseline and reopen it
    only for regressions, vectors, or spec-conformance fixes.
 4. Continue Milestone 6 relay intro/fallback work from the current relay
-   baseline instead of leaving it at a placeholder.
+   baseline instead of leaving it at a placeholder, and keep recursive
+   relay-on-relay behavior out of scope unless the spec explicitly reopens it.
 5. Keep status docs, milestone prompts, and `docs/OPEN_QUESTIONS.md` aligned as
    the repository stage evolves.
