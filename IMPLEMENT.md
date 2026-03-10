@@ -4,7 +4,7 @@ This file is the execution plan for Codex.
 
 ## Current repository stage
 
-The repository has a closed Milestone 1-5 baseline.
+The repository has a closed Milestone 1-6 baseline.
 
 - Milestone 0 bootstrap is complete.
 - Milestone 1 foundations are implemented, vectorized, and validated in
@@ -32,33 +32,37 @@ The repository has a closed Milestone 1-5 baseline.
   publish/lookup message vectors, freshness and epoch/sequence conflict
   handling, bounded lookup state, negative cache behavior, verified-signature
   handoff at the store boundary, and publish/lookup integration coverage.
-- Milestone 6 relay intro and fallback work is now active in
+- Milestone 6 relay intro and fallback work is implemented in
   `crates/overlay-core/src/relay/mod.rs`, including profile-based bounded relay
   quota defaults, an explicit local relay role model, canonical
   `ResolveIntro` / `IntroResponse` wire-body helpers with deterministic relay
   intro message vectors, intro/tunnel/byte quota enforcement, verified
   `IntroTicket` usage, direct-first/relay-second reachability planning, and
-  relay fallback integration coverage.
-- Milestone 7 and later are still placeholder modules and stage-boundary smoke tests.
+  relay fallback integration coverage. Milestone 6 is considered closed.
+- Milestone 7 routing metrics and path switching work is now active in
+  `crates/overlay-core/src/routing/mod.rs`, including deterministic path
+  scoring, integer EWMA updates for observed path metrics, hysteresis-gated
+  route selection, anti-flapping unit coverage, and a routing stage-boundary
+  integration scenario.
+- Milestone 8 and later are still placeholder modules and stage-boundary smoke tests.
 
-Treat Milestones 0-4 as a closed baseline. Prefer regression fixes,
+Treat Milestones 0-6 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
 over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Continue Milestone 6 conservatively from the current relay baseline:
+Continue Milestone 7 conservatively from the current routing baseline:
 
-1. keep the current relay quota model, verified intro-ticket path, and
-   direct-first fallback policy aligned with `spec/relay.md`,
-   `spec/records.md`, and `docs/OPEN_QUESTIONS.md`;
-2. broaden Milestone 6 only around relay intro/fallback behavior, validation,
-   or conservative wire-surface maintenance;
-3. keep Milestones 1-5 limited to regression fixes, vector maintenance, or
+1. keep the current path-score formula, integer EWMA updates, and switch
+   hysteresis aligned with `spec/routing.md` and `docs/OPEN_QUESTIONS.md`;
+2. broaden Milestone 7 only around path metrics, probes, routing validation, or
+   conservative wire/config maintenance;
+3. keep Milestones 1-6 limited to regression fixes, vector maintenance, or
    validation maintenance;
 4. update status docs, prompts, and `docs/OPEN_QUESTIONS.md` whenever the
    documented baseline changes;
-5. keep Milestone 7+ behavior out of scope until Milestone 6 is materially complete.
+5. keep Milestone 8+ behavior out of scope until Milestone 7 is materially complete.
 
 ## Milestone 0 — repository bootstrap
 
@@ -242,7 +246,8 @@ Make nodes discoverable by exact `node_id` without open enumeration.
 
 ## Milestone 6 — relay intro and fallback connectivity
 
-Status: active and partially implemented in this repository.
+Status: closed in this repository. Reopen only for regression fixes, vector
+maintenance, validation maintenance, or conservative spec-conformance fixes.
 
 ### Goal
 Allow nodes to reach each other when direct transport is unavailable.
@@ -268,12 +273,14 @@ Allow nodes to reach each other when direct transport is unavailable.
 
 ## Milestone 7 — routing metrics and path switching
 
+Status: active and partially implemented in this repository.
+
 ### Goal
 Add path quality measurement and stable route selection.
 
 ### Tasks
-1. Implement `PathMetric`.
-2. Implement active probes and EWMA updates.
+1. Implement `PathMetrics`.
+2. Implement path observations and EWMA updates.
 3. Implement path scoring.
 4. Implement hysteresis and switch limits.
 5. Add tests for anti-flapping behavior.
@@ -285,6 +292,7 @@ Add path quality measurement and stable route selection.
 ### Done when
 - path score tests pass
 - switching tests show no oscillation under small jitter
+- a routing stage-boundary integration test passes
 
 ---
 

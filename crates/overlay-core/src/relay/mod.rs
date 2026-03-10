@@ -1074,7 +1074,7 @@ mod tests {
             verified_intro_ticket(&target_signing_key, b"requester-binding", 1_700_000_000);
         let error = build_reachability_plan(
             &target_presence,
-            &[relay_hint.clone()],
+            std::slice::from_ref(&relay_hint),
             &expired_ticket,
             b"requester-binding",
             1_700_000_001,

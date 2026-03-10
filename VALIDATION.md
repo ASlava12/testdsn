@@ -63,6 +63,7 @@ cargo test -p overlay-core --test integration_bootstrap
 cargo test -p overlay-core --test integration_bootstrap
 cargo test -p overlay-core --test integration_publish_lookup
 cargo test -p overlay-core --test integration_relay_fallback
+cargo test -p overlay-core --test integration_routing
 cargo test -p overlay-core --test integration_service_open
 ```
 
@@ -81,14 +82,22 @@ cargo test -p overlay-core relay::tests
 cargo test -p overlay-core --test integration_relay_fallback
 ```
 
+## Milestone 7 regression runs
+
+```bash
+cargo test -p overlay-core routing::tests
+cargo test -p overlay-core --test integration_routing
+```
+
 ## Notes
 
-- Milestone 5 is considered closed, and Milestone 6 relay intro/fallback work is now active in code.
-- Use the Milestone 1-5 regression runs above as the primary checks for baseline regressions while Milestone 6 continues to land.
+- Milestone 6 is considered closed, and Milestone 7 routing work is now active in code.
+- Use the Milestone 1-6 regression runs above as the primary checks for baseline regressions while Milestone 7 continues to land.
 - If `REPOSITORY_STAGE`, milestone prompts, or other status markers change, rerun the stage-boundary smoke tests so code and docs stay aligned.
-- `integration_publish_lookup` remains the real Milestone 5 integration path; `integration_relay_fallback` is now a real Milestone 6 integration path; `integration_service_open` remains a stage-boundary smoke test until its later milestone lands.
+- `integration_publish_lookup` remains the real Milestone 5 integration path; `integration_relay_fallback` is the real Milestone 6 integration path; `integration_routing` is now the real Milestone 7 integration path; `integration_service_open` remains a stage-boundary smoke test until its later milestone lands.
 - `rendezvous::tests` now also covers deterministic publish/lookup message vectors in `tests/vectors/rendezvous_messages.json`.
 - `relay::tests` now also covers deterministic relay intro message vectors in `tests/vectors/relay_intro_messages.json`.
+- `routing::tests` now covers the deterministic path-score formula, integer EWMA updates, hysteresis thresholds, and switch-rate caps.
 - If the default temp directory is not writable in your environment, prefix the build, lint, and test commands with `TMPDIR=/tmp`.
 
 If a command fails, report exactly which command failed and whether it failed because:

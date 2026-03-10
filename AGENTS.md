@@ -59,15 +59,20 @@ Do not add by default:
 - Milestone 5 rendezvous/presence publish and exact lookup work is implemented,
   vectorized, and validated.
 - Milestone 5 is considered closed.
-- Milestone 6 relay intro and fallback work is now active with local quota
-  enforcement, an explicit local role model, canonical relay-intro wire bodies,
-  verified intro-ticket usage, and direct-first fallback planning.
-- Milestone 7 and later remain placeholder modules or smoke-test stubs unless
+- Milestone 6 relay intro and fallback work is implemented, vectorized, and
+  validated with local quota enforcement, an explicit local role model,
+  canonical relay-intro wire bodies, verified intro-ticket usage, and
+  direct-first fallback planning.
+- Milestone 6 is considered closed.
+- Milestone 7 path metrics, deterministic scoring, and switch hysteresis work
+  is now active with integer EWMA observation updates and anti-flapping route
+  selection tests.
+- Milestone 8 and later remain placeholder modules or smoke-test stubs unless
   the task explicitly begins those milestones.
 
-For normal work, touch Milestones 1-5 only for regression fixes, spec
+For normal work, touch Milestones 1-6 only for regression fixes, spec
 mismatches, vector maintenance, or validation maintenance unless the task
-explicitly reopens that stage. Milestone 6 is now the next active feature
+explicitly reopens that stage. Milestone 7 is now the next active feature
 stage.
 
 ## 3. Change policy

@@ -32,7 +32,7 @@ fn publish_lookup_flow_tracks_current_stage_boundary() {
         .expect("lookup state should be created");
     let response = store.lookup(LookupNode { node_id }, now_unix_s + 1, &mut state);
 
-    assert_eq!(REPOSITORY_STAGE, "milestone-6-relay-fallback");
+    assert_eq!(REPOSITORY_STAGE, "milestone-7-routing");
     match response {
         LookupResponse::Result(result) => {
             assert_eq!(result.node_id, node_id);

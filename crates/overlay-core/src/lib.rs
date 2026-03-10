@@ -14,7 +14,7 @@ pub mod session;
 pub mod transport;
 pub mod wire;
 
-pub const REPOSITORY_STAGE: &str = "milestone-6-relay-fallback";
+pub const REPOSITORY_STAGE: &str = "milestone-7-routing";
 
 #[cfg(test)]
 mod tests {
@@ -22,6 +22,6 @@ mod tests {
 
     #[test]
     fn reports_repository_stage() {
-        assert_eq!(REPOSITORY_STAGE, "milestone-6-relay-fallback");
+        assert_eq!(REPOSITORY_STAGE, "milestone-7-routing");
     }
 }

@@ -1,7 +1,7 @@
 # Open Questions
 
 This file exists so Codex does not silently invent protocol details.
-All currently known MVP ambiguities affecting the current Milestone 1-6
+All currently known MVP ambiguities affecting the current Milestone 1-7
 baseline are resolved below and should be reused as the conservative defaults.
 
 ## Resolved conservative choices for MVP
@@ -225,14 +225,18 @@ For current work, treat the repository stage as:
   helpers, deterministic message vectors, freshness and epoch/sequence conflict
   handling, bounded lookup state, negative cache, and verified-signature
   handoff at the store boundary;
-- Milestone 6 relay intro and fallback work started in
+- Milestone 6 relay intro and fallback work is implemented in
   `crates/overlay-core/src/relay/mod.rs` with profile-based bounded relay quota
   defaults, an explicit local relay role model, canonical `ResolveIntro` /
   `IntroResponse` wire-body helpers with deterministic relay intro message
   vectors, intro/tunnel/byte quota enforcement, verified `IntroTicket` usage,
   direct-first/relay-second reachability planning, and relay fallback
-  integration coverage;
-- Milestone 7+ not started beyond placeholders and remaining stage-boundary smoke tests.
+  integration coverage. Milestone 6 is considered closed;
+- Milestone 7 routing metrics and path switching work is active in
+  `crates/overlay-core/src/routing/mod.rs` with deterministic path-score
+  weights, integer EWMA observation updates, hysteresis-gated route selection,
+  anti-flapping unit coverage, and routing stage-boundary integration coverage;
+- Milestone 8+ not started beyond placeholders and remaining stage-boundary smoke tests.
 
 That means:
 
@@ -244,8 +248,10 @@ That means:
 - lock missing conservative defaults here before inventing new wire or session behavior;
 - Milestone 5 is closed and should be touched only for regressions,
   vectors, or spec mismatches;
-- Milestone 6 is active in code and remains the current feature stage;
-- Milestone 7+ remains out of scope for current work.
+- Milestone 6 is closed and should be touched only for regressions,
+  vectors, or spec mismatches;
+- Milestone 7 is active in code and remains the current feature stage;
+- Milestone 8+ remains out of scope for current work.
 
 ### 9. Final encoding of `supported_kex` and `supported_signatures`
 
@@ -564,6 +570,21 @@ Rules:
   `rejected_rate_limited`;
 - keep relay intro message bodies on the same canonical JSON UTF-8 encoding
   rules and MVP frame-size limit as other current protocol bodies.
+
+### 25. Conservative routing selector defaults for the current Milestone 7 baseline
+
+For the current Milestone 7 baseline, route selection stays deterministic and local.
+
+Rules:
+- `PathMetrics.score()` uses the integer score formula locked in section 5,
+  and lower score is better;
+- `PathObservation` updates `obs_rtt_ms`, `loss_ppm`, and `jitter_ms` through
+  integer EWMA rounding with the section 5 alpha defaults;
+- when scores tie, choose the lower `path_id` deterministically;
+- route switching requires both the absolute and relative improvement
+  thresholds, the minimum dwell time, and the per-minute switch cap;
+- if the current path disappears from the candidate set, switch immediately to
+  the best remaining candidate and record that switch in local history.
 
 ## Rule
 

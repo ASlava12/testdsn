@@ -108,7 +108,7 @@ impl HysteresisConfig {
         for (field, value) in [
             (
                 "min_absolute_improvement_ms",
-                self.min_absolute_improvement_ms as u64,
+                self.min_absolute_improvement_ms,
             ),
             (
                 "min_relative_improvement_percent",

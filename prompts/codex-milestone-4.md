@@ -17,8 +17,8 @@ Current repository baseline:
   closed.
 - Milestone 4 peer/bootstrap work is implemented, validated, and considered
   closed.
-- Milestone 5 presence/lookup work is closed; Milestone 6 is active; Milestone 7
-  and later are still placeholders.
+- Milestone 5 presence/lookup work is closed; Milestone 6 is closed; Milestone 7
+  is active; Milestone 8 and later are still placeholders.
 
 Requirements:
 - touch Milestone 4 only for regression fixes, fixture maintenance,

@@ -153,15 +153,11 @@ impl VerifiedPresenceRecord {
     pub fn into_inner(self) -> PresenceRecord {
         self.0
     }
-
-    pub fn as_ref(&self) -> &PresenceRecord {
-        &self.0
-    }
 }
 
 impl AsRef<PresenceRecord> for VerifiedPresenceRecord {
     fn as_ref(&self) -> &PresenceRecord {
-        self.as_ref()
+        &self.0
     }
 }
 
@@ -310,15 +306,11 @@ impl VerifiedIntroTicket {
     pub fn into_inner(self) -> IntroTicket {
         self.0
     }
-
-    pub fn as_ref(&self) -> &IntroTicket {
-        &self.0
-    }
 }
 
 impl AsRef<IntroTicket> for VerifiedIntroTicket {
     fn as_ref(&self) -> &IntroTicket {
-        self.as_ref()
+        &self.0
     }
 }
 

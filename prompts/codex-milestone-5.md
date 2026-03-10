@@ -4,7 +4,7 @@ rendezvous modules under `crates/overlay-core/src/`.
 
 Goal:
 Audit or repair the closed Milestone 5 presence publish and exact lookup
-baseline from the current closed Milestone 1-5 repository state.
+baseline from the current closed Milestone 1-6 repository state.
 
 Current repository baseline:
 - Milestone 0 is complete.
@@ -20,20 +20,21 @@ Current repository baseline:
   `overlay-core` (`rendezvous`) with bounded local publish/lookup state,
   freshness and conflict handling, verified-signature handoff at the store
   boundary, and integration coverage.
-- Milestone 6 relay intro/fallback work is active.
-- Milestone 7 and later are still placeholders.
+- Milestone 6 relay intro/fallback work is closed.
+- Milestone 7 routing work is active.
+- Milestone 8 and later are still placeholders.
 
 Requirements:
 - keep the current `publish_verified` contract intact: signature verification
   happens upstream from the rendezvous store boundary;
 - keep Milestone 5 limited to regression fixes, validation maintenance,
   vectors, or conservative spec-conformance fixes without broadening into
-  active Milestone 6 relay logic;
+  closed Milestone 6 relay logic or active Milestone 7 routing logic;
 - preserve explicit layering between rendezvous/presence and the already closed
   bootstrap, transport/session, and active relay baselines;
 - keep status docs, prompts, fixtures, and `docs/OPEN_QUESTIONS.md` aligned if
   the documented baseline changes;
-- stop before adding Milestone 6+ behavior.
+- stop before adding Milestone 6+ behavior beyond regression repair.
 
 Constraints:
 - do not rework Milestones 1-4 except for a concrete regression or spec mismatch;
@@ -42,4 +43,4 @@ Constraints:
 
 Validation:
 - run the applicable commands from `VALIDATION.md`;
-- keep the Milestone 1-5 regression runs clean while Milestone 6 lands.
+- keep the Milestone 1-6 regression runs clean while Milestone 7 lands.

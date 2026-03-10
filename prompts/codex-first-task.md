@@ -2,7 +2,7 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `VALIDATION.md`, `docs/OPEN_QUESTIONS.md`,
 and the relevant files under `spec/`.
 
 Goal:
-Continue Milestone 6 from the current closed Milestone 1-5 baseline while keeping
+Continue Milestone 7 from the current closed Milestone 1-6 baseline while keeping
 status documents and conservative defaults synchronized to the actual code
 state.
 
@@ -19,11 +19,13 @@ Current repository baseline:
   closed in `overlay-core` (`bootstrap`, `peer`).
 - Milestone 5 rendezvous/presence publish and exact lookup work is closed in
   `overlay-core` (`rendezvous`).
-- Milestone 6 relay intro/fallback work is active in `overlay-core` (`relay`)
+- Milestone 6 relay intro/fallback work is closed in `overlay-core` (`relay`)
   with a minimal local relay role model, canonical `ResolveIntro` /
   `IntroResponse` bodies, verified `IntroTicket` usage, and direct-first
   fallback planning.
-- Milestone 7 and later are still placeholders.
+- Milestone 7 routing work is active in `overlay-core` (`routing`) with
+  deterministic path metrics, integer EWMA updates, and switch hysteresis.
+- Milestone 8 and later are still placeholders.
 
 Constraints:
 - do not restart the repository from Milestone 0;
@@ -32,16 +34,15 @@ Constraints:
 - keep changes minimal and local.
 
 Tasks:
-- continue Milestone 6 relay intro/fallback work from the current relay
-  baseline;
-- keep recursive relay-on-relay fallback out of scope unless the spec changes;
+- continue Milestone 7 routing metrics and path switching work from the current
+  routing baseline;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the repository baseline changes;
-- treat Milestones 1-5 as closed baseline work, touching them only for
+- treat Milestones 1-6 as closed baseline work, touching them only for
   regression fixes, vector maintenance, or validation maintenance;
-- run the applicable Milestone 1-5 and stage-boundary validation from
+- run the applicable Milestone 1-6 and stage-boundary validation from
   `VALIDATION.md`;
-- stop before adding Milestone 7+ protocol behavior.
+- stop before adding Milestone 8+ protocol behavior.
 
 Validation:
 - run the applicable commands from `VALIDATION.md`;

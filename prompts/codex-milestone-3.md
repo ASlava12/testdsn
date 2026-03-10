@@ -15,8 +15,8 @@ Current repository baseline:
 - Milestone 3 already has a closed transport/session baseline with an explicit
   runner boundary and bounded local stores.
 - Milestone 4 is closed; Milestone 5 presence/lookup work is closed; Milestone 6
-  relay intro/fallback work is active; Milestone 7 and later are still
-  placeholders.
+  relay intro/fallback work is closed; Milestone 7 routing work is active;
+  Milestone 8 and later are still placeholders.
 
 Requirements:
 - touch Milestone 3 only for regression fixes, fixture maintenance, runner-boundary
