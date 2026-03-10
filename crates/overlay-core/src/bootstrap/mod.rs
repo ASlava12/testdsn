@@ -412,6 +412,24 @@ mod tests {
     }
 
     #[test]
+    fn rejects_bootstrap_response_expiring_at_current_time() {
+        let mut response = sample_response();
+        response.expires_at_unix_s = 1_700_000_100;
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("bootstrap responses expiring at now must be rejected as stale");
+
+        assert_eq!(
+            error,
+            BootstrapValidationError::Expired {
+                expires_at_unix_s: 1_700_000_100,
+                now_unix_s: 1_700_000_100,
+            }
+        );
+    }
+
+    #[test]
     fn rejects_unsupported_bootstrap_schema_version() {
         let mut response = sample_response();
         response.version = BOOTSTRAP_SCHEMA_VERSION + 1;
@@ -496,6 +514,23 @@ mod tests {
     }
 
     #[test]
+    fn rejects_unknown_bootstrap_peer_transport_class() {
+        let mut response = sample_response();
+        response.peers[0].transport_classes.push("smtp".to_string());
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("unknown peer transport classes must be rejected");
+
+        assert_eq!(
+            error,
+            BootstrapValidationError::UnknownTransportClass {
+                value: "smtp".to_string(),
+            }
+        );
+    }
+
+    #[test]
     fn rejects_unknown_bootstrap_capability() {
         let mut response = sample_response();
         response.peers[0].capabilities.push("smtp".to_string());
@@ -503,6 +538,42 @@ mod tests {
         let error = response
             .validated(1_700_000_100)
             .expect_err("unknown bootstrap capabilities must be rejected");
+
+        assert_eq!(
+            error,
+            BootstrapValidationError::UnknownCapability {
+                value: "smtp".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_bootstrap_bridge_hint_transport_class() {
+        let mut response = sample_response();
+        response.bridge_hints[0].transport_class = "smtp".to_string();
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("unknown bridge-hint transport classes must be rejected");
+
+        assert_eq!(
+            error,
+            BootstrapValidationError::UnknownTransportClass {
+                value: "smtp".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_bootstrap_bridge_hint_capability() {
+        let mut response = sample_response();
+        response.bridge_hints[0]
+            .capabilities
+            .push("smtp".to_string());
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("unknown bridge-hint capabilities must be rejected");
 
         assert_eq!(
             error,
@@ -553,6 +624,40 @@ mod tests {
     }
 
     #[test]
+    fn rejects_bootstrap_peer_without_transport_classes() {
+        let mut response = sample_response();
+        response.peers[0].transport_classes.clear();
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("bootstrap peers without transport classes must be rejected");
+
+        assert_eq!(
+            error,
+            BootstrapValidationError::PeerWithoutTransportClasses {
+                node_id: NodeId::from_bytes([1_u8; 32]),
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_bootstrap_peer_without_dial_hints() {
+        let mut response = sample_response();
+        response.peers[0].dial_hints.clear();
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("bootstrap peers without dial hints must be rejected");
+
+        assert_eq!(
+            error,
+            BootstrapValidationError::PeerWithoutDialHints {
+                node_id: NodeId::from_bytes([1_u8; 32]),
+            }
+        );
+    }
+
+    #[test]
     fn rejects_blank_peer_dial_hint_after_trimming() {
         let mut response = sample_response();
         response.peers[0].dial_hints = vec!["   ".to_string()];
@@ -565,6 +670,23 @@ mod tests {
             error,
             BootstrapValidationError::EmptyDialHint {
                 field: "peers[].dial_hints[]",
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_blank_bridge_hint_dial_hint_after_trimming() {
+        let mut response = sample_response();
+        response.bridge_hints[0].dial_hint = "   ".to_string();
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("blank bridge dial hints must be rejected");
+
+        assert_eq!(
+            error,
+            BootstrapValidationError::EmptyDialHint {
+                field: "bridge_hints[].dial_hint",
             }
         );
     }
