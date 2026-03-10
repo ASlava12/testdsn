@@ -14,6 +14,7 @@ use crate::{
     crypto::sign::Ed25519PublicKey,
     error::{FrameError, RecordEncodingError, RecordValidationError},
     identity::NodeId,
+    metrics::{LogComponent, LogContext, Observability},
     records::{FreshRecord, NodeRecord, PresenceRecord, VerifiedPresenceRecord},
     wire::{Message, MessageType, MAX_FRAME_BODY_LEN},
 };
@@ -179,6 +180,17 @@ pub enum PublishDisposition {
     Stale,
 }
 
+impl PublishDisposition {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Stored => "stored",
+            Self::Replaced => "replaced",
+            Self::Duplicate => "duplicate",
+            Self::Stale => "stale",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PublishAck {
     pub node_id: NodeId,
@@ -249,6 +261,16 @@ pub enum LookupNotFoundReason {
     Missing,
     NegativeCacheHit,
     BudgetExhausted,
+}
+
+impl LookupNotFoundReason {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Missing => "missing",
+            Self::NegativeCacheHit => "negative_cache_hit",
+            Self::BudgetExhausted => "budget_exhausted",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -475,6 +497,36 @@ impl RendezvousStore {
         })
     }
 
+    pub fn publish_verified_with_observability(
+        &mut self,
+        publish: VerifiedPublishPresence,
+        now_unix_s: u64,
+        observability: &mut Observability,
+        context: LogContext,
+    ) -> Result<PublishAck, RendezvousError> {
+        match self.publish_verified(publish, now_unix_s) {
+            Ok(ack) => {
+                observability.note_publish_presence();
+                observability.push_log(
+                    context,
+                    LogComponent::Rendezvous,
+                    "publish_presence",
+                    ack.disposition.as_str(),
+                );
+                Ok(ack)
+            }
+            Err(error) => {
+                observability.push_log(
+                    context,
+                    LogComponent::Rendezvous,
+                    "publish_presence",
+                    "rejected",
+                );
+                Err(error)
+            }
+        }
+    }
+
     pub fn lookup(
         &mut self,
         lookup: LookupNode,
@@ -518,6 +570,34 @@ impl RendezvousStore {
             reason: LookupNotFoundReason::Missing,
             remaining_budget: state.remaining_budget(),
         })
+    }
+
+    pub fn lookup_with_observability(
+        &mut self,
+        lookup: LookupNode,
+        now_unix_s: u64,
+        state: &mut LookupState,
+        latency_ms: u64,
+        observability: &mut Observability,
+        context: LogContext,
+    ) -> LookupResponse {
+        let response = self.lookup(lookup, now_unix_s, state);
+        match &response {
+            LookupResponse::Result(_) => {
+                observability.note_lookup(true, latency_ms);
+                observability.push_log(context, LogComponent::Rendezvous, "lookup_node", "found");
+            }
+            LookupResponse::NotFound(not_found) => {
+                observability.note_lookup(false, latency_ms);
+                observability.push_log(
+                    context,
+                    LogComponent::Rendezvous,
+                    "lookup_node",
+                    not_found.reason.as_str(),
+                );
+            }
+        }
+        response
     }
 
     fn prune_expired(&mut self, now_unix_s: u64) {
@@ -665,6 +745,7 @@ mod tests {
     use crate::crypto::sign::Ed25519SigningKey;
     use crate::error::FrameError;
     use crate::identity::NodeId;
+    use crate::metrics::{LogContext, Observability};
     use crate::records::{NodeRecord, PresenceRecord};
     use crate::wire::{Message, MessageType, MAX_FRAME_BODY_LEN};
 
@@ -717,6 +798,54 @@ mod tests {
                 panic!("expected fresh record lookup to succeed, got {not_found:?}")
             }
         }
+    }
+
+    #[test]
+    fn rendezvous_observability_tracks_publish_and_lookup() {
+        let signing_key = sample_presence_signing_key(30);
+        let record = sample_signed_presence_record(&signing_key, 5, 9, 1_700_000_300);
+        let node_id = record.node_id;
+        let mut store = RendezvousStore::new(RendezvousConfig::default())
+            .expect("default rendezvous config should be valid");
+        let mut observability = Observability::default();
+
+        let ack = store
+            .publish_verified_with_observability(
+                verified_publish(record.clone(), &signing_key),
+                1_700_000_000,
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_700_000_000_000,
+                    node_id,
+                    correlation_id: 51,
+                },
+            )
+            .expect("publish should succeed");
+        assert_eq!(ack.disposition, PublishDisposition::Stored);
+
+        let mut state = store
+            .lookup_state(4)
+            .expect("lookup state should be created");
+        let response = store.lookup_with_observability(
+            LookupNode { node_id },
+            1_700_000_001,
+            &mut state,
+            12,
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_001_012,
+                node_id,
+                correlation_id: 52,
+            },
+        );
+        assert!(matches!(response, LookupResponse::Result(_)));
+        assert_eq!(observability.metrics().publish_presence_total, 1);
+        assert_eq!(observability.metrics().lookup_total, 1);
+        assert_eq!(observability.metrics().lookup_success_total, 1);
+        assert_eq!(observability.metrics().lookup_latency_ms, Some(12));
+        let log = observability.latest_log().expect("log should be present");
+        assert_eq!(log.event, "lookup_node");
+        assert_eq!(log.result, "found");
     }
 
     #[test]

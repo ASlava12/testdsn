@@ -33,8 +33,11 @@ Current repository baseline:
   bounded local service registry and open-session store, exact `app_id`
   resolution, `reachability_ref` binding checks, allow/deny local policy
   enforcement, and `integration_service_open` coverage.
-- Milestone 9 hardening and polish is now active with the current regression
-  suites and stage-boundary integration tests as its entry boundary.
+- Milestone 9 hardening and polish is now active with initial observability and
+  config groundwork plus broad explicit subsystem observability integration landed, and
+  with the current regression suites, stage-boundary integration tests, plus
+  `config::tests` / `metrics::tests` / `peer::tests` / `rendezvous::tests` /
+  `service::tests` / `session::manager::tests` as its working boundary.
 
 Constraints:
 - do not restart the repository from Milestone 0;
@@ -44,7 +47,7 @@ Constraints:
 
 Tasks:
 - continue Milestone 9 hardening and polish work from the current validation
-  and stage-boundary baseline;
+  baseline;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the repository baseline changes;
 - treat Milestones 1-8 as closed baseline work, touching them only for

@@ -3,6 +3,7 @@
 ```text
 overlay/
 ├─ AGENTS.md
+├─ HANDOFF.md
 ├─ IMPLEMENT.md
 ├─ VALIDATION.md
 ├─ docs/
@@ -14,7 +15,11 @@ overlay/
 │  ├─ codex-milestone-2.md
 │  ├─ codex-milestone-3.md
 │  ├─ codex-milestone-4.md
-│  └─ codex-milestone-5.md
+│  ├─ codex-milestone-5.md
+│  ├─ codex-milestone-6.md
+│  ├─ codex-milestone-7.md
+│  ├─ codex-milestone-8.md
+│  └─ codex-milestone-9.md
 ├─ spec/
 │  ├─ architecture.md
 │  ├─ threat-model.md

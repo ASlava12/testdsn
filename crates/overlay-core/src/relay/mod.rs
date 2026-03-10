@@ -9,6 +9,7 @@ use thiserror::Error;
 use crate::{
     error::{FrameError, IntroTicketVerificationError, RecordValidationError},
     identity::NodeId,
+    metrics::{LogComponent, LogContext, Observability},
     records::{FreshRecord, IntroTicket, PresenceRecord, RelayHint, VerifiedIntroTicket},
     transport::TransportClass,
     wire::{Message, MessageType, MAX_FRAME_BODY_LEN},
@@ -308,6 +309,20 @@ pub enum IntroResponseStatus {
     RejectedRateLimited,
 }
 
+impl IntroResponseStatus {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Forwarded => "forwarded",
+            Self::RejectedRelayDisabled => "rejected_relay_disabled",
+            Self::RejectedRelayMismatch => "rejected_relay_mismatch",
+            Self::RejectedRoleDisabled => "rejected_role_disabled",
+            Self::RejectedTicketExpired => "rejected_ticket_expired",
+            Self::RejectedRequesterBinding => "rejected_requester_binding",
+            Self::RejectedRateLimited => "rejected_rate_limited",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IntroResponse {
     pub relay_node_id: NodeId,
@@ -448,6 +463,33 @@ impl RelayManager {
         response
     }
 
+    pub fn process_resolve_intro_with_observability(
+        &mut self,
+        local_relay_node_id: NodeId,
+        request: VerifiedResolveIntro,
+        expected_requester_binding: &[u8],
+        now_unix_s: u64,
+        observability: &mut Observability,
+        context: LogContext,
+    ) -> IntroResponse {
+        let response = self.process_resolve_intro(
+            local_relay_node_id,
+            request,
+            expected_requester_binding,
+            now_unix_s,
+        );
+        if response.status == IntroResponseStatus::RejectedRateLimited {
+            observability.note_rate_limited_drop();
+        }
+        observability.push_log(
+            context,
+            LogComponent::Relay,
+            "resolve_intro",
+            response.status.as_str(),
+        );
+        response
+    }
+
     pub fn bind_tunnel(
         &mut self,
         tunnel_id: u64,
@@ -473,6 +515,28 @@ impl RelayManager {
         };
         self.active_tunnels.insert(tunnel_id, tunnel);
         Ok(tunnel)
+    }
+
+    pub fn bind_tunnel_with_observability(
+        &mut self,
+        tunnel_id: u64,
+        relay_node_id: NodeId,
+        target_node_id: NodeId,
+        now_unix_s: u64,
+        observability: &mut Observability,
+        context: LogContext,
+    ) -> Result<RelayTunnel, RelayError> {
+        match self.bind_tunnel(tunnel_id, relay_node_id, target_node_id, now_unix_s) {
+            Ok(tunnel) => {
+                observability.note_relay_bind();
+                observability.push_log(context, LogComponent::Relay, "bind_tunnel", "opened");
+                Ok(tunnel)
+            }
+            Err(error) => {
+                observability.push_log(context, LogComponent::Relay, "bind_tunnel", "rejected");
+                Err(error)
+            }
+        }
     }
 
     pub fn release_tunnel(&mut self, tunnel_id: u64) -> Option<RelayTunnel> {
@@ -715,6 +779,7 @@ mod tests {
         crypto::sign::Ed25519SigningKey,
         error::RecordValidationError,
         identity::{derive_node_id, NodeId},
+        metrics::{LogContext, Observability},
         records::{IntroTicket, NodeRecord, PresenceRecord, RelayHint},
         transport::TransportClass,
         wire::{Message, MessageType},
@@ -1187,6 +1252,95 @@ mod tests {
             .note_intro_request(1_700_000_000)
             .expect_err("standard profile defaults to relay mode disabled");
         assert!(matches!(error, RelayError::RelayDisabled));
+    }
+
+    #[test]
+    fn relay_observability_tracks_bind_and_rate_limited_intro() {
+        let target_signing_key = Ed25519SigningKey::from_seed([61_u8; 32]);
+        let relay_node_id = NodeId::from_bytes([70_u8; 32]);
+        let target_node_id = derive_node_id(target_signing_key.public_key().as_bytes());
+        let requester_binding = b"requester-binding";
+        let mut manager = RelayManager::new(RelayConfig {
+            relay_mode: true,
+            role_policy: RelayRolePolicy::milestone6_default(),
+            max_concurrent_relay_tunnels: 2,
+            max_intro_requests_per_minute: 1,
+            max_bytes_relayed_per_peer_per_hour: 32,
+            max_total_relay_bytes_per_hour: 40,
+        })
+        .expect("relay config should be valid");
+        let mut observability = Observability::default();
+
+        let tunnel = manager
+            .bind_tunnel_with_observability(
+                1,
+                relay_node_id,
+                target_node_id,
+                1_700_000_000,
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_700_000_000_000,
+                    node_id: relay_node_id,
+                    correlation_id: 61,
+                },
+            )
+            .expect("bind should succeed");
+        assert_eq!(tunnel.tunnel_id, 1);
+
+        let first_request = ResolveIntro {
+            relay_node_id,
+            intro_ticket: verified_intro_ticket(
+                &target_signing_key,
+                requester_binding,
+                1_700_000_600,
+            )
+            .into_inner(),
+        }
+        .verify_with_public_key(&target_signing_key.public_key())
+        .expect("resolve intro should verify");
+        let first = manager.process_resolve_intro_with_observability(
+            relay_node_id,
+            first_request,
+            requester_binding,
+            1_700_000_000,
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_000_100,
+                node_id: relay_node_id,
+                correlation_id: 62,
+            },
+        );
+        assert_eq!(first.status, IntroResponseStatus::Forwarded);
+
+        let second_request = ResolveIntro {
+            relay_node_id,
+            intro_ticket: verified_intro_ticket(
+                &target_signing_key,
+                requester_binding,
+                1_700_000_600,
+            )
+            .into_inner(),
+        }
+        .verify_with_public_key(&target_signing_key.public_key())
+        .expect("resolve intro should verify");
+        let second = manager.process_resolve_intro_with_observability(
+            relay_node_id,
+            second_request,
+            requester_binding,
+            1_700_000_001,
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_001_000,
+                node_id: relay_node_id,
+                correlation_id: 63,
+            },
+        );
+        assert_eq!(second.status, IntroResponseStatus::RejectedRateLimited);
+        assert_eq!(observability.metrics().relay_bind_total, 1);
+        assert_eq!(observability.metrics().dropped_rate_limited_total, 1);
+        let log = observability.latest_log().expect("log should be present");
+        assert_eq!(log.event, "resolve_intro");
+        assert_eq!(log.result, "rejected_rate_limited");
     }
 
     #[test]

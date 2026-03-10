@@ -7,6 +7,7 @@ use crate::{
     bootstrap::{BootstrapPeer, BootstrapPeerRole, BootstrapResponse, BootstrapValidationError},
     crypto::hash::Blake3Hasher,
     identity::NodeId,
+    metrics::{LogComponent, LogContext, Observability},
 };
 
 pub const DEFAULT_MAX_NEIGHBORS: usize = 16;
@@ -162,6 +163,26 @@ impl PeerStore {
         }
 
         Ok(self.rebalance())
+    }
+
+    pub fn ingest_bootstrap_response_with_observability(
+        &mut self,
+        response: BootstrapResponse,
+        now_unix_s: u64,
+        observability: &mut Observability,
+        context: LogContext,
+    ) -> Result<Vec<NodeId>, PeerStoreError> {
+        match self.ingest_bootstrap_response(response, now_unix_s) {
+            Ok(active) => {
+                observability.set_active_peers(self.active_neighbors().count());
+                observability.push_log(context, LogComponent::Peer, "bootstrap_ingest", "accepted");
+                Ok(active)
+            }
+            Err(error) => {
+                observability.push_log(context, LogComponent::Peer, "bootstrap_ingest", "rejected");
+                Err(error)
+            }
+        }
     }
 
     fn upsert_bootstrap_peer(&mut self, peer: BootstrapPeer, now_unix_s: u64) {
@@ -361,7 +382,12 @@ mod tests {
         BootstrapNetworkParams, BootstrapPeer, BootstrapPeerRole, BootstrapResponse,
         BOOTSTRAP_SCHEMA_VERSION,
     };
-    use crate::{identity::NodeId, session::HANDSHAKE_VERSION, wire::MAX_FRAME_BODY_LEN};
+    use crate::{
+        identity::NodeId,
+        metrics::{LogContext, Observability},
+        session::HANDSHAKE_VERSION,
+        wire::MAX_FRAME_BODY_LEN,
+    };
 
     #[test]
     fn rejects_invalid_peer_store_limits() {
@@ -435,6 +461,37 @@ mod tests {
         assert!(store
             .candidate_neighbors()
             .all(|neighbor| neighbor.state == NeighborState::Candidate));
+    }
+
+    #[test]
+    fn bootstrap_ingest_updates_observability_gauge_and_log() {
+        let mut store = PeerStore::new(PeerStoreConfig {
+            max_neighbors: 3,
+            max_relay_neighbors: 1,
+            max_neighbors_per_transport: 1,
+        })
+        .expect("peer store config should be valid");
+        let node_id = NodeId::from_bytes([9_u8; 32]);
+        let mut observability = Observability::default();
+
+        let active = store
+            .ingest_bootstrap_response_with_observability(
+                sample_response(),
+                1_700_000_100,
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_700_000_100_000,
+                    node_id,
+                    correlation_id: 41,
+                },
+            )
+            .expect("bootstrap response should ingest");
+
+        assert_eq!(active.len(), 3);
+        assert_eq!(observability.metrics().active_peers, 3);
+        let log = observability.latest_log().expect("log should be present");
+        assert_eq!(log.event, "bootstrap_ingest");
+        assert_eq!(log.result, "accepted");
     }
 
     fn sample_response() -> BootstrapResponse {

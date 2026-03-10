@@ -243,9 +243,16 @@ For current work, treat the repository stage as:
   open-session store, exact `app_id` resolution, `reachability_ref` binding
   checks, allow/deny local policy enforcement, and integration coverage.
   Milestone 8 is considered closed;
-- Milestone 9 hardening and polish is now the current feature stage, with the
-  current regression suites and stage-boundary integration tests as the active
-  boundary until Milestone 9-specific hardening work lands.
+- Milestone 9 hardening and polish is now the current feature stage, with
+  bounded observability groundwork in `crates/overlay-core/src/metrics/mod.rs`,
+  a validated top-level config baseline in `crates/overlay-core/src/config.rs`,
+  explicit observability hooks in peer/bootstrap ingest, rendezvous
+  publish/lookup, relay bind and rate-limit handling, routing probe/switch
+  paths, service registry flows, and session event export, and the current
+  regression suites, stage-boundary integration tests, plus `config::tests` /
+  `metrics::tests` / `peer::tests` / `rendezvous::tests` / `relay::tests` /
+  `routing::tests` / `service::tests` / `session::manager::tests` as the
+  active boundary while broader hardening work continues;
 
 That means:
 
@@ -690,6 +697,52 @@ Rules:
   with `spec/observability.md`;
 - do not broaden into simulation-focused work until the Milestone 9 hardening
   checklist in `IMPLEMENT.md` is materially complete.
+
+### 29. Conservative top-level node config defaults for the current Milestone 9 baseline
+
+For the current Milestone 9 baseline, the top-level node config stays minimal
+and projects into the existing bounded subsystem configs without inventing new
+protocol behavior.
+
+Rules:
+- `bootstrap_sources[]` are stored as non-empty opaque local strings until a
+  richer provider schema is explicitly specified;
+- `log_level` uses lowercase local enums: `error`, `warn`, `info`, `debug`,
+  `trace`;
+- `max_total_neighbors` maps to `PeerStoreConfig.max_neighbors`, while
+  `max_relay_neighbors` and `max_neighbors_per_transport` keep their existing
+  local defaults capped to the total-neighbor limit;
+- `max_presence_records` maps to
+  `RendezvousConfig.max_published_records`;
+- `max_service_records` maps to
+  `ServiceConfig.max_registered_services`;
+- `path_probe_interval_ms` maps directly to `PathProbeConfig`;
+- `relay_mode` maps directly to the existing `RelayConfig` role-toggle
+  behavior;
+- all other bounded subsystem knobs keep their current local defaults until the
+  config spec expands further.
+
+### 30. Conservative observability integration defaults for the current Milestone 9 baseline
+
+For the current Milestone 9 baseline, observability integration stays explicit
+at subsystem boundaries instead of introducing a new runtime orchestration layer.
+
+Rules:
+- keep the original subsystem methods available and add explicit
+  `*_with_observability` wrappers when local metrics/log updates are needed;
+- `active_peers` is updated from peer-store bootstrap ingest outcomes;
+- rendezvous publish/lookup wrappers update publish and lookup counters plus
+  structured logs;
+- relay wrappers update relay-bind counters and rate-limited-drop counters only
+  on explicit rate-limit outcomes;
+- routing wrappers update path-switch counters and probe RTT/loss samples from
+  completed or lost probes;
+- service wrappers log register/resolve/open/close outcomes without inventing
+  new service-layer counters;
+- session observability stays as explicit event-export helpers over
+  `SessionEvent` values instead of implicit state-machine side effects;
+- `established_sessions` remains a caller-managed gauge until broader session
+  aggregation lands.
 
 ## Rule
 

@@ -1,9 +1,12 @@
+use std::collections::{BTreeMap, VecDeque};
+
 use serde::Serialize;
 use thiserror::Error;
 
 use crate::{
     crypto::hash::Blake3Digest,
     identity::NodeId,
+    metrics::{LogComponent, LogContext, Observability},
     transport::{Transport, TransportClass},
 };
 
@@ -12,6 +15,8 @@ use super::handshake::{HandshakeOutcome, SessionKeys};
 const SESSION_COMPONENT: &str = "session";
 pub const MAX_SESSION_EVENT_LOG_LEN: usize = 64;
 pub const MAX_SESSION_IO_ACTION_QUEUE_LEN: usize = 32;
+pub const DEFAULT_REPLAY_CACHE_ENTRIES: usize = 1_024;
+pub const DEFAULT_REPLAY_WINDOW_MS: u64 = 300_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -39,6 +44,23 @@ pub enum SessionEventKind {
     Failed,
 }
 
+impl SessionEventKind {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::OpenStarted => "open_started",
+            Self::OpenSucceeded => "open_succeeded",
+            Self::ActivityObserved => "activity_observed",
+            Self::KeepaliveDue => "keepalive_due",
+            Self::Degraded => "degraded",
+            Self::Recovered => "recovered",
+            Self::CloseStarted => "close_started",
+            Self::Closed => "closed",
+            Self::TimedOut => "timed_out",
+            Self::Failed => "failed",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SessionEventResult {
@@ -47,6 +69,18 @@ pub enum SessionEventResult {
     Degraded,
     Timeout,
     Error,
+}
+
+impl SessionEventResult {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Accepted => "accepted",
+            Self::Ok => "ok",
+            Self::Degraded => "degraded",
+            Self::Timeout => "timeout",
+            Self::Error => "error",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -98,6 +132,122 @@ pub enum SessionError {
         keepalive_interval_ms: u64,
         idle_timeout_ms: u64,
     },
+    #[error(transparent)]
+    ReplayCache(#[from] ReplayCacheError),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct ReplayCacheConfig {
+    pub max_entries: usize,
+    pub replay_window_ms: u64,
+}
+
+impl Default for ReplayCacheConfig {
+    fn default() -> Self {
+        Self {
+            max_entries: DEFAULT_REPLAY_CACHE_ENTRIES,
+            replay_window_ms: DEFAULT_REPLAY_WINDOW_MS,
+        }
+    }
+}
+
+impl ReplayCacheConfig {
+    pub fn validate(self) -> Result<Self, ReplayCacheError> {
+        for (field, value) in [
+            ("max_entries", self.max_entries as u64),
+            ("replay_window_ms", self.replay_window_ms),
+        ] {
+            if value == 0 {
+                return Err(ReplayCacheError::ZeroLimit { field });
+            }
+        }
+
+        Ok(self)
+    }
+}
+
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
+pub enum ReplayCacheError {
+    #[error("replay cache limit {field} must be non-zero")]
+    ZeroLimit { field: &'static str },
+    #[error("handshake transcript replay detected for peer {peer_node_id}")]
+    ReplayDetected { peer_node_id: NodeId },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ReplayCacheEntry {
+    transcript_hash: Blake3Digest,
+    peer_node_id: NodeId,
+    observed_at_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplayCache {
+    config: ReplayCacheConfig,
+    entries: VecDeque<ReplayCacheEntry>,
+    seen: BTreeMap<Blake3Digest, ReplayCacheEntry>,
+}
+
+impl ReplayCache {
+    pub fn new(config: ReplayCacheConfig) -> Result<Self, ReplayCacheError> {
+        Ok(Self {
+            config: config.validate()?,
+            entries: VecDeque::new(),
+            seen: BTreeMap::new(),
+        })
+    }
+
+    pub const fn config(&self) -> ReplayCacheConfig {
+        self.config
+    }
+
+    pub fn observed_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn observe_outcome(
+        &mut self,
+        outcome: &HandshakeOutcome,
+        now_unix_ms: u64,
+    ) -> Result<(), ReplayCacheError> {
+        self.prune_expired(now_unix_ms);
+
+        if self.seen.contains_key(&outcome.transcript_hash) {
+            return Err(ReplayCacheError::ReplayDetected {
+                peer_node_id: outcome.peer_node_id,
+            });
+        }
+
+        if self.entries.len() == self.config.max_entries {
+            self.evict_oldest();
+        }
+
+        let entry = ReplayCacheEntry {
+            transcript_hash: outcome.transcript_hash,
+            peer_node_id: outcome.peer_node_id,
+            observed_at_unix_ms: now_unix_ms,
+        };
+        self.entries.push_back(entry);
+        self.seen.insert(entry.transcript_hash, entry);
+        Ok(())
+    }
+
+    fn prune_expired(&mut self, now_unix_ms: u64) {
+        while let Some(entry) = self.entries.front().copied() {
+            if now_unix_ms.saturating_sub(entry.observed_at_unix_ms) < self.config.replay_window_ms
+            {
+                break;
+            }
+            self.entries.pop_front();
+            self.seen.remove(&entry.transcript_hash);
+        }
+    }
+
+    fn evict_oldest(&mut self) {
+        if let Some(entry) = self.entries.pop_front() {
+            self.seen.remove(&entry.transcript_hash);
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -193,6 +343,25 @@ pub struct SessionEvent {
     pub transport: Option<SessionTransportBinding>,
     pub timer: Option<SessionTimerKind>,
     pub detail: Option<String>,
+}
+
+impl SessionEvent {
+    pub fn record_with_observability(
+        &self,
+        fallback_node_id: NodeId,
+        observability: &mut Observability,
+    ) {
+        observability.push_log(
+            LogContext {
+                timestamp_unix_ms: self.timestamp_unix_ms,
+                node_id: self.node_id.unwrap_or(fallback_node_id),
+                correlation_id: self.correlation_id,
+            },
+            LogComponent::Session,
+            self.event.as_str(),
+            self.result.as_str(),
+        );
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -385,6 +554,23 @@ impl SessionManager {
         }
     }
 
+    pub fn handle_runner_input_with_replay_cache(
+        &mut self,
+        timestamp_unix_ms: u64,
+        input: SessionRunnerInput,
+        replay_cache: &mut ReplayCache,
+    ) -> Result<SessionEvent, SessionError> {
+        match input {
+            SessionRunnerInput::HandshakeSucceeded { outcome } => self
+                .mark_established_with_handshake_and_replay_cache(
+                    timestamp_unix_ms,
+                    outcome,
+                    replay_cache,
+                ),
+            other => self.handle_runner_input(timestamp_unix_ms, other),
+        }
+    }
+
     pub fn mark_established(
         &mut self,
         timestamp_unix_ms: u64,
@@ -406,6 +592,16 @@ impl SessionManager {
             timestamp_unix_ms,
             Some("handshake bound to peer identity".to_string()),
         )
+    }
+
+    pub fn mark_established_with_handshake_and_replay_cache(
+        &mut self,
+        timestamp_unix_ms: u64,
+        outcome: HandshakeOutcome,
+        replay_cache: &mut ReplayCache,
+    ) -> Result<SessionEvent, SessionError> {
+        replay_cache.observe_outcome(&outcome, timestamp_unix_ms)?;
+        self.mark_established_with_handshake(timestamp_unix_ms, outcome)
     }
 
     pub fn record_activity(
@@ -857,13 +1053,15 @@ fn push_bounded<T>(items: &mut Vec<T>, item: T, limit: usize) {
 #[cfg(test)]
 mod tests {
     use super::{
-        SessionAction, SessionError, SessionEventKind, SessionEventResult, SessionIoActionKind,
-        SessionManager, SessionRunnerInput, SessionState, SessionTimerKind, SessionTimingConfig,
+        ReplayCache, ReplayCacheConfig, ReplayCacheError, SessionAction, SessionError,
+        SessionEventKind, SessionEventResult, SessionIoActionKind, SessionManager,
+        SessionRunnerInput, SessionState, SessionTimerKind, SessionTimingConfig,
         MAX_SESSION_EVENT_LOG_LEN, MAX_SESSION_IO_ACTION_QUEUE_LEN,
     };
     use crate::{
         crypto::{aead::ChaCha20Poly1305Key, hash::Blake3Digest},
         identity::NodeId,
+        metrics::Observability,
         session::{HandshakeOutcome, SessionKeys},
         transport::{TcpTransport, TransportClass},
     };
@@ -1494,6 +1692,153 @@ mod tests {
             .io_actions()
             .iter()
             .any(|action| action.detail.as_deref() == Some("failure-0")));
+    }
+
+    #[test]
+    fn session_events_can_be_exported_to_observability() {
+        let fallback_node_id = NodeId::from_bytes([55_u8; 32]);
+        let mut manager =
+            SessionManager::with_timing(24, TEST_TIMING).expect("timing config should be valid");
+        let mut observability = Observability::default();
+
+        let open_started = manager
+            .begin_open(100, &TcpTransport)
+            .expect("open should transition from idle to opening");
+        let open_succeeded = manager
+            .mark_established(120)
+            .expect("opening should transition to established");
+        let keepalive = manager
+            .poll_timers(140)
+            .expect("timer polling should succeed")
+            .into_iter()
+            .next()
+            .expect("keepalive event should be emitted");
+
+        open_started.record_with_observability(fallback_node_id, &mut observability);
+        open_succeeded.record_with_observability(fallback_node_id, &mut observability);
+        keepalive.record_with_observability(fallback_node_id, &mut observability);
+
+        assert_eq!(observability.logs().len(), 3);
+        assert_eq!(observability.logs()[0].node_id, fallback_node_id);
+        let latest = observability.latest_log().expect("log should be present");
+        assert_eq!(latest.event, "keepalive_due");
+        assert_eq!(latest.result, "ok");
+    }
+
+    #[test]
+    fn replay_cache_rejects_zero_limits() {
+        let error = ReplayCache::new(ReplayCacheConfig {
+            max_entries: 0,
+            replay_window_ms: 1,
+        })
+        .expect_err("zero replay cache entries must be rejected");
+
+        assert_eq!(
+            error,
+            ReplayCacheError::ZeroLimit {
+                field: "max_entries"
+            }
+        );
+    }
+
+    #[test]
+    fn replay_cache_rejects_replayed_transcript_within_window() {
+        let outcome = handshake_outcome();
+        let mut cache = ReplayCache::new(ReplayCacheConfig {
+            max_entries: 2,
+            replay_window_ms: 100,
+        })
+        .expect("replay cache config should be valid");
+
+        cache
+            .observe_outcome(&outcome, 1_000)
+            .expect("first observation should be accepted");
+        let error = cache
+            .observe_outcome(&outcome, 1_050)
+            .expect_err("second observation within window should be rejected");
+
+        assert_eq!(
+            error,
+            ReplayCacheError::ReplayDetected {
+                peer_node_id: outcome.peer_node_id
+            }
+        );
+    }
+
+    #[test]
+    fn replay_cache_prunes_expired_entries_and_evicts_oldest_when_bounded() {
+        let first = handshake_outcome();
+        let second = HandshakeOutcome {
+            peer_node_id: NodeId::from_bytes([10_u8; 32]),
+            transcript_hash: [8_u8; 32],
+            session_keys: first.session_keys,
+        };
+        let third = HandshakeOutcome {
+            peer_node_id: NodeId::from_bytes([11_u8; 32]),
+            transcript_hash: [9_u8; 32],
+            session_keys: first.session_keys,
+        };
+        let mut cache = ReplayCache::new(ReplayCacheConfig {
+            max_entries: 2,
+            replay_window_ms: 100,
+        })
+        .expect("replay cache config should be valid");
+
+        cache
+            .observe_outcome(&first, 1_000)
+            .expect("first outcome should fit");
+        cache
+            .observe_outcome(&second, 1_001)
+            .expect("second outcome should fit");
+        cache
+            .observe_outcome(&third, 1_002)
+            .expect("third outcome should evict the oldest");
+        assert_eq!(cache.observed_count(), 2);
+
+        cache
+            .observe_outcome(&first, 1_200)
+            .expect("expired first outcome should be accepted again");
+    }
+
+    #[test]
+    fn replay_cache_wrapper_rejects_replayed_handshake_outcome() {
+        let outcome = handshake_outcome();
+        let mut first_manager =
+            SessionManager::with_timing(25, TEST_TIMING).expect("timing config should be valid");
+        let mut second_manager =
+            SessionManager::with_timing(26, TEST_TIMING).expect("timing config should be valid");
+        let mut replay_cache = ReplayCache::new(ReplayCacheConfig {
+            max_entries: 8,
+            replay_window_ms: 300_000,
+        })
+        .expect("replay cache config should be valid");
+
+        first_manager
+            .begin_open(100, &TcpTransport)
+            .expect("open should transition from idle to opening");
+        first_manager
+            .mark_established_with_handshake_and_replay_cache(120, outcome, &mut replay_cache)
+            .expect("first handshake outcome should be accepted");
+
+        second_manager
+            .begin_open(130, &TcpTransport)
+            .expect("open should transition from idle to opening");
+        let error = second_manager
+            .handle_runner_input_with_replay_cache(
+                140,
+                SessionRunnerInput::HandshakeSucceeded { outcome },
+                &mut replay_cache,
+            )
+            .expect_err("replayed handshake outcome should be rejected");
+
+        assert_eq!(
+            error,
+            SessionError::ReplayCache(ReplayCacheError::ReplayDetected {
+                peer_node_id: outcome.peer_node_id,
+            })
+        );
+        assert_eq!(second_manager.state(), SessionState::Opening);
+        assert!(second_manager.security().is_none());
     }
 
     fn handshake_outcome() -> HandshakeOutcome {

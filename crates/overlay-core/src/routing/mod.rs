@@ -7,6 +7,7 @@ use thiserror::Error;
 
 use crate::{
     error::FrameError,
+    metrics::{LogComponent, LogContext, Observability},
     wire::{Message, MessageType, MAX_FRAME_BODY_LEN},
 };
 
@@ -361,6 +362,31 @@ impl PathProbeTracker {
         })
     }
 
+    pub fn complete_probe_with_observability(
+        &mut self,
+        result: PathProbeResult,
+        received_at_unix_ms: u64,
+        observability: &mut Observability,
+        context: LogContext,
+    ) -> Result<PathProbeFeedback, RoutingError> {
+        match self.complete_probe(result, received_at_unix_ms) {
+            Ok(feedback) => {
+                observability.observe_probe_feedback(feedback.obs_rtt_ms, feedback.loss_ppm);
+                observability.push_log(context, LogComponent::Routing, "probe_feedback", "success");
+                Ok(feedback)
+            }
+            Err(error) => {
+                observability.push_log(
+                    context,
+                    LogComponent::Routing,
+                    "probe_feedback",
+                    "rejected",
+                );
+                Err(error)
+            }
+        }
+    }
+
     pub fn mark_probe_lost(
         &mut self,
         path_id: u64,
@@ -379,6 +405,31 @@ impl PathProbeTracker {
             loss_ppm: loss_ppm(&state.recent_outcomes),
             jitter_ms: None,
         })
+    }
+
+    pub fn mark_probe_lost_with_observability(
+        &mut self,
+        path_id: u64,
+        probe_id: u64,
+        observability: &mut Observability,
+        context: LogContext,
+    ) -> Result<PathProbeFeedback, RoutingError> {
+        match self.mark_probe_lost(path_id, probe_id) {
+            Ok(feedback) => {
+                observability.observe_probe_feedback(feedback.obs_rtt_ms, feedback.loss_ppm);
+                observability.push_log(context, LogComponent::Routing, "probe_feedback", "lost");
+                Ok(feedback)
+            }
+            Err(error) => {
+                observability.push_log(
+                    context,
+                    LogComponent::Routing,
+                    "probe_feedback",
+                    "rejected",
+                );
+                Err(error)
+            }
+        }
     }
 
     pub fn in_flight_probe_count(&self, path_id: u64) -> usize {
@@ -463,6 +514,37 @@ impl RouteSelector {
             from_score,
             to_score: best_score,
         }
+    }
+
+    pub fn evaluate_with_observability(
+        &mut self,
+        now_unix_s: u64,
+        candidates: &[PathState],
+        observability: &mut Observability,
+        context: LogContext,
+    ) -> RouteDecision {
+        let decision = self.evaluate(now_unix_s, candidates);
+        match decision {
+            RouteDecision::SelectedInitial { .. } => {
+                observability.push_log(
+                    context,
+                    LogComponent::Routing,
+                    "route_selection",
+                    "selected_initial",
+                );
+            }
+            RouteDecision::Switched { .. } => {
+                observability.note_path_switch();
+                observability.push_log(
+                    context,
+                    LogComponent::Routing,
+                    "route_selection",
+                    "switched",
+                );
+            }
+            _ => {}
+        }
+        decision
     }
 
     fn should_switch(&mut self, now_unix_s: u64, current_score: u64, best_score: u64) -> bool {
@@ -610,6 +692,7 @@ mod tests {
         RouteSelector, RoutingError, DEFAULT_MAX_IN_FLIGHT_PATH_PROBES_PER_PATH,
         DEFAULT_PATH_PROBE_INTERVAL_MS,
     };
+    use crate::metrics::{LogContext, Observability};
     use crate::wire::{Message, MessageType};
 
     #[test]
@@ -946,6 +1029,85 @@ mod tests {
         assert_eq!(path.metrics.obs_rtt_ms, 96);
         assert_eq!(path.metrics.jitter_ms, 11);
         assert_eq!(path.metrics.loss_ppm, 50_000);
+    }
+
+    #[test]
+    fn routing_observability_tracks_probe_feedback_and_path_switches() {
+        let node_id = crate::identity::NodeId::from_bytes([77_u8; 32]);
+        let mut tracker =
+            PathProbeTracker::new(PathProbeConfig::default()).expect("config should be valid");
+        let mut selector =
+            RouteSelector::new(HysteresisConfig::default()).expect("config should be valid");
+        let mut observability = Observability::default();
+
+        let probe = tracker
+            .begin_probe(9, 1_000)
+            .expect("probe scheduling should succeed")
+            .expect("first probe should be emitted");
+        let feedback = tracker
+            .complete_probe_with_observability(
+                PathProbeResult {
+                    path_id: probe.path_id,
+                    probe_id: probe.probe_id,
+                },
+                1_080,
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_080,
+                    node_id,
+                    correlation_id: 71,
+                },
+            )
+            .expect("probe completion should succeed");
+        assert_eq!(feedback.obs_rtt_ms, Some(80));
+
+        let lost_probe = tracker
+            .begin_probe(9, 6_000)
+            .expect("second probe scheduling should succeed")
+            .expect("second probe should be emitted");
+        let lost_feedback = tracker
+            .mark_probe_lost_with_observability(
+                lost_probe.path_id,
+                lost_probe.probe_id,
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 6_010,
+                    node_id,
+                    correlation_id: 72,
+                },
+            )
+            .expect("probe loss should succeed");
+        assert_eq!(lost_feedback.loss_ppm, 500_000);
+
+        let current = sample_path(1, 50, 100, 10);
+        let better = sample_path(2, 40, 80, 10);
+        let _ = selector.evaluate_with_observability(
+            1_700_000_000,
+            &[current],
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_000_000,
+                node_id,
+                correlation_id: 73,
+            },
+        );
+        let decision = selector.evaluate_with_observability(
+            1_700_000_031,
+            &[current, better],
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_031_000,
+                node_id,
+                correlation_id: 74,
+            },
+        );
+        assert!(matches!(decision, RouteDecision::Switched { .. }));
+        assert_eq!(observability.metrics().probe_rtt_ms, Some(80));
+        assert_eq!(observability.metrics().probe_loss_ratio, Some(500_000));
+        assert_eq!(observability.metrics().path_switch_total, 1);
+        let log = observability.latest_log().expect("log should be present");
+        assert_eq!(log.event, "route_selection");
+        assert_eq!(log.result, "switched");
     }
 
     fn sample_path(path_id: u64, est_rtt_ms: u32, obs_rtt_ms: u32, jitter_ms: u32) -> PathState {

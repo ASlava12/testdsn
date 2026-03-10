@@ -14,8 +14,10 @@ A Codex-oriented handoff bundle containing:
 
 Use the contents of `prompts/codex-milestone-9.md` as the first task.
 It assumes the repository already has a closed Milestone 1-8 baseline and that
-Milestone 9 hardening and polish is now active with the current regression and
-stage-boundary suites as its entry boundary.
+Milestone 9 hardening and polish is now active with initial observability and
+config groundwork plus broad explicit subsystem observability integration
+landed, and with the current regression, stage-boundary, and Milestone 9 unit
+suites as its working boundary.
 
 ## Recommended workflow
 
@@ -24,7 +26,7 @@ stage-boundary suites as its entry boundary.
 2. Treat Milestones 1-8 as regression-fix, vector-maintenance, and
    validation-maintenance territory only unless the task explicitly reopens them.
 3. Continue Milestone 9 hardening and polish work from the current validation
-   and stage-boundary baseline instead of broadening scope prematurely.
+   baseline instead of broadening scope prematurely.
 4. Keep simulation-focused expansion and broader protocol scope out of work
    until Milestone 9 is materially complete.
 5. Keep status docs, milestone prompts, and `docs/OPEN_QUESTIONS.md` aligned as

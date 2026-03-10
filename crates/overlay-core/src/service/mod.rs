@@ -8,6 +8,7 @@ use thiserror::Error;
 use crate::{
     error::FrameError,
     identity::{AppId, NodeId},
+    metrics::{LogComponent, LogContext, Observability},
     records::{ServiceRecord, VerifiedServiceRecord},
     wire::{Message, MessageType, MAX_FRAME_BODY_LEN},
 };
@@ -353,6 +354,35 @@ impl ServiceRegistry {
         Ok(())
     }
 
+    pub fn register_verified_with_observability(
+        &mut self,
+        record: VerifiedServiceRecord,
+        policy: LocalServicePolicy,
+        observability: &mut Observability,
+        context: LogContext,
+    ) -> Result<(), ServiceError> {
+        match self.register_verified(record, policy) {
+            Ok(()) => {
+                observability.push_log(
+                    context,
+                    LogComponent::Service,
+                    "register_service",
+                    "registered",
+                );
+                Ok(())
+            }
+            Err(error) => {
+                observability.push_log(
+                    context,
+                    LogComponent::Service,
+                    "register_service",
+                    "rejected",
+                );
+                Err(error)
+            }
+        }
+    }
+
     pub fn registered_service_count(&self) -> usize {
         self.services.len()
     }
@@ -369,11 +399,47 @@ impl ServiceRegistry {
         self.open_sessions.remove(&session_id)
     }
 
+    pub fn close_session_with_observability(
+        &mut self,
+        session_id: u64,
+        observability: &mut Observability,
+        context: LogContext,
+    ) -> Option<OpenServiceSession> {
+        let session = self.close_session(session_id);
+        observability.push_log(
+            context,
+            LogComponent::Service,
+            "close_app_session",
+            if session.is_some() {
+                "closed"
+            } else {
+                "not_found"
+            },
+        );
+        session
+    }
+
     pub fn resolve(&self, request: GetServiceRecord) -> ServiceRecordResponse {
         match self.services.get(&request.app_id) {
             Some(registered) => ServiceRecordResponse::found(registered.record.clone()),
             None => ServiceRecordResponse::not_found(request.app_id),
         }
+    }
+
+    pub fn resolve_with_observability(
+        &self,
+        request: GetServiceRecord,
+        observability: &mut Observability,
+        context: LogContext,
+    ) -> ServiceRecordResponse {
+        let response = self.resolve(request);
+        observability.push_log(
+            context,
+            LogComponent::Service,
+            "resolve_service_record",
+            response.status.as_str(),
+        );
+        response
     }
 
     pub fn open_app_session(
@@ -419,6 +485,23 @@ impl ServiceRegistry {
         };
         self.open_sessions.insert(session_id, session);
         OpenAppSessionResult::opened(request.app_id, session_id)
+    }
+
+    pub fn open_app_session_with_observability(
+        &mut self,
+        request: OpenAppSession,
+        now_unix_ms: u64,
+        observability: &mut Observability,
+        context: LogContext,
+    ) -> OpenAppSessionResult {
+        let result = self.open_app_session(request, now_unix_ms);
+        observability.push_log(
+            context,
+            LogComponent::Service,
+            "open_app_session",
+            result.status.as_str(),
+        );
+        result
     }
 }
 
@@ -467,6 +550,7 @@ mod tests {
     use crate::{
         crypto::sign::Ed25519SigningKey,
         identity::{derive_app_id, derive_node_id, AppId, NodeId},
+        metrics::{LogContext, Observability},
         records::ServiceRecord,
     };
 
@@ -722,6 +806,76 @@ mod tests {
                 .opened_at_unix_ms,
             1_700_000_000_123
         );
+    }
+
+    #[test]
+    fn service_observability_tracks_register_resolve_open_and_close() {
+        let signing_key = Ed25519SigningKey::from_seed([45_u8; 32]);
+        let record = sample_signed_service_record(&signing_key, "terminal");
+        let node_id = record.node_id;
+        let mut registry =
+            ServiceRegistry::new(ServiceConfig::default()).expect("default config should work");
+        let mut observability = Observability::default();
+
+        registry
+            .register_verified_with_observability(
+                record
+                    .clone()
+                    .verify_with_public_key(&signing_key.public_key())
+                    .expect("signed service record should verify"),
+                LocalServicePolicy::allow_all(),
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_700_000_000_100,
+                    node_id,
+                    correlation_id: 81,
+                },
+            )
+            .expect("verified service should register");
+
+        let resolved = registry.resolve_with_observability(
+            GetServiceRecord {
+                app_id: record.app_id,
+            },
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_000_110,
+                node_id,
+                correlation_id: 82,
+            },
+        );
+        assert_eq!(resolved.status, ServiceRecordResponseStatus::Found);
+
+        let opened = registry.open_app_session_with_observability(
+            OpenAppSession {
+                app_id: record.app_id,
+                reachability_ref: record.reachability_ref.clone(),
+            },
+            1_700_000_000_123,
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_000_123,
+                node_id,
+                correlation_id: 83,
+            },
+        );
+        assert_eq!(opened.status, OpenAppSessionStatus::Opened);
+
+        let closed = registry.close_session_with_observability(
+            opened
+                .session_id
+                .expect("opened result should have session id"),
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_000_130,
+                node_id,
+                correlation_id: 84,
+            },
+        );
+        assert!(closed.is_some());
+        let log = observability.latest_log().expect("log should be present");
+        assert_eq!(log.event, "close_app_session");
+        assert_eq!(log.result, "closed");
     }
 
     fn sample_signed_service_record(
