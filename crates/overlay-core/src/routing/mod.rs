@@ -1129,6 +1129,92 @@ mod tests {
         assert_eq!(log.result, "switched");
     }
 
+    #[test]
+    fn routing_observability_logs_rejected_probe_feedback_without_clobbering_samples() {
+        let node_id = crate::identity::NodeId::from_bytes([78_u8; 32]);
+        let mut tracker =
+            PathProbeTracker::new(PathProbeConfig::default()).expect("config should be valid");
+        let mut observability = Observability::default();
+
+        let probe = tracker
+            .begin_probe(10, 1_000)
+            .expect("probe scheduling should succeed")
+            .expect("probe should be emitted");
+        tracker
+            .complete_probe_with_observability(
+                PathProbeResult {
+                    path_id: probe.path_id,
+                    probe_id: probe.probe_id,
+                },
+                1_070,
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_070,
+                    node_id,
+                    correlation_id: 81,
+                },
+            )
+            .expect("probe completion should succeed");
+        assert_eq!(observability.metrics().probe_rtt_ms, Some(70));
+
+        let error = tracker
+            .complete_probe_with_observability(
+                PathProbeResult {
+                    path_id: 99,
+                    probe_id: 1,
+                },
+                1_080,
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_080,
+                    node_id,
+                    correlation_id: 82,
+                },
+            )
+            .expect_err("unknown probe completion should be rejected");
+
+        assert!(matches!(
+            error,
+            RoutingError::UnknownPathProbe {
+                path_id: 99,
+                probe_id: 1,
+            }
+        ));
+        assert_eq!(observability.metrics().probe_rtt_ms, Some(70));
+        assert_eq!(observability.metrics().probe_loss_ratio, Some(0));
+        let log = observability.latest_log().expect("log should be present");
+        assert_eq!(log.event, "probe_feedback");
+        assert_eq!(log.result, "rejected");
+    }
+
+    #[test]
+    fn routing_observability_logs_selected_initial_without_counting_switch() {
+        let node_id = crate::identity::NodeId::from_bytes([79_u8; 32]);
+        let mut selector =
+            RouteSelector::new(HysteresisConfig::default()).expect("config should be valid");
+        let mut observability = Observability::default();
+
+        let decision = selector.evaluate_with_observability(
+            1_700_000_100,
+            &[sample_path(7, 40, 80, 5)],
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_100_000,
+                node_id,
+                correlation_id: 83,
+            },
+        );
+
+        assert!(matches!(
+            decision,
+            RouteDecision::SelectedInitial { path_id: 7, .. }
+        ));
+        assert_eq!(observability.metrics().path_switch_total, 0);
+        let log = observability.latest_log().expect("log should be present");
+        assert_eq!(log.event, "route_selection");
+        assert_eq!(log.result, "selected_initial");
+    }
+
     fn sample_path(path_id: u64, est_rtt_ms: u32, obs_rtt_ms: u32, jitter_ms: u32) -> PathState {
         PathState {
             path_id,

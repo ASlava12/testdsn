@@ -68,9 +68,10 @@ The repository has a closed Milestone 1-8 baseline.
   fetch/validation, peer bootstrap ingest, rendezvous publish/lookup, relay
   bind and rate-limit handling, routing probe/switch paths, service registry
   flows, and session event export, and malformed-input coverage now explicitly
-  exercises bootstrap schema validation, duplicate peer/bridge-hint rejection,
-  peer ingest rejection handling, rendezvous response-shape validation, and
-  relay, routing, and service wire-body rejection paths.
+  exercises bootstrap schema validation across schema/version, timing, frame
+  limits, and duplicate peer/bridge-hint rejection, peer ingest rejection
+  handling, rendezvous response-shape validation, and relay, routing, and
+  service wire-body rejection paths.
   Session observability now also has an explicit established-session gauge sync
   helper while keeping aggregation caller-invoked. The remaining active
   Milestone 9 work is broader stale/malformed-input expansion, validation

@@ -30,10 +30,10 @@ Current repository baseline:
   subsystem observability integration landed, including bootstrap provider
   fetch/validation logging, explicit transport-buffer config projection from
   top-level node config and runner-boundary transport frame validation, plus
-  expanded malformed-input coverage in relay/routing/service wire helpers, an
-  explicit established-session gauge sync helper, and with the current
-  regression suites, stage-boundary integration tests, and Milestone 9 unit
-  coverage as its working boundary.
+  expanded malformed-input coverage in bootstrap, relay, routing, and service
+  wire helpers, an explicit established-session gauge sync helper, and with the
+  current regression suites, stage-boundary integration tests, and Milestone 9
+  unit coverage as its working boundary.
 
 Requirements:
 - keep hardening work aligned with `spec/observability.md`,

@@ -412,6 +412,90 @@ mod tests {
     }
 
     #[test]
+    fn rejects_unsupported_bootstrap_schema_version() {
+        let mut response = sample_response();
+        response.version = BOOTSTRAP_SCHEMA_VERSION + 1;
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("unsupported bootstrap schema versions must be rejected");
+
+        assert_eq!(
+            error,
+            BootstrapValidationError::UnsupportedSchemaVersion {
+                expected: BOOTSTRAP_SCHEMA_VERSION,
+                actual: BOOTSTRAP_SCHEMA_VERSION + 1,
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_bootstrap_generated_after_expiry() {
+        let mut response = sample_response();
+        response.generated_at_unix_s = 1_700_000_901;
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("generated_at after expiry must be rejected");
+
+        assert_eq!(
+            error,
+            BootstrapValidationError::GeneratedAfterExpiry {
+                generated_at_unix_s: 1_700_000_901,
+                expires_at_unix_s: 1_700_000_900,
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_empty_bootstrap_network_id() {
+        let mut response = sample_response();
+        response.network_params.network_id = "   ".to_string();
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("blank network_id must be rejected");
+
+        assert_eq!(error, BootstrapValidationError::EmptyNetworkId);
+    }
+
+    #[test]
+    fn rejects_zero_bootstrap_epoch_duration_and_presence_ttl() {
+        for field in ["epoch_duration_s", "presence_ttl_s"] {
+            let mut response = sample_response();
+            match field {
+                "epoch_duration_s" => response.epoch_duration_s = 0,
+                "presence_ttl_s" => response.presence_ttl_s = 0,
+                _ => unreachable!(),
+            }
+
+            let error = response
+                .validated(1_700_000_100)
+                .expect_err("zero bootstrap timing fields must be rejected");
+
+            assert_eq!(error, BootstrapValidationError::ZeroField { field });
+        }
+    }
+
+    #[test]
+    fn rejects_bootstrap_frame_body_len_above_mvp_limit() {
+        let mut response = sample_response();
+        response.max_frame_body_len = MAX_FRAME_BODY_LEN + 1;
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("bootstrap frame body len above MVP limit must be rejected");
+
+        assert_eq!(
+            error,
+            BootstrapValidationError::FrameBodyTooLarge {
+                max_frame_body_len: MAX_FRAME_BODY_LEN + 1,
+                allowed_max_frame_body_len: MAX_FRAME_BODY_LEN,
+            }
+        );
+    }
+
+    #[test]
     fn rejects_unknown_bootstrap_capability() {
         let mut response = sample_response();
         response.peers[0].capabilities.push("smtp".to_string());

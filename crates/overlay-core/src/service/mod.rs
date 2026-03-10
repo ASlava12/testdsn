@@ -544,8 +544,8 @@ mod tests {
 
     use super::{
         GetServiceRecord, LocalServicePolicy, OpenAppSession, OpenAppSessionResult,
-        OpenAppSessionStatus, ServiceConfig, ServiceMessageError, ServiceRecordResponse,
-        ServiceRecordResponseStatus, ServiceRegistry,
+        OpenAppSessionStatus, ServiceConfig, ServiceError, ServiceMessageError,
+        ServiceRecordResponse, ServiceRecordResponseStatus, ServiceRegistry,
     };
     use crate::{
         crypto::sign::Ed25519SigningKey,
@@ -978,6 +978,174 @@ mod tests {
         let log = observability.latest_log().expect("log should be present");
         assert_eq!(log.event, "close_app_session");
         assert_eq!(log.result, "closed");
+    }
+
+    #[test]
+    fn service_observability_tracks_rejected_and_not_found_outcomes() {
+        let first_signing_key = Ed25519SigningKey::from_seed([46_u8; 32]);
+        let second_signing_key = Ed25519SigningKey::from_seed([47_u8; 32]);
+        let first_record = sample_signed_service_record(&first_signing_key, "terminal");
+        let second_record = sample_signed_service_record(&second_signing_key, "shell");
+        let node_id = first_record.node_id;
+        let mut registry = ServiceRegistry::new(ServiceConfig {
+            max_registered_services: 1,
+            max_open_service_sessions: 1,
+        })
+        .expect("config should work");
+        let mut observability = Observability::default();
+
+        registry
+            .register_verified_with_observability(
+                first_record
+                    .clone()
+                    .verify_with_public_key(&first_signing_key.public_key())
+                    .expect("signed service record should verify"),
+                LocalServicePolicy::deny_all(),
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_700_000_001_000,
+                    node_id,
+                    correlation_id: 91,
+                },
+            )
+            .expect("first service should register");
+
+        let register_error = registry
+            .register_verified_with_observability(
+                second_record
+                    .verify_with_public_key(&second_signing_key.public_key())
+                    .expect("signed service record should verify"),
+                LocalServicePolicy::allow_all(),
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_700_000_001_010,
+                    node_id,
+                    correlation_id: 92,
+                },
+            )
+            .expect_err("second service should hit the registry limit");
+        assert!(matches!(
+            register_error,
+            ServiceError::RegisteredServiceLimitExceeded {
+                max_registered_services: 1,
+            }
+        ));
+        assert_eq!(
+            observability
+                .latest_log()
+                .expect("register rejection log should exist")
+                .result,
+            "rejected"
+        );
+
+        let missing_app_id = derive_app_id(&NodeId::from_bytes([99_u8; 32]), "chat", "missing");
+        let missing = registry.resolve_with_observability(
+            GetServiceRecord {
+                app_id: missing_app_id,
+            },
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_001_020,
+                node_id,
+                correlation_id: 93,
+            },
+        );
+        assert_eq!(missing.status, ServiceRecordResponseStatus::NotFound);
+        assert_eq!(
+            observability
+                .latest_log()
+                .expect("resolve not_found log should exist")
+                .result,
+            "not_found"
+        );
+
+        let not_found_open = registry.open_app_session_with_observability(
+            OpenAppSession {
+                app_id: missing_app_id,
+                reachability_ref: vec![0xFF],
+            },
+            1_700_000_001_030,
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_001_030,
+                node_id,
+                correlation_id: 94,
+            },
+        );
+        assert_eq!(
+            not_found_open.status,
+            OpenAppSessionStatus::RejectedNotFound
+        );
+        assert_eq!(
+            observability
+                .latest_log()
+                .expect("open not_found log should exist")
+                .result,
+            "rejected_not_found"
+        );
+
+        let reachability_mismatch = registry.open_app_session_with_observability(
+            OpenAppSession {
+                app_id: first_record.app_id,
+                reachability_ref: vec![0xDE, 0xAD],
+            },
+            1_700_000_001_040,
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_001_040,
+                node_id,
+                correlation_id: 95,
+            },
+        );
+        assert_eq!(
+            reachability_mismatch.status,
+            OpenAppSessionStatus::RejectedReachabilityMismatch
+        );
+        assert_eq!(
+            observability
+                .latest_log()
+                .expect("reachability mismatch log should exist")
+                .result,
+            "rejected_reachability_mismatch"
+        );
+
+        let denied = registry.open_app_session_with_observability(
+            OpenAppSession {
+                app_id: first_record.app_id,
+                reachability_ref: first_record.reachability_ref.clone(),
+            },
+            1_700_000_001_050,
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_001_050,
+                node_id,
+                correlation_id: 96,
+            },
+        );
+        assert_eq!(denied.status, OpenAppSessionStatus::RejectedPolicy);
+        assert_eq!(
+            observability
+                .latest_log()
+                .expect("policy denial log should exist")
+                .result,
+            "rejected_policy"
+        );
+
+        let closed = registry.close_session_with_observability(
+            9_999,
+            &mut observability,
+            LogContext {
+                timestamp_unix_ms: 1_700_000_001_060,
+                node_id,
+                correlation_id: 97,
+            },
+        );
+        assert!(closed.is_none());
+        let log = observability
+            .latest_log()
+            .expect("close not_found log should exist");
+        assert_eq!(log.event, "close_app_session");
+        assert_eq!(log.result, "not_found");
     }
 
     fn sample_signed_service_record(

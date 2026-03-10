@@ -19,9 +19,10 @@ groundwork, a bounded replay cache, and broad explicit subsystem
 observability integration landed, including bootstrap provider fetch/validation
 logging, explicit transport-buffer config projection from top-level node
 config and runner-boundary transport frame validation, plus expanded
-malformed-input coverage in the wire-helper tests and an explicit
-established-session gauge sync helper, and with the current regression,
-stage-boundary, and Milestone 9 unit suites as its working boundary.
+malformed-input coverage in the wire-helper tests, including bootstrap schema
+timing and frame-limit rejection paths, and an explicit established-session
+gauge sync helper, and with the current regression, stage-boundary, and
+Milestone 9 unit suites as its working boundary.
 
 ## Recommended workflow
 

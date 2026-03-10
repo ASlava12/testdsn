@@ -135,11 +135,23 @@ cargo test -p overlay-core --test integration_service_open
 - `session::manager::tests` now also covers converting bounded
   `TransportPollEvent` values into runner inputs and rejecting oversized
   transport frames at that boundary.
-- `bootstrap::tests` now also covers zero `max_frame_body_len`, duplicate peer-node rejection, duplicate bridge-hint rejection, blank peer dial-hint rejection after trimming, and expired bridge hints.
+- `bootstrap::tests` now also covers unsupported schema versions,
+  `generated_at_unix_s > expires_at_unix_s`, blank `network_id`, zero
+  `epoch_duration_s`, zero `presence_ttl_s`, zero or oversized
+  `max_frame_body_len`, duplicate peer-node rejection, duplicate bridge-hint
+  rejection, blank peer dial-hint rejection after trimming, and expired bridge
+  hints.
 - `rendezvous::tests` now also covers deterministic publish/lookup message vectors in `tests/vectors/rendezvous_messages.json`, derived placement-key validation on `PublishAck` / `LookupResult` / `LookupNotFound`, and `LookupResult.record.node_id` shape validation.
 - `relay::tests` now also covers deterministic relay intro message vectors in `tests/vectors/relay_intro_messages.json` and oversize relay wire-body rejection.
 - `routing::tests` now covers deterministic path-probe message vectors, bounded local probe tracking, the deterministic path-score formula, integer EWMA updates, hysteresis thresholds, switch-rate caps, and oversize probe-body rejection.
+- `routing::tests` now also covers observability wrapper rejection logging for
+  unknown probe completions and `selected_initial` route-selection logging
+  without incrementing `path_switch_total`.
 - `service::tests` now covers deterministic service message vectors in `tests/vectors/service_messages.json`, verified `ServiceRecord` registration, exact `app_id` resolution, `reachability_ref` binding checks, local open-session limits, policy denials, invalid response/result wire shapes, and oversize service wire-body rejection.
+- `service::tests` now also covers observability wrapper logs for rejected
+  registration, not-found resolution, rejected-not-found session opens,
+  rejected reachability mismatches, rejected policy opens, and close-session
+  not-found outcomes.
 - `peer::tests` now also covers rejected bootstrap ingest observability without clobbering the active-peer gauge.
 - `session::manager::tests` now also covers bounded handshake transcript replay-cache validation, rejection, pruning, oldest-entry eviction, and explicit established-session gauge synchronization.
 - routing probe message vectors live in `tests/vectors/path_probe_messages.json`.
