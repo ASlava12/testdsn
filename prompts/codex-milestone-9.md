@@ -25,10 +25,12 @@ Current repository baseline:
   closed.
 - Milestone 8 service-layer work is implemented, validated, and considered
   closed.
-- Milestone 9 hardening and polish is active with initial observability/config
-  groundwork and broad explicit subsystem observability integration landed, and with
-  the current regression suites, stage-boundary integration tests, and
-  Milestone 9 unit coverage as its working boundary.
+- Milestone 9 hardening and polish is active with observability/config
+  groundwork, a bounded replay cache in `session::manager`, and broad explicit
+  subsystem observability integration landed, plus expanded malformed-input
+  coverage in relay/routing/service wire helpers, and with the current
+  regression suites, stage-boundary integration tests, and Milestone 9 unit
+  coverage as its working boundary.
 
 Requirements:
 - keep hardening work aligned with `spec/observability.md`,

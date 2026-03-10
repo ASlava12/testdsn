@@ -380,7 +380,7 @@ mod tests {
     };
     use crate::bootstrap::{
         BootstrapNetworkParams, BootstrapPeer, BootstrapPeerRole, BootstrapResponse,
-        BOOTSTRAP_SCHEMA_VERSION,
+        BootstrapValidationError, BOOTSTRAP_SCHEMA_VERSION,
     };
     use crate::{
         identity::NodeId,
@@ -492,6 +492,59 @@ mod tests {
         let log = observability.latest_log().expect("log should be present");
         assert_eq!(log.event, "bootstrap_ingest");
         assert_eq!(log.result, "accepted");
+    }
+
+    #[test]
+    fn rejected_bootstrap_ingest_preserves_active_peer_gauge_and_logs_rejected() {
+        let mut store = PeerStore::new(PeerStoreConfig {
+            max_neighbors: 3,
+            max_relay_neighbors: 1,
+            max_neighbors_per_transport: 1,
+        })
+        .expect("peer store config should be valid");
+        let node_id = NodeId::from_bytes([10_u8; 32]);
+        let mut observability = Observability::default();
+
+        let active = store
+            .ingest_bootstrap_response_with_observability(
+                sample_response(),
+                1_700_000_100,
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_700_000_100_000,
+                    node_id,
+                    correlation_id: 42,
+                },
+            )
+            .expect("bootstrap response should ingest");
+        assert_eq!(active.len(), 3);
+        assert_eq!(observability.metrics().active_peers, 3);
+
+        let mut invalid = sample_response();
+        invalid.max_frame_body_len = 0;
+        let error = store
+            .ingest_bootstrap_response_with_observability(
+                invalid,
+                1_700_000_101,
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_700_000_101_000,
+                    node_id,
+                    correlation_id: 43,
+                },
+            )
+            .expect_err("invalid bootstrap response must be rejected");
+
+        assert!(matches!(
+            error,
+            PeerStoreError::BootstrapValidation(BootstrapValidationError::ZeroField {
+                field: "max_frame_body_len",
+            })
+        ));
+        assert_eq!(observability.metrics().active_peers, 3);
+        let log = observability.latest_log().expect("log should be present");
+        assert_eq!(log.event, "bootstrap_ingest");
+        assert_eq!(log.result, "rejected");
     }
 
     fn sample_response() -> BootstrapResponse {

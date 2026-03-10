@@ -185,6 +185,9 @@ For MVP:
 - providers may deliver this schema over HTTPS, DNS-derived data, or static config;
 - bootstrap responses are advisory;
 - a peer entry must not be trusted as sufficient on its own.
+- `epoch_duration_s`, `presence_ttl_s`, and `max_frame_body_len` must be
+  non-zero during local bootstrap-response validation;
+- `max_frame_body_len` must not exceed the MVP frame-body limit.
 
 ### 7. Final encoding of transport classes and capabilities
 
@@ -246,13 +249,17 @@ For current work, treat the repository stage as:
 - Milestone 9 hardening and polish is now the current feature stage, with
   bounded observability groundwork in `crates/overlay-core/src/metrics/mod.rs`,
   a validated top-level config baseline in `crates/overlay-core/src/config.rs`,
-  explicit observability hooks in peer/bootstrap ingest, rendezvous
+  a bounded handshake transcript replay cache in
+  `crates/overlay-core/src/session/manager.rs`, explicit observability hooks in
+  peer/bootstrap ingest, rendezvous
   publish/lookup, relay bind and rate-limit handling, routing probe/switch
-  paths, service registry flows, and session event export, and the current
-  regression suites, stage-boundary integration tests, plus `config::tests` /
-  `metrics::tests` / `peer::tests` / `rendezvous::tests` / `relay::tests` /
-  `routing::tests` / `service::tests` / `session::manager::tests` as the
-  active boundary while broader hardening work continues;
+  paths, service registry flows, and session event export, with malformed-input
+  coverage now explicitly exercising relay, routing, and service wire-body
+  rejection paths, and the current regression suites, stage-boundary
+  integration tests, plus `config::tests` / `metrics::tests` / `peer::tests` /
+  `rendezvous::tests` / `relay::tests` / `routing::tests` /
+  `service::tests` / `session::manager::tests` as the active boundary while
+  broader hardening work continues;
 
 That means:
 
@@ -522,6 +529,10 @@ Rules:
   store is full;
 - clear any negative-cache entry for a node when a fresher presence record is
   accepted for that node.
+- `PublishAck.placement_key`, `LookupResult.placement_key`, and
+  `LookupNotFound.placement_key` must equal the derived placement key for the
+  corresponding `node_id`;
+- `LookupResult.record.node_id` must match `LookupResult.node_id`.
 
 ### 21. Signature-verification handoff for the conservative Milestone 5 store
 
@@ -743,6 +754,25 @@ Rules:
   `SessionEvent` values instead of implicit state-machine side effects;
 - `established_sessions` remains a caller-managed gauge until broader session
   aggregation lands.
+
+### 31. Conservative replay-cache defaults for the current Milestone 9 baseline
+
+For the current Milestone 9 baseline, session replay-risk mitigation stays
+local, bounded, and tied to handshake transcript outcomes instead of
+introducing new protocol messages.
+
+Rules:
+- track successful handshake outcomes by `transcript_hash` in a bounded local
+  replay cache keyed to the current node process;
+- default replay-cache limits are `max_entries = 1024` and
+  `replay_window_ms = 300000`;
+- reject a repeated `transcript_hash` seen within the replay window as
+  `ReplayCacheError::ReplayDetected`;
+- prune expired entries before duplicate checks and evict the oldest surviving
+  entry when the bounded cache is full;
+- keep replay-cache enforcement explicit at the session-manager runner boundary
+  through the existing replay-cache wrapper instead of adding implicit
+  cross-layer state.
 
 ## Rule
 

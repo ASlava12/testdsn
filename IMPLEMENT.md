@@ -58,12 +58,19 @@ The repository has a closed Milestone 1-8 baseline.
   considered closed.
 - Milestone 9 hardening and polish is now active with initial bounded
   observability groundwork in `crates/overlay-core/src/metrics/mod.rs` and a
-  validated top-level config baseline in `crates/overlay-core/src/config.rs`.
+  validated top-level config baseline in `crates/overlay-core/src/config.rs`,
+  with a bounded handshake transcript replay cache now landed in
+  `crates/overlay-core/src/session/manager.rs`.
   Observability integration is now explicitly wired into peer bootstrap ingest,
   rendezvous publish/lookup, relay bind and rate-limit handling, routing
-  probe/switch paths, service registry flows, and session event export.
-  Broader replay cache work and malformed-input expansion remain active, and
-  the current validation boundary is the existing regression suites,
+  probe/switch paths, service registry flows, and session event export, and
+  malformed-input coverage now explicitly exercises bootstrap schema
+  validation, peer ingest rejection handling, rendezvous response-shape
+  validation, and relay, routing, and service wire-body rejection paths. The
+  remaining active Milestone 9 work is broader stale/malformed-input
+  expansion, validation maintenance, and any remaining explicit observability
+  aggregation boundaries, and the current validation boundary is the existing
+  regression suites,
   stage-boundary integration tests, and Milestone 9 unit coverage in
   `config::tests`, `metrics::tests`, `peer::tests`, `rendezvous::tests`,
   `relay::tests`, `routing::tests`, `service::tests`, and
@@ -350,18 +357,19 @@ Open an application session after node reachability is resolved.
 
 ## Milestone 9 — hardening and polish
 
-Status: active with initial observability/config groundwork and broad explicit
-subsystem observability integration landed in this repository.
+Status: active with observability/config groundwork, bounded replay-cache
+hardening, and expanded malformed-input coverage landed in this repository.
 
 ### Goal
 Close the highest-risk gaps before larger-scale simulation.
 
 ### Tasks
 1. Add rate limits and byte budgets.
-2. Add replay cache.
+2. Broaden malformed/stale input rejection coverage and tests.
 3. Finish integrating the current structured metrics and logs into the few
    remaining subsystem paths and aggregation boundaries.
-4. Add stale/malformed record tests.
+4. Keep replay-risk mitigation and bounded local stores aligned with the
+   current validation boundary.
 5. Fill in missing validation commands.
 
 ### Done when

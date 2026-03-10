@@ -94,6 +94,11 @@ impl BootstrapResponse {
                 field: "presence_ttl_s",
             });
         }
+        if self.max_frame_body_len == 0 {
+            return Err(BootstrapValidationError::ZeroField {
+                field: "max_frame_body_len",
+            });
+        }
         if self.max_frame_body_len > MAX_FRAME_BODY_LEN {
             return Err(BootstrapValidationError::FrameBodyTooLarge {
                 max_frame_body_len: self.max_frame_body_len,
@@ -355,6 +360,58 @@ mod tests {
             error,
             BootstrapValidationError::UnknownCapability {
                 value: "smtp".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_zero_bootstrap_max_frame_body_len() {
+        let mut response = sample_response();
+        response.max_frame_body_len = 0;
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("zero max_frame_body_len must be rejected");
+
+        assert_eq!(
+            error,
+            BootstrapValidationError::ZeroField {
+                field: "max_frame_body_len",
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_blank_peer_dial_hint_after_trimming() {
+        let mut response = sample_response();
+        response.peers[0].dial_hints = vec!["   ".to_string()];
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("blank dial hints must be rejected");
+
+        assert_eq!(
+            error,
+            BootstrapValidationError::EmptyDialHint {
+                field: "peers[].dial_hints[]",
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_expired_bridge_hint() {
+        let mut response = sample_response();
+        response.bridge_hints[0].expires_at_unix_s = 1_700_000_100;
+
+        let error = response
+            .validated(1_700_000_100)
+            .expect_err("expired bridge hints must be rejected");
+
+        assert_eq!(
+            error,
+            BootstrapValidationError::ExpiredBridgeHint {
+                expires_at_unix_s: 1_700_000_100,
+                now_unix_s: 1_700_000_100,
             }
         );
     }

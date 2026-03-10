@@ -117,6 +117,11 @@ pub enum RendezvousMessageError {
     Serialization(#[from] serde_json::Error),
     #[error(transparent)]
     Frame(#[from] FrameError),
+    #[error("rendezvous message {message} requires {expectation}")]
+    InvalidMessageShape {
+        message: &'static str,
+        expectation: &'static str,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -202,11 +207,25 @@ pub struct PublishAck {
 
 impl PublishAck {
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, RendezvousMessageError> {
+        self.validate()?;
         canonical_message_bytes(self)
     }
 
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, RendezvousMessageError> {
-        parse_message_bytes(bytes)
+        let message = parse_message_bytes::<Self>(bytes)?;
+        message.validate()?;
+        Ok(message)
+    }
+
+    fn validate(&self) -> Result<(), RendezvousMessageError> {
+        if self.placement_key == PlacementKey::derive(&self.node_id) {
+            Ok(())
+        } else {
+            Err(RendezvousMessageError::InvalidMessageShape {
+                message: "publish_ack",
+                expectation: "a placement_key derived from node_id",
+            })
+        }
     }
 }
 
@@ -243,11 +262,32 @@ pub struct LookupResult {
 
 impl LookupResult {
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, RendezvousMessageError> {
+        self.validate()?;
         canonical_message_bytes(self)
     }
 
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, RendezvousMessageError> {
-        parse_message_bytes(bytes)
+        let message = parse_message_bytes::<Self>(bytes)?;
+        message.validate()?;
+        Ok(message)
+    }
+
+    fn validate(&self) -> Result<(), RendezvousMessageError> {
+        if self.record.node_id != self.node_id {
+            return Err(RendezvousMessageError::InvalidMessageShape {
+                message: "lookup_result",
+                expectation: "a record whose node_id matches the response node_id",
+            });
+        }
+
+        if self.placement_key != PlacementKey::derive(&self.node_id) {
+            return Err(RendezvousMessageError::InvalidMessageShape {
+                message: "lookup_result",
+                expectation: "a placement_key derived from node_id",
+            });
+        }
+
+        Ok(())
     }
 }
 
@@ -283,11 +323,25 @@ pub struct LookupNotFound {
 
 impl LookupNotFound {
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, RendezvousMessageError> {
+        self.validate()?;
         canonical_message_bytes(self)
     }
 
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, RendezvousMessageError> {
-        parse_message_bytes(bytes)
+        let message = parse_message_bytes::<Self>(bytes)?;
+        message.validate()?;
+        Ok(message)
+    }
+
+    fn validate(&self) -> Result<(), RendezvousMessageError> {
+        if self.placement_key == PlacementKey::derive(&self.node_id) {
+            Ok(())
+        } else {
+            Err(RendezvousMessageError::InvalidMessageShape {
+                message: "lookup_not_found",
+                expectation: "a placement_key derived from node_id",
+            })
+        }
     }
 }
 
@@ -1026,6 +1080,86 @@ mod tests {
             .expect("lookup not found vector should deserialize"),
             not_found
         );
+    }
+
+    #[test]
+    fn publish_ack_rejects_mismatched_placement_key() {
+        let node_id = NodeId::from_bytes([41_u8; 32]);
+        let invalid_ack = PublishAck {
+            node_id,
+            placement_key: PlacementKey::derive(&NodeId::from_bytes([42_u8; 32])),
+            disposition: PublishDisposition::Stored,
+            accepted_epoch: 3,
+            accepted_sequence: 9,
+        };
+
+        assert!(matches!(
+            invalid_ack.canonical_bytes(),
+            Err(RendezvousMessageError::InvalidMessageShape {
+                message: "publish_ack",
+                expectation: "a placement_key derived from node_id",
+            })
+        ));
+    }
+
+    #[test]
+    fn lookup_result_rejects_mismatched_node_id_or_placement_key() {
+        let signing_key = sample_presence_signing_key(7);
+        let record = sample_signed_presence_record(&signing_key, 2, 5, 1_700_000_900);
+        let node_id = record.node_id;
+
+        let invalid_record = LookupResult {
+            node_id,
+            placement_key: PlacementKey::derive(&node_id),
+            record: PresenceRecord {
+                node_id: NodeId::from_bytes([43_u8; 32]),
+                ..record.clone()
+            },
+            remaining_budget: 4,
+        };
+        let invalid_record_bytes =
+            serde_json::to_vec(&invalid_record).expect("invalid lookup result should serialize");
+        assert!(matches!(
+            LookupResult::from_canonical_bytes(&invalid_record_bytes),
+            Err(RendezvousMessageError::InvalidMessageShape {
+                message: "lookup_result",
+                expectation: "a record whose node_id matches the response node_id",
+            })
+        ));
+
+        let invalid_placement = LookupResult {
+            node_id,
+            placement_key: PlacementKey::derive(&NodeId::from_bytes([44_u8; 32])),
+            record,
+            remaining_budget: 4,
+        };
+        assert!(matches!(
+            invalid_placement.canonical_bytes(),
+            Err(RendezvousMessageError::InvalidMessageShape {
+                message: "lookup_result",
+                expectation: "a placement_key derived from node_id",
+            })
+        ));
+    }
+
+    #[test]
+    fn lookup_not_found_rejects_mismatched_placement_key() {
+        let invalid_not_found = LookupNotFound {
+            node_id: NodeId::from_bytes([45_u8; 32]),
+            placement_key: PlacementKey::derive(&NodeId::from_bytes([46_u8; 32])),
+            reason: LookupNotFoundReason::Missing,
+            remaining_budget: 0,
+        };
+        let invalid_bytes = serde_json::to_vec(&invalid_not_found)
+            .expect("invalid not-found payload should serialize");
+
+        assert!(matches!(
+            LookupNotFound::from_canonical_bytes(&invalid_bytes),
+            Err(RendezvousMessageError::InvalidMessageShape {
+                message: "lookup_not_found",
+                expectation: "a placement_key derived from node_id",
+            })
+        ));
     }
 
     #[test]

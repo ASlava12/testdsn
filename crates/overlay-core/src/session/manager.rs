@@ -166,7 +166,7 @@ impl ReplayCacheConfig {
     }
 }
 
-#[derive(Debug, Error, Clone, PartialEq, Eq)]
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
 pub enum ReplayCacheError {
     #[error("replay cache limit {field} must be non-zero")]
     ZeroLimit { field: &'static str },

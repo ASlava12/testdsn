@@ -689,11 +689,14 @@ mod tests {
     use super::{
         HysteresisConfig, PathMetrics, PathObservation, PathProbe, PathProbeConfig,
         PathProbeFeedback, PathProbeResult, PathProbeTracker, PathState, RouteDecision,
-        RouteSelector, RoutingError, DEFAULT_MAX_IN_FLIGHT_PATH_PROBES_PER_PATH,
-        DEFAULT_PATH_PROBE_INTERVAL_MS,
+        RouteSelector, RoutingError, RoutingMessageError,
+        DEFAULT_MAX_IN_FLIGHT_PATH_PROBES_PER_PATH, DEFAULT_PATH_PROBE_INTERVAL_MS,
     };
-    use crate::metrics::{LogContext, Observability};
-    use crate::wire::{Message, MessageType};
+    use crate::{
+        error::FrameError,
+        metrics::{LogContext, Observability},
+        wire::{Message, MessageType, MAX_FRAME_BODY_LEN},
+    };
 
     #[test]
     fn path_score_matches_open_question_formula() {
@@ -907,6 +910,22 @@ mod tests {
                 .expect("probe result should decode"),
             result
         );
+    }
+
+    #[test]
+    fn path_probe_parse_rejects_messages_larger_than_mvp_frame_limit() {
+        let oversized = vec![b'0'; MAX_FRAME_BODY_LEN as usize + 1];
+
+        let error = PathProbe::from_canonical_bytes(&oversized)
+            .expect_err("oversized path probe body should be rejected");
+
+        assert!(matches!(
+            error,
+            RoutingMessageError::Frame(FrameError::BodyTooLarge {
+                max_body_len: MAX_FRAME_BODY_LEN,
+                ..
+            })
+        ));
     }
 
     #[test]

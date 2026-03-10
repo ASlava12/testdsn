@@ -544,14 +544,16 @@ mod tests {
 
     use super::{
         GetServiceRecord, LocalServicePolicy, OpenAppSession, OpenAppSessionResult,
-        OpenAppSessionStatus, ServiceConfig, ServiceRecordResponse, ServiceRecordResponseStatus,
-        ServiceRegistry,
+        OpenAppSessionStatus, ServiceConfig, ServiceMessageError, ServiceRecordResponse,
+        ServiceRecordResponseStatus, ServiceRegistry,
     };
     use crate::{
         crypto::sign::Ed25519SigningKey,
+        error::FrameError,
         identity::{derive_app_id, derive_node_id, AppId, NodeId},
         metrics::{LogContext, Observability},
         records::ServiceRecord,
+        wire::MAX_FRAME_BODY_LEN,
     };
 
     #[test]
@@ -666,6 +668,106 @@ mod tests {
             .status,
             OpenAppSessionStatus::RejectedPolicy
         );
+    }
+
+    #[test]
+    fn service_record_response_rejects_invalid_wire_shapes() {
+        let signing_key = Ed25519SigningKey::from_seed([46_u8; 32]);
+        let record = sample_signed_service_record(&signing_key, "terminal");
+
+        let missing_record = ServiceRecordResponse {
+            app_id: record.app_id,
+            status: ServiceRecordResponseStatus::Found,
+            record: None,
+        };
+        assert!(matches!(
+            missing_record.canonical_bytes(),
+            Err(ServiceMessageError::InvalidResponseShape {
+                status: "found",
+                expectation: "a matching record payload",
+            })
+        ));
+
+        let mismatched_app_id = ServiceRecordResponse {
+            app_id: AppId::from_bytes([0xEE; 32]),
+            status: ServiceRecordResponseStatus::Found,
+            record: Some(record.clone()),
+        };
+        let mismatched_bytes =
+            serde_json::to_vec(&mismatched_app_id).expect("invalid response should serialize");
+        assert!(matches!(
+            ServiceRecordResponse::from_canonical_bytes(&mismatched_bytes),
+            Err(ServiceMessageError::InvalidResponseShape {
+                status: "found",
+                expectation: "a record whose app_id matches the response app_id",
+            })
+        ));
+
+        let unexpected_record = ServiceRecordResponse {
+            app_id: record.app_id,
+            status: ServiceRecordResponseStatus::NotFound,
+            record: Some(record),
+        };
+        assert!(matches!(
+            unexpected_record.canonical_bytes(),
+            Err(ServiceMessageError::InvalidResponseShape {
+                status: "not_found",
+                expectation: "no record payload",
+            })
+        ));
+    }
+
+    #[test]
+    fn open_app_session_result_rejects_invalid_wire_shapes() {
+        let app_id = AppId::from_bytes([0xAB; 32]);
+
+        let missing_session_id = OpenAppSessionResult {
+            app_id,
+            status: OpenAppSessionStatus::Opened,
+            session_id: None,
+        };
+        assert!(matches!(
+            missing_session_id.canonical_bytes(),
+            Err(ServiceMessageError::InvalidOpenResultShape {
+                status: "opened",
+                expectation: "a session_id",
+            })
+        ));
+
+        let unexpected_session_id = OpenAppSessionResult {
+            app_id,
+            status: OpenAppSessionStatus::RejectedPolicy,
+            session_id: Some(7),
+        };
+        let invalid_bytes =
+            serde_json::to_vec(&unexpected_session_id).expect("invalid open result should encode");
+        assert!(matches!(
+            OpenAppSessionResult::from_canonical_bytes(&invalid_bytes),
+            Err(ServiceMessageError::InvalidOpenResultShape {
+                status: "rejected_policy",
+                expectation: "no session_id",
+            })
+        ));
+    }
+
+    #[test]
+    fn open_app_session_rejects_messages_larger_than_mvp_frame_limit() {
+        let request = OpenAppSession {
+            app_id: AppId::from_bytes([0xCD; 32]),
+            reachability_ref: vec![0xAA; MAX_FRAME_BODY_LEN as usize],
+        };
+
+        let error = request
+            .canonical_bytes()
+            .expect_err("oversized open request should be rejected");
+
+        assert!(matches!(
+            error,
+            ServiceMessageError::Frame(FrameError::BodyTooLarge {
+                max_body_len: MAX_FRAME_BODY_LEN,
+                ..
+            })
+        ));
     }
 
     #[test]

@@ -58,6 +58,13 @@ Presence / lookup rules for the current Milestone 5 baseline:
 - `PublishPresence.record` carries a full `PresenceRecord`;
 - `LookupNode` stays exact-by-`node_id` only;
 - `LookupResult.record` carries the fresh winning `PresenceRecord`;
+- `PublishAck.placement_key` must equal the derived placement key for
+  `PublishAck.node_id`;
+- `LookupResult.record.node_id` must match `LookupResult.node_id`, and
+  `LookupResult.placement_key` must equal the derived placement key for that
+  `node_id`;
+- `LookupNotFound.placement_key` must equal the derived placement key for
+  `LookupNotFound.node_id`;
 - `PublishAck.disposition` values are `stored`, `replaced`, `duplicate`, `stale`;
 - `LookupNotFound.reason` values are `missing`, `negative_cache_hit`, `budget_exhausted`;
 - these message bodies use the same canonical JSON UTF-8 body rules as the rest

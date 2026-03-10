@@ -767,7 +767,7 @@ mod tests {
 
     use super::{
         build_reachability_plan, IntroResponse, IntroResponseStatus, RelayConfig, RelayError,
-        RelayManager, RelayMode, RelayProfile, RelayRolePolicy, ResolveIntro,
+        RelayManager, RelayMessageError, RelayMode, RelayProfile, RelayRolePolicy, ResolveIntro,
         RELAY_MAX_CONCURRENT_RELAY_TUNNELS, RELAY_MAX_INTRO_REQUESTS_PER_MINUTE,
         RELAY_MAX_TOTAL_RELAY_BYTES_PER_HOUR, STANDARD_MAX_BYTES_RELAYED_PER_PEER_PER_HOUR,
         STANDARD_MAX_CONCURRENT_RELAY_TUNNELS, STANDARD_MAX_INTRO_REQUESTS_PER_MINUTE,
@@ -777,12 +777,12 @@ mod tests {
     };
     use crate::{
         crypto::sign::Ed25519SigningKey,
-        error::RecordValidationError,
+        error::{FrameError, RecordValidationError},
         identity::{derive_node_id, NodeId},
         metrics::{LogContext, Observability},
         records::{IntroTicket, NodeRecord, PresenceRecord, RelayHint},
         transport::TransportClass,
-        wire::{Message, MessageType},
+        wire::{Message, MessageType, MAX_FRAME_BODY_LEN},
     };
 
     #[test]
@@ -884,6 +884,31 @@ mod tests {
             .expect("intro response should deserialize"),
             response
         );
+    }
+
+    #[test]
+    fn resolve_intro_rejects_messages_larger_than_mvp_frame_limit() {
+        let target_signing_key = Ed25519SigningKey::from_seed([32_u8; 32]);
+        let relay_node_id = NodeId::from_bytes([8_u8; 32]);
+        let mut intro_ticket =
+            verified_intro_ticket(&target_signing_key, b"requester-binding", 1_700_000_600)
+                .into_inner();
+        intro_ticket.requester_binding = vec![0x55; MAX_FRAME_BODY_LEN as usize];
+
+        let error = ResolveIntro {
+            relay_node_id,
+            intro_ticket,
+        }
+        .canonical_bytes()
+        .expect_err("oversized resolve-intro request should be rejected");
+
+        assert!(matches!(
+            error,
+            RelayMessageError::Frame(FrameError::BodyTooLarge {
+                max_body_len: MAX_FRAME_BODY_LEN,
+                ..
+            })
+        ));
     }
 
     #[test]

@@ -14,10 +14,11 @@ A Codex-oriented handoff bundle containing:
 
 Use the contents of `prompts/codex-milestone-9.md` as the first task.
 It assumes the repository already has a closed Milestone 1-8 baseline and that
-Milestone 9 hardening and polish is now active with initial observability and
-config groundwork plus broad explicit subsystem observability integration
-landed, and with the current regression, stage-boundary, and Milestone 9 unit
-suites as its working boundary.
+Milestone 9 hardening and polish is now active with observability/config
+groundwork, a bounded replay cache, and broad explicit subsystem
+observability integration landed, plus expanded malformed-input coverage in the
+wire-helper tests, and with the current regression, stage-boundary, and
+Milestone 9 unit suites as its working boundary.
 
 ## Recommended workflow
 
