@@ -38,7 +38,8 @@ and the Milestone 19 pilot pack under
 - [devnet/run-distributed-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-pilot-checklist.sh):
   wrapper for the current pilot-closure checklist
 - [devnet/run-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-pilot-checklist.sh):
-  retained Milestone 18 localhost rehearsal pack
+  retained Milestone 18 localhost rehearsal pack, not the current sign-off
+  path
 
 ## Smoke flow
 
@@ -98,6 +99,9 @@ Run:
 ```bash
 ./devnet/run-distributed-pilot-checklist.sh
 ```
+
+This is the current localhost pilot-closure sign-off path after
+`./devnet/run-launch-gate.sh`.
 
 This uses the dedicated `devnet/pilot/localhost` topology pack and validates:
 

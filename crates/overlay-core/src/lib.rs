@@ -21,8 +21,15 @@ pub const REPOSITORY_STAGE: &str = "milestone-19-pilot-closure";
 mod tests {
     use super::REPOSITORY_STAGE;
 
+    const REPOSITORY_STAGE_FILE: &str = include_str!("../../../REPOSITORY_STAGE");
+
     #[test]
     fn reports_repository_stage() {
         assert_eq!(REPOSITORY_STAGE, "milestone-19-pilot-closure");
+    }
+
+    #[test]
+    fn repository_stage_marker_file_matches_constant() {
+        assert_eq!(REPOSITORY_STAGE_FILE.trim(), REPOSITORY_STAGE);
     }
 }

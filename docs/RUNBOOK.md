@@ -8,6 +8,11 @@ as the release gate, this runbook as the operator flow behind that gate, and
 [docs/PILOT_RUNBOOK.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RUNBOOK.md)
 for the dedicated Milestone 19 off-box pilot-closure exercise.
 
+The current localhost sign-off path is `./devnet/run-launch-gate.sh` followed
+by `./devnet/run-distributed-pilot-checklist.sh`. The older
+`./devnet/run-pilot-checklist.sh` remains a retained Milestone 18 rehearsal
+only.
+
 ## Current boundary
 
 What exists today:

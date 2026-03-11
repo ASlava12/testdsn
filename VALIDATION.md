@@ -2,6 +2,23 @@
 
 Run the following commands when applicable.
 
+## Current Milestone 19 sign-off path
+
+Use the current pilot-closure sign-off order on the commit you intend to
+validate:
+
+```bash
+cargo fmt --all --check
+TMPDIR=/tmp cargo clippy --workspace --all-targets --all-features -- -D warnings
+TMPDIR=/tmp cargo check --workspace
+TMPDIR=/tmp cargo test --workspace
+./devnet/run-launch-gate.sh
+./devnet/run-distributed-pilot-checklist.sh
+```
+
+`./devnet/run-pilot-checklist.sh` is retained as the Milestone 18 localhost
+rehearsal pack only. It is not part of the current sign-off path.
+
 ## Formatting
 
 ```bash
@@ -79,6 +96,9 @@ cargo test -p overlay-core --test integration_service_open
 ./devnet/run-pilot-checklist.sh
 ```
 
+Use this only when you need the older localhost rehearsal path for the landed
+Milestone 18 baseline. It is not part of current Milestone 19 sign-off.
+
 ## Milestone 19 pilot-closure checklist
 
 ```bash
@@ -102,7 +122,6 @@ TMPDIR=/tmp cargo test -p overlay-core --test integration_service_open
 ./devnet/run-multihost-smoke.sh
 ./devnet/run-soak.sh
 ./devnet/run-restart-smoke.sh
-./devnet/run-pilot-checklist.sh
 ./devnet/run-distributed-pilot-checklist.sh
 ```
 
@@ -197,13 +216,16 @@ cargo test -p overlay-core --test integration_service_open
 - Milestones 1-12 are considered implemented baseline work, and the current
   repository stage marker is `milestone-19-pilot-closure` (Milestone 19 pilot
   closure support on top of the landed Milestone 18 real-pilot baseline).
+- The current sign-off path is the top-level Milestone 19 section above:
+  workspace format/lint/build/test, then `./devnet/run-launch-gate.sh`, then
+  `./devnet/run-distributed-pilot-checklist.sh`.
 - Use the Milestone 1-12 regression runs, stage-boundary smoke tests, the
-  distributed localhost smoke, the bounded soak, the Milestone 17 launch gate,
-  and the Milestone 19 distributed pilot checklist as the primary checks for
-  the current pilot-closure baseline.
-- If `REPOSITORY_STAGE`, `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, milestone
-  prompts, or other status markers change, rerun the stage-boundary smoke
-  tests so code and docs stay aligned.
+  distributed localhost smoke, the bounded soak, and the retained Milestone 18
+  checklist only when the touched code or docs justify the narrower reruns.
+- If `REPOSITORY_STAGE`, `README.md`, `HANDOFF.md`, `IMPLEMENT.md`,
+  `VALIDATION.md`, `docs/LAUNCH_CHECKLIST.md`, milestone prompts, or other
+  status markers change, rerun the stage-boundary smoke tests, launch gate,
+  and distributed pilot checklist so code and docs stay aligned.
 - `integration_publish_lookup` remains the real Milestone 5 integration path; `integration_relay_fallback` is the real Milestone 6 integration path; `integration_routing` is the real Milestone 7 integration path; `integration_service_open` is now the real Milestone 8 integration path.
 - Milestone 9 hardening coverage remains part of the frozen baseline through
   `bootstrap::tests`, `config::tests`, `metrics::tests`, `peer::tests`,
@@ -249,7 +271,8 @@ cargo test -p overlay-core --test integration_service_open
   shutdown plus `overlay-cli status`, and folds the bounded logical soak into
   the required launch order.
 - `./devnet/run-pilot-checklist.sh` remains the Milestone 18 localhost
-  rehearsal pack for the smoke-harness pilot boundary.
+  rehearsal pack for the smoke-harness pilot boundary; it is retained for the
+  landed baseline but is not the current Milestone 19 sign-off path.
 - `./devnet/run-distributed-pilot-checklist.sh` is the current Milestone 19
   pilot-closure proof path for the dedicated pilot topology pack, the expanded
   fault matrix, the two relay-capable fallback paths, and the pinned-bootstrap

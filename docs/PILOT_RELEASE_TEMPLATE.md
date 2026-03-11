@@ -20,9 +20,13 @@ Short statement of what this pilot candidate is intended to prove.
 ## Frozen launch surface
 
 - `overlay-cli run` for single-node bounded startup and status inspection
-- `overlay-cli smoke --devnet-dir devnet` for the checked-in four-node green path
-- exact `node_id` lookup, exact `app_id` service resolution, and one relay
-  fallback path
+- `./devnet/run-launch-gate.sh` followed by
+  `./devnet/run-distributed-pilot-checklist.sh` as the current localhost
+  sign-off path
+- supporting repo-local proof paths in `./devnet/run-smoke.sh`,
+  `./devnet/run-distributed-smoke.sh`, and `./devnet/run-multihost-smoke.sh`
+- exact `node_id` lookup, exact `app_id` service resolution, and the two
+  documented relay fallback paths
 - structured JSON logs and `runtime_status` snapshots
 
 ## Launch gate evidence
@@ -39,6 +43,7 @@ Short statement of what this pilot candidate is intended to prove.
 - `./devnet/run-smoke.sh`: `<pass/fail>`
 - `./devnet/run-distributed-smoke.sh`: `<pass/fail>`
 - `./devnet/run-multihost-smoke.sh`: `<pass/fail>`
+- `./devnet/run-soak.sh`: `<pass/fail>`
 - `./devnet/run-distributed-pilot-checklist.sh`: `<pass/fail>`
 - `./devnet/run-restart-smoke.sh`: `<pass/fail>`
 

@@ -2,29 +2,72 @@
 
 Specification-first Rust workspace for a censorship-resistant overlay network.
 
-Current repository status:
-- Milestone 0 bootstrap is complete.
-- Milestone 1 foundations in `overlay-core` (`identity`, `records`, `wire`) are implemented and covered by deterministic vectors in `tests/vectors/`, including `node_id` fixtures tied to the shared record key and handshake transcript identities, `app_id`, `frame_header`, and record fixtures.
-- Milestone 2 crypto and handshake surface in `overlay-core` (`crypto`, `session::handshake`) are implemented, covered by the handshake transcript vector, and validated with negative tests for version, identity binding, signature, client-finish, and replay-unsafe shared-secret rejection.
-- Milestone 2 is considered closed.
-- Milestone 3 transport/session work in `overlay-core` (`transport`, `session::manager`) now has an explicit placeholder runner boundary, runner-facing session input surface, bounded event and I/O-action stores, handshake-bound session context, integration coverage for handshake-to-session establishment, and state-transition tests. Milestone 3 is considered closed. It still intentionally excludes bootstrap, rendezvous, relay intro, and real path logic.
-- Milestone 4 peer/bootstrap work in `overlay-core` (`bootstrap`, `peer`) now has validated bootstrap response types, a static bootstrap provider abstraction, a bounded peer store, deterministic diversity-preserving rebalance policy, and bootstrap integration coverage. Milestone 4 is considered closed.
-- Milestone 5 rendezvous/presence work in `overlay-core` (`rendezvous`) now has deterministic placement key derivation, bounded in-memory `PublishPresence` / `PublishAck` and exact `LookupNode` / `LookupResult` / `LookupNotFound` flows, canonical wire-body helpers with MVP frame-size enforcement, deterministic message vectors for publish/lookup payloads, strict freshness plus epoch/sequence conflict handling, bounded lookup budget and seen-set state, negative-cache behavior, and integration coverage. The current store expects already-verified `PresenceRecord` signatures from upstream callers. Milestone 5 is considered closed.
-- Milestone 6 relay work in `overlay-core` (`relay`) now has profile-based bounded relay quota defaults, an explicit local relay role model, canonical `ResolveIntro` / `IntroResponse` wire-body helpers with deterministic message vectors, intro/tunnel/byte quota enforcement, verified `IntroTicket` usage, direct-first/relay-second reachability planning that preserves secondary relay candidates, and integration coverage for fallback planning. Milestone 6 is considered closed.
-- Milestone 7 routing work in `overlay-core` (`routing`) now has canonical `PathProbe` / `PathProbeResult` wire-body helpers with deterministic message vectors, a bounded local path probe tracker, deterministic `PathMetrics`, integer EWMA updates from `PathObservation` and probe feedback, deterministic path scoring, switch hysteresis and switch-rate caps in `RouteSelector`, unit coverage for anti-flapping behavior, and a stage-boundary routing integration test. Milestone 7 is considered closed.
-- Milestone 8 service-layer work in `overlay-core` (`service`) now has canonical `GetServiceRecord` / `ServiceRecordResponse` and `OpenAppSession` / `OpenAppSessionResult` wire-body helpers, deterministic service message vectors, verified `ServiceRecord` registration, a bounded local service registry and open-session store, exact `app_id` resolution, `reachability_ref` binding checks, allow/deny local policy enforcement, and integration coverage in `integration_service_open`. Milestone 8 is considered closed.
-- Milestone 9 hardening and polish is implemented in `overlay-core` with bounded in-memory observability surfaces in `metrics`, validated top-level node config projection in `config` and `transport` including explicit `max_transport_buffer_bytes` mapping and runner-boundary transport frame checks, a bounded handshake transcript replay cache in `session::manager`, explicit observability hooks across bootstrap provider fetch/validation, peer bootstrap ingest, rendezvous publish/lookup, relay bind/rate-limit handling, routing probe/switch paths, service registry flows, session-event export, and an explicit established-session gauge sync helper, plus broader malformed-input coverage for bootstrap schema validation, including schema/version, timing, frame-limit, duplicate peer, and bridge-hint rejection, and rendezvous, relay, routing, and service wire-body helpers.
-- The Milestone 10 minimal runtime is implemented in `overlay-core::runtime` and surfaced through `overlay-cli run`, with JSON config loading, hex-or-raw seed loading, local bootstrap-file startup, and bounded runtime tick orchestration.
-- A Milestone 11 local devnet now lives under `devnet/`, with four sample node configs, deterministic key files, local bootstrap seeds, and `overlay-cli smoke` / `devnet/run-smoke.sh` for a reproducible bootstrap -> session -> publish -> lookup -> service-open -> relay-fallback flow. This stays intentionally local-devnet focused and does not introduce distributed deployment automation.
-- Milestone 12 launch hardening is now implemented on top of the local runtime/devnet boundary. `overlay-core::runtime` now performs bounded stale-state cleanup for replay cache, rendezvous expiry, service-open sessions, relay tunnels, and expired path probes; retries degraded bootstrap on a conservative local schedule; exposes a health snapshot with peer/session/publish/lookup/relay usage and resource-limit surfaces; and `overlay-cli run` can emit periodic status dumps with `--status-every`. The local devnet smoke harness also has an in-process logical soak path via `overlay-cli smoke --soak-seconds ...` / `devnet/run-soak.sh`.
-- Milestone 14 launch gate and pilot-tag work is now implemented with [docs/LAUNCH_CHECKLIST.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/LAUNCH_CHECKLIST.md), [docs/PILOT_RELEASE_TEMPLATE.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RELEASE_TEMPLATE.md), a frozen current MVP launch surface, a documented green-path launch sequence, `devnet/run-launch-gate.sh`, and explicit pilot-only limitations. This is a pilot-ready baseline only; it is not a public-production or hostile-deployment claim.
-- Milestone 16 network-bootstrap and multi-host devnet work is now implemented with minimal `http://` bootstrap fetch in `overlay-core::runtime`, `overlay-cli bootstrap-serve`, host-style devnet layouts under [devnet/hosts](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/hosts), `devnet/run-distributed-smoke.sh`, `devnet/run-multihost-smoke.sh`, and updated runbooks for host-to-host bootstrap validation without introducing a broad public bootstrap stack.
-- Milestone 17 operator-grade runtime hardening is now implemented with signal-aware `overlay-cli run` shutdown, restart-safe operator lock/status files under config-local `.overlay-runtime/`, `overlay-cli status`, stricter operator config validation, an updated restart smoke, and the bounded soak folded into the current launch gate.
-- Milestone 18 real-pilot support is now implemented with [docs/PILOT_RUNBOOK.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RUNBOOK.md), [docs/PILOT_REPORT_TEMPLATE.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_REPORT_TEMPLATE.md), the dedicated [devnet/pilot](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot) topology/config pack, `devnet/run-pilot-checklist.sh`, repeatable node-down / relay-unavailable / bootstrap-seed-unavailable rehearsals, and synchronized pilot-stage docs.
-- Milestone 19 pilot-closure support is now implemented with one-shot distributed operator commands for `publish`, `lookup`, `open-service`, and `relay-intro`, SHA-256-pinned static bootstrap artifacts over `http://`, a second relay-capable pilot path, and [devnet/run-distributed-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-pilot-checklist.sh) for the current networked pilot-closure proof path.
-- The current Milestone 19 validation green path is `./devnet/run-launch-gate.sh` followed by `./devnet/run-distributed-pilot-checklist.sh`; the distributed pilot checklist is the clear localhost proof for pilot-closure sign-off on the validated commit.
-- Remaining closure items for regular distributed use are still explicit: separate-host evidence must still be collected off-box, bootstrap is still static pinned `http://` only, distributed operator flows are still one-shot point-to-point surfaces rather than a general control plane, and runtime peers/presence/services/sessions/relay state remain in-memory across restarts.
+## Current Stage
 
-The baseline docs, validation guidance, and pilot launch materials are aligned to this repository state. The current repository stage is `milestone-19-pilot-closure`, and the recommended current-stage prompt is `prompts/codex-milestone-19.md`; keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, prompts, and `docs/OPEN_QUESTIONS.md` in sync whenever that stage boundary changes.
+The current repository stage is `milestone-19-pilot-closure`.
 
-In sandboxed Linux-on-Windows environments, set `TMPDIR=/tmp` for commands that link test binaries if the default temp directory is not writable.
+Milestones 0-18 are landed baseline work. Current tasks should stay narrow:
+stabilize the distributed pilot path, keep the launch/runbook docs honest, and
+fix validation or operator-surface regressions without widening protocol scope.
+
+## Current Green Path
+
+Use this repository in the current stage with one sign-off flow:
+
+1. run the applicable commands in `VALIDATION.md`;
+2. run `./devnet/run-launch-gate.sh`;
+3. run `./devnet/run-distributed-pilot-checklist.sh` on the same commit;
+4. use `docs/PILOT_RUNBOOK.md` to collect separate-host evidence before
+   claiming regular distributed pilot use.
+
+`./devnet/run-pilot-checklist.sh` is retained only as the older Milestone 18
+localhost rehearsal pack. It is not the current sign-off path.
+
+## Current Pilot-Closure Surface
+
+The current validated surface includes:
+
+- node identity, wire framing, handshake, transport/session, peer/bootstrap,
+  presence publish, exact lookup by `node_id`, relay fallback, path scoring,
+  service registration/open, and structured metrics/logs;
+- `overlay-cli run`, `status`, `bootstrap-serve`, `publish`, `lookup`,
+  `open-service`, and `relay-intro`;
+- repo-local proof paths in `devnet/run-smoke.sh`,
+  `devnet/run-distributed-smoke.sh`, `devnet/run-multihost-smoke.sh`,
+  `devnet/run-launch-gate.sh`, and
+  `devnet/run-distributed-pilot-checklist.sh`;
+- the dedicated distributed pilot pack under `devnet/pilot/`.
+
+## Primary Docs
+
+- `HANDOFF.md`: current stage summary and first-task guidance
+- `IMPLEMENT.md`: repository stage history and current execution boundaries
+- `VALIDATION.md`: required validation commands and current sign-off order
+- `docs/LAUNCH_CHECKLIST.md`: current launch gate and localhost sign-off flow
+- `docs/PILOT_RUNBOOK.md`: separate-host pilot execution and evidence
+- `docs/DEVNET.md`: checked-in devnet layouts and proof wrappers
+- `docs/OPEN_QUESTIONS.md`: conservative defaults for underspecified areas
+
+## Remaining Blockers For Regular Distributed Use
+
+- separate-host evidence still must be collected off-box on the validated
+  commit; the localhost checklist is necessary but not sufficient
+- bootstrap is still static pinned `http://` artifact delivery, not HTTPS or a
+  public trust framework
+- the distributed operator commands are one-shot point-to-point proof
+  surfaces, not a general distributed control plane or discovery layer
+- peers, presence, services, sessions, relay tunnels, and path probes remain
+  in-memory runtime state across restart
+- only the two documented relay fallback paths are proven in the current pilot
+  pack
+
+## Stage Marker Discipline
+
+The repository stage marker lives in the root `REPOSITORY_STAGE` file and in
+`overlay_core::REPOSITORY_STAGE`. Keep `README.md`, `HANDOFF.md`,
+`IMPLEMENT.md`, `VALIDATION.md`, `docs/LAUNCH_CHECKLIST.md`, and
+`docs/OPEN_QUESTIONS.md` synchronized with that marker whenever the stage
+changes.
+
+In sandboxed Linux-on-Windows environments, set `TMPDIR=/tmp` for commands
+that link test binaries if the default temp directory is not writable.

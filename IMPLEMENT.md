@@ -10,6 +10,18 @@ Milestone 17 operator-runtime stage, a landed Milestone 18 real-pilot stage,
 and the current Milestone 19 pilot-closure stage.
 The current repository stage marker is `milestone-19-pilot-closure`.
 
+## Current pilot-closure green path
+
+Treat the current stage as having one localhost sign-off flow:
+
+1. run the applicable commands in `VALIDATION.md`;
+2. run `./devnet/run-launch-gate.sh`;
+3. run `./devnet/run-distributed-pilot-checklist.sh` on the same commit;
+4. use `docs/PILOT_RUNBOOK.md` for the separate-host evidence run.
+
+`./devnet/run-pilot-checklist.sh` remains a retained Milestone 18 localhost
+rehearsal only. It is not the current sign-off path.
+
 - Milestone 0 bootstrap is complete.
 - Milestone 1 foundations are implemented, vectorized, and validated in
   `crates/overlay-core/src/identity.rs`, `crates/overlay-core/src/records/mod.rs`,
@@ -165,8 +177,8 @@ current pilot-closure boundary:
 3. prefer pilot execution support, validation maintenance, documentation sync,
    and operator-surface hardening over feature expansion;
 4. rerun the documented launch gate and distributed pilot checklist whenever
-   `REPOSITORY_STAGE`, launch docs, pilot docs, or current-stage scripts
-   change;
+   `REPOSITORY_STAGE`, `README.md`, `HANDOFF.md`, `IMPLEMENT.md`,
+   `VALIDATION.md`, launch docs, pilot docs, or current-stage scripts change;
 5. keep public bootstrap infrastructure, protocol redesign, and scope expansion
    out of work unless explicitly requested.
 

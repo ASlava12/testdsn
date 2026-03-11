@@ -10,6 +10,9 @@ For current Milestone 19 sign-off, the validation green path is
 `./devnet/run-launch-gate.sh` followed by
 `./devnet/run-distributed-pilot-checklist.sh` on the same commit.
 
+`./devnet/run-pilot-checklist.sh` remains a retained Milestone 18 localhost
+rehearsal. Do not treat it as the current sign-off path.
+
 ## Launchable surface freeze
 
 The current launchable MVP surface is frozen to:
@@ -88,7 +91,7 @@ Pass criteria:
   `overlay-cli status` surface, and a second clean startup against the same
   config.
 
-## Milestone 19 follow-on
+## Current pilot-closure follow-on
 
 After the launch gate stays green on the target commit, run the current
 pilot-closure checklist:
@@ -110,6 +113,23 @@ Pass criteria:
 - the service-host restart scenario reports a clean later startup;
 - the tampered-bootstrap scenario is rejected by the new integrity check;
 - the final output reaches `pilot_checklist_complete`.
+
+## Operator assumptions for the current checklist path
+
+- `./devnet/run-distributed-pilot-checklist.sh` uses the checked-in
+  `devnet/pilot/localhost/` configs and bootstrap artifacts; do not mix those
+  ports or pins with `devnet/pilot/examples/`.
+- The checked-in pilot pack assumes three static bootstrap seed servers and one
+  service host: `node-b` must start with `--service devnet:terminal`.
+- The distributed operator commands are explicit point-to-point CLI calls to a
+  chosen runtime listener; they do not auto-discover targets or route a
+  control plane through the overlay.
+- If any bootstrap JSON changes, every referencing
+  `http://...#sha256=<pin>` config entry must be updated before the pilot
+  checklist is honest again.
+- The current checklist proves only the documented relay paths
+  `node-a -> node-relay -> node-b` and
+  `node-a -> node-relay-b -> node-b`.
 
 ## Green path launch sequence
 
@@ -194,6 +214,9 @@ Workflow:
   off; the localhost checklist is necessary but not sufficient evidence.
 - Keep bootstrap artifacts and their pinned `#sha256=<hex>` URLs synchronized
   manually; the current repo still has no HTTPS bootstrap or public trust root.
+- Keep the current localhost sign-off path anchored on
+  `./devnet/run-distributed-pilot-checklist.sh`; the older
+  `./devnet/run-pilot-checklist.sh` remains a historical rehearsal only.
 - Treat the distributed operator commands as explicit proof surfaces only; they
   are not a general distributed control plane, orchestration layer, or
   discovery system.

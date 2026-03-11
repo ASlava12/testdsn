@@ -1,8 +1,9 @@
 # Open Questions
 
 This file exists so Codex does not silently invent protocol details.
-All currently known MVP ambiguities affecting the current Milestone 1-7
-baseline are resolved below and should be reused as the conservative defaults.
+All currently known MVP ambiguities affecting the current
+`milestone-19-pilot-closure` baseline are resolved below and should be reused
+as the conservative defaults.
 
 ## Resolved conservative choices for MVP
 
@@ -271,7 +272,7 @@ For current work, treat the repository stage as:
   soak in the launch gate;
 - Milestone 18 real pilot remains part of the landed baseline, with
   `docs/PILOT_RUNBOOK.md`, `docs/PILOT_REPORT_TEMPLATE.md`, `devnet/pilot/`,
-  and `devnet/run-pilot-checklist.sh`;
+  and the retained `devnet/run-pilot-checklist.sh` localhost rehearsal pack;
 - Milestone 19 pilot closure is now the current stage, with distributed
   operator surfaces, pinned static bootstrap artifacts, the expanded pilot
   topology, and `devnet/run-distributed-pilot-checklist.sh`;
@@ -296,6 +297,11 @@ That means:
   support, network-bootstrap and operator-runtime maintenance, regression
   fixes, validation maintenance, and documentation synchronization unless a
   task explicitly reopens scope;
+- the current localhost sign-off flow is `./devnet/run-launch-gate.sh`
+  followed by `./devnet/run-distributed-pilot-checklist.sh` on the same
+  commit;
+- `./devnet/run-pilot-checklist.sh` is retained only as the older Milestone 18
+  localhost rehearsal and should not be treated as the current sign-off path;
 - public bootstrap infrastructure, discovery expansion, and simulation-focused
   expansion remain out of scope for current work.
 
