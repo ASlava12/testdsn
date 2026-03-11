@@ -6,6 +6,7 @@ license.workspace = true
 authors.workspace = true
 
 [dependencies]
+getrandom.workspace = true
 overlay-core = { path = "../overlay-core" }
 serde.workspace = true
 serde_json.workspace = true

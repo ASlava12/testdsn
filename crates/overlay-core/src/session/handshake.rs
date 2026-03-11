@@ -140,6 +140,7 @@ pub struct SessionKeys {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HandshakeOutcome {
     pub peer_node_id: NodeId,
+    pub peer_signing_public_key: Ed25519PublicKey,
     pub transcript_hash: Blake3Digest,
     pub session_keys: SessionKeys,
 }
@@ -206,6 +207,7 @@ impl ClientHandshake {
         };
         let outcome = HandshakeOutcome {
             peer_node_id: server_hello.server_node_id,
+            peer_signing_public_key: server_hello.server_signing_public_key,
             transcript_hash: derived.hello_transcript_hash,
             session_keys: derived.session_keys,
         };
@@ -293,6 +295,7 @@ impl ServerHandshake {
 
         Ok(HandshakeOutcome {
             peer_node_id: self.client_hello.client_node_id,
+            peer_signing_public_key: self.client_hello.client_signing_public_key,
             transcript_hash: self.derived.hello_transcript_hash,
             session_keys: self.derived.session_keys,
         })

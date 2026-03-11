@@ -11,6 +11,7 @@ use std::{
 
 use getrandom::getrandom;
 use serde::Serialize;
+use sha2::{Digest as ShaDigest, Sha256};
 use thiserror::Error;
 
 use crate::{
@@ -20,18 +21,27 @@ use crate::{
         kex::X25519StaticSecret,
         sign::{Ed25519SigningKey, ED25519_SECRET_KEY_LEN},
     },
-    error::{PresenceVerificationError, RecordEncodingError},
-    identity::{derive_node_id, NodeId},
+    error::{PresenceVerificationError, RecordEncodingError, ServiceVerificationError},
+    identity::{derive_app_id, derive_node_id, NodeId},
     metrics::{LogComponent, LogContext, MetricsSnapshot, Observability},
     peer::{PeerStore, PeerStoreError},
-    relay::{RelayCleanupSummary, RelayError, RelayManager, RelayUsageSnapshot},
-    rendezvous::{PublishPresence, RendezvousError, RendezvousStore, VerifiedPublishPresence},
+    records::ServiceRecord,
+    relay::{
+        IntroResponseStatus, RelayCleanupSummary, RelayError, RelayManager, RelayUsageSnapshot,
+        ResolveIntro,
+    },
+    rendezvous::{
+        LookupNode, LookupResponse, PublishPresence, RendezvousError, RendezvousStore,
+        VerifiedPublishPresence,
+    },
     routing::{
         HysteresisConfig, PathProbe, PathProbeTracker, PathState, RouteDecision, RouteSelector,
         RoutingError, DEFAULT_MAX_IN_FLIGHT_PATH_PROBES_PER_PATH,
         DEFAULT_PATH_PROBE_TIMEOUT_MULTIPLIER,
     },
-    service::{ServiceError, ServiceRegistry},
+    service::{
+        GetServiceRecord, LocalServicePolicy, OpenAppSession, ServiceError, ServiceRegistry,
+    },
     session::{
         ClientFinish, ClientHandshake, ClientHello, HandshakeConfig, ReplayCache,
         ReplayCacheConfig, ReplayCacheError, ServerHandshake, ServerHello, SessionError,
@@ -208,6 +218,8 @@ pub enum NodeRuntimeError {
     #[error(transparent)]
     PresenceVerification(#[from] PresenceVerificationError),
     #[error(transparent)]
+    ServiceVerification(#[from] ServiceVerificationError),
+    #[error(transparent)]
     PeerStore(#[from] PeerStoreError),
     #[error(transparent)]
     Rendezvous(#[from] RendezvousError),
@@ -349,6 +361,13 @@ struct ManagedSession {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct ManagedApplicationFrame {
+    message_type: MessageType,
+    body: Vec<u8>,
+    wire_correlation_id: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum BootstrapSource {
     File { path: PathBuf },
     Http { source: BootstrapHttpSource },
@@ -361,6 +380,7 @@ struct BootstrapHttpSource {
     endpoint: String,
     host_header: String,
     request_target: String,
+    expected_sha256_hex: Option<String>,
 }
 
 pub struct NodeRuntime {
@@ -481,6 +501,49 @@ impl NodeRuntime {
             cleanup_totals: self.cleanup_totals,
             bootstrap: self.bootstrap_status,
         }
+    }
+
+    pub fn register_local_service(
+        &mut self,
+        app_namespace: &str,
+        service_name: &str,
+        service_version: &str,
+        timestamp_unix_ms: u64,
+    ) -> Result<ServiceRecord, NodeRuntimeError> {
+        let mut record = ServiceRecord {
+            version: 1,
+            node_id: self.context.node_id,
+            app_id: derive_app_id(&self.context.node_id, app_namespace, service_name),
+            service_name: service_name.to_string(),
+            service_version: service_version.to_string(),
+            auth_mode: "none".to_string(),
+            policy: b"pilot-allow".to_vec(),
+            reachability_ref: local_service_reachability_ref(
+                self.context.node_id,
+                app_namespace,
+                service_name,
+            ),
+            metadata_commitment: service_version.as_bytes().to_vec(),
+            signature: Vec::new(),
+        };
+        let body = record.canonical_body_bytes()?;
+        record.signature = self.context.signing_key.sign(&body).as_bytes().to_vec();
+        let verified = record
+            .clone()
+            .verify_with_public_key(&self.context.signing_key.public_key())?;
+        self.context
+            .service_registry
+            .register_verified_with_observability(
+                verified,
+                LocalServicePolicy::allow_all(),
+                &mut self.context.observability,
+                allocate_log_context(
+                    &mut self.next_correlation_id,
+                    self.context.node_id,
+                    timestamp_unix_ms,
+                ),
+            )?;
+        Ok(record)
     }
 
     pub fn startup_now(&mut self) -> Result<(), NodeRuntimeError> {
@@ -1329,7 +1392,7 @@ impl NodeRuntime {
                     break;
                 }
                 let poll_result = managed.transport.poll_event(timestamp_unix_ms);
-                let session_input = match poll_result {
+                let handled_event = match poll_result {
                     Ok(Some(event)) => {
                         self.context.observability.push_log(
                             LogContext {
@@ -1357,12 +1420,12 @@ impl NodeRuntime {
                             &mut *managed.transport,
                         )
                     }
-                    Ok(None) => Ok(None),
-                    Err(TransportRunnerError::UnsupportedOperation { .. }) => Ok(None),
+                    Ok(None) => Ok((None, None)),
+                    Err(TransportRunnerError::UnsupportedOperation { .. }) => Ok((None, None)),
                 };
 
-                let Some(input) = (match session_input {
-                    Ok(input) => input,
+                let (session_input, application_frame) = match handled_event {
+                    Ok(outcome) => outcome,
                     Err(detail) => {
                         let session_event = managed.session.fail(timestamp_unix_ms, detail)?;
                         session_event
@@ -1370,18 +1433,38 @@ impl NodeRuntime {
                         session_events.push(session_event);
                         break;
                     }
-                }) else {
-                    break;
                 };
 
-                let session_event = managed.session.handle_runner_input_with_replay_cache(
-                    timestamp_unix_ms,
-                    input,
-                    &mut self.context.replay_cache,
-                )?;
-                session_event.record_with_observability(node_id, &mut self.context.observability);
-                session_events.push(session_event);
+                let had_session_input = session_input.is_some();
+                if let Some(input) = session_input {
+                    let session_event = managed.session.handle_runner_input_with_replay_cache(
+                        timestamp_unix_ms,
+                        input,
+                        &mut self.context.replay_cache,
+                    )?;
+                    session_event
+                        .record_with_observability(node_id, &mut self.context.observability);
+                    session_events.push(session_event);
+                }
                 if managed.session.state() == SessionState::Closed {
+                    break;
+                }
+                if let Some(frame) = application_frame {
+                    if let Err(detail) = handle_application_frame(
+                        managed,
+                        &mut self.context,
+                        &mut self.next_correlation_id,
+                        node_id,
+                        frame,
+                        timestamp_unix_ms,
+                    ) {
+                        let session_event = managed.session.fail(timestamp_unix_ms, detail)?;
+                        session_event
+                            .record_with_observability(node_id, &mut self.context.observability);
+                        session_events.push(session_event);
+                        break;
+                    }
+                } else if !had_session_input {
                     break;
                 }
             }
@@ -1424,6 +1507,154 @@ impl NodeRuntime {
     }
 }
 
+fn handle_application_frame(
+    managed: &mut ManagedSession,
+    context: &mut NodeContext,
+    next_correlation_id: &mut u64,
+    node_id: NodeId,
+    frame: ManagedApplicationFrame,
+    timestamp_unix_ms: u64,
+) -> Result<(), String> {
+    let security = managed
+        .session
+        .security()
+        .ok_or_else(|| "application frame arrived before handshake security context".to_string())?;
+    let now_unix_s = unix_ms_to_s(timestamp_unix_ms);
+
+    match frame.message_type {
+        MessageType::PublishPresence => {
+            let publish = PublishPresence::from_canonical_bytes(&frame.body)
+                .map_err(|error| error.to_string())?;
+            if publish.record.node_id != security.peer_node_id {
+                context.observability.push_log(
+                    allocate_log_context(next_correlation_id, node_id, timestamp_unix_ms),
+                    LogComponent::Rendezvous,
+                    "publish_presence",
+                    "rejected",
+                );
+                return Err(format!(
+                    "publish_presence node_id {} did not match authenticated peer {}",
+                    publish.record.node_id, security.peer_node_id
+                ));
+            }
+            let verified = publish
+                .verify_with_public_key(&security.peer_signing_public_key)
+                .map_err(|error| error.to_string())?;
+            let ack = context
+                .rendezvous
+                .publish_verified_with_observability(
+                    verified,
+                    now_unix_s,
+                    &mut context.observability,
+                    allocate_log_context(next_correlation_id, node_id, timestamp_unix_ms),
+                )
+                .map_err(|error| error.to_string())?;
+            send_transport_message(&mut *managed.transport, frame.wire_correlation_id, &ack)
+        }
+        MessageType::LookupNode => {
+            let lookup =
+                LookupNode::from_canonical_bytes(&frame.body).map_err(|error| error.to_string())?;
+            let max_budget = context.rendezvous.config().max_lookup_budget;
+            let mut state = context
+                .rendezvous
+                .lookup_state(max_budget)
+                .map_err(|error| error.to_string())?;
+            let response = context.rendezvous.lookup_with_observability(
+                lookup,
+                now_unix_s,
+                &mut state,
+                0,
+                &mut context.observability,
+                allocate_log_context(next_correlation_id, node_id, timestamp_unix_ms),
+            );
+            match response {
+                LookupResponse::Result(result) => send_transport_message(
+                    &mut *managed.transport,
+                    frame.wire_correlation_id,
+                    result.as_ref(),
+                ),
+                LookupResponse::NotFound(not_found) => send_transport_message(
+                    &mut *managed.transport,
+                    frame.wire_correlation_id,
+                    &not_found,
+                ),
+            }
+        }
+        MessageType::GetServiceRecord => {
+            let request = GetServiceRecord::from_canonical_bytes(&frame.body)
+                .map_err(|error| error.to_string())?;
+            let response = context.service_registry.resolve_with_observability(
+                request,
+                &mut context.observability,
+                allocate_log_context(next_correlation_id, node_id, timestamp_unix_ms),
+            );
+            send_transport_message(
+                &mut *managed.transport,
+                frame.wire_correlation_id,
+                &response,
+            )
+        }
+        MessageType::OpenAppSession => {
+            let request = OpenAppSession::from_canonical_bytes(&frame.body)
+                .map_err(|error| error.to_string())?;
+            let response = context
+                .service_registry
+                .open_app_session_with_observability(
+                    request,
+                    timestamp_unix_ms,
+                    &mut context.observability,
+                    allocate_log_context(next_correlation_id, node_id, timestamp_unix_ms),
+                );
+            send_transport_message(
+                &mut *managed.transport,
+                frame.wire_correlation_id,
+                &response,
+            )
+        }
+        MessageType::ResolveIntro => {
+            let request = ResolveIntro::from_canonical_bytes(&frame.body)
+                .map_err(|error| error.to_string())?;
+            let verified = request
+                .verify_with_public_key(&security.peer_signing_public_key)
+                .map_err(|error| error.to_string())?;
+            let expected_requester_binding = verified.intro_ticket().requester_binding.clone();
+            let response = context
+                .relay_manager
+                .process_resolve_intro_with_observability(
+                    context.node_id,
+                    verified,
+                    &expected_requester_binding,
+                    now_unix_s,
+                    &mut context.observability,
+                    allocate_log_context(next_correlation_id, node_id, timestamp_unix_ms),
+                );
+            if response.status == IntroResponseStatus::Forwarded {
+                let tunnel_id = *next_correlation_id;
+                *next_correlation_id = next_correlation_id.saturating_add(1);
+                context
+                    .relay_manager
+                    .bind_tunnel_with_observability(
+                        tunnel_id,
+                        response.relay_node_id,
+                        response.target_node_id,
+                        now_unix_s,
+                        &mut context.observability,
+                        allocate_log_context(next_correlation_id, node_id, timestamp_unix_ms),
+                    )
+                    .map_err(|error| error.to_string())?;
+            }
+            send_transport_message(
+                &mut *managed.transport,
+                frame.wire_correlation_id,
+                &response,
+            )
+        }
+        other => Err(format!(
+            "runtime does not handle application message {other:?} on the established session path"
+        )),
+    }
+}
+
 enum ManagedSessionDriver {
     Placeholder,
     Tcp(Box<TcpSessionDriver>),
@@ -1453,11 +1684,12 @@ impl ManagedSessionDriver {
         timestamp_unix_ms: u64,
         signing_key: &Ed25519SigningKey,
         transport: &mut dyn TransportRunner,
-    ) -> Result<Option<SessionRunnerInput>, String> {
+    ) -> Result<(Option<SessionRunnerInput>, Option<ManagedApplicationFrame>), String> {
         match self {
             Self::Placeholder => {
-                SessionRunnerInput::from_transport_poll_event(event, buffer_config)
-                    .map_err(|error| error.to_string())
+                let input = SessionRunnerInput::from_transport_poll_event(event, buffer_config)
+                    .map_err(|error| error.to_string())?;
+                Ok((input, None))
             }
             Self::Tcp(driver) => driver.handle_transport_event(
                 event,
@@ -1542,14 +1774,15 @@ impl TcpSessionDriver {
         _timestamp_unix_ms: u64,
         signing_key: &Ed25519SigningKey,
         transport: &mut dyn TransportRunner,
-    ) -> Result<Option<SessionRunnerInput>, String> {
+    ) -> Result<(Option<SessionRunnerInput>, Option<ManagedApplicationFrame>), String> {
         match event {
-            crate::transport::TransportPollEvent::Opened => Ok(None),
-            crate::transport::TransportPollEvent::Closed => {
-                Ok(Some(SessionRunnerInput::TransportClosed { detail: None }))
-            }
+            crate::transport::TransportPollEvent::Opened => Ok((None, None)),
+            crate::transport::TransportPollEvent::Closed => Ok((
+                Some(SessionRunnerInput::TransportClosed { detail: None }),
+                None,
+            )),
             crate::transport::TransportPollEvent::Failed { detail } => {
-                Ok(Some(SessionRunnerInput::TransportFailed { detail }))
+                Ok((Some(SessionRunnerInput::TransportFailed { detail }), None))
             }
             crate::transport::TransportPollEvent::FrameReceived { bytes } => {
                 let (header, body) =
@@ -1578,14 +1811,17 @@ impl TcpSessionDriver {
                             ignore_unsupported_runner_op(
                                 transport.begin_close(header.correlation_id),
                             );
-                            Ok(Some(SessionRunnerInput::TransportClosed {
-                                detail: Some("peer acknowledged close".to_string()),
-                            }))
+                            Ok((
+                                Some(SessionRunnerInput::TransportClosed {
+                                    detail: Some("peer acknowledged close".to_string()),
+                                }),
+                                None,
+                            ))
                         } else {
-                            Ok(None)
+                            Ok((None, None))
                         }
                     }
-                    SessionState::Idle | SessionState::Closed => Ok(None),
+                    SessionState::Idle | SessionState::Closed => Ok((None, None)),
                 }
             }
         }
@@ -1598,7 +1834,7 @@ impl TcpSessionDriver {
         wire_correlation_id: u64,
         signing_key: &Ed25519SigningKey,
         transport: &mut dyn TransportRunner,
-    ) -> Result<Option<SessionRunnerInput>, String> {
+    ) -> Result<(Option<SessionRunnerInput>, Option<ManagedApplicationFrame>), String> {
         match std::mem::replace(&mut self.state, TcpSessionDriverState::Established) {
             TcpSessionDriverState::AwaitServerHello { handshake } => {
                 if message_type != MessageType::ServerHello {
@@ -1613,7 +1849,10 @@ impl TcpSessionDriver {
                     .map_err(|error| error.to_string())?;
                 send_transport_message(transport, wire_correlation_id, &client_finish)?;
                 self.state = TcpSessionDriverState::Established;
-                Ok(Some(SessionRunnerInput::HandshakeSucceeded { outcome }))
+                Ok((
+                    Some(SessionRunnerInput::HandshakeSucceeded { outcome }),
+                    None,
+                ))
             }
             TcpSessionDriverState::AwaitClientHello => {
                 if message_type != MessageType::ClientHello {
@@ -1634,7 +1873,7 @@ impl TcpSessionDriver {
                 self.state = TcpSessionDriverState::AwaitClientFinish {
                     handshake: Box::new(handshake),
                 };
-                Ok(None)
+                Ok((None, None))
             }
             TcpSessionDriverState::AwaitClientFinish { handshake } => {
                 if message_type != MessageType::ClientFinish {
@@ -1648,7 +1887,10 @@ impl TcpSessionDriver {
                     .handle_client_finish(&client_finish)
                     .map_err(|error| error.to_string())?;
                 self.state = TcpSessionDriverState::Established;
-                Ok(Some(SessionRunnerInput::HandshakeSucceeded { outcome }))
+                Ok((
+                    Some(SessionRunnerInput::HandshakeSucceeded { outcome }),
+                    None,
+                ))
             }
             TcpSessionDriverState::DialPending => {
                 Err("tcp session received a frame before begin_handshake was emitted".to_string())
@@ -1666,34 +1908,50 @@ impl TcpSessionDriver {
         framed_len: usize,
         wire_correlation_id: u64,
         transport: &mut dyn TransportRunner,
-    ) -> Result<Option<SessionRunnerInput>, String> {
+    ) -> Result<(Option<SessionRunnerInput>, Option<ManagedApplicationFrame>), String> {
         match message_type {
             MessageType::Ping => {
                 let _: Ping =
                     decode_message_body(body).map_err(|error: WireCodecError| error.to_string())?;
                 send_transport_message(transport, wire_correlation_id, &Pong)?;
-                Ok(Some(SessionRunnerInput::FrameReceived {
-                    byte_len: framed_len,
-                }))
+                Ok((
+                    Some(SessionRunnerInput::FrameReceived {
+                        byte_len: framed_len,
+                    }),
+                    None,
+                ))
             }
             MessageType::Pong => {
                 let _: Pong =
                     decode_message_body(body).map_err(|error: WireCodecError| error.to_string())?;
-                Ok(Some(SessionRunnerInput::FrameReceived {
-                    byte_len: framed_len,
-                }))
+                Ok((
+                    Some(SessionRunnerInput::FrameReceived {
+                        byte_len: framed_len,
+                    }),
+                    None,
+                ))
             }
             MessageType::Close => {
                 let _: Close =
                     decode_message_body(body).map_err(|error: WireCodecError| error.to_string())?;
                 ignore_unsupported_runner_op(transport.begin_close(wire_correlation_id));
-                Ok(Some(SessionRunnerInput::TransportClosed {
-                    detail: Some("peer requested close".to_string()),
-                }))
+                Ok((
+                    Some(SessionRunnerInput::TransportClosed {
+                        detail: Some("peer requested close".to_string()),
+                    }),
+                    None,
+                ))
             }
-            _ => Ok(Some(SessionRunnerInput::FrameReceived {
-                byte_len: framed_len,
-            })),
+            _ => Ok((
+                Some(SessionRunnerInput::FrameReceived {
+                    byte_len: framed_len,
+                }),
+                Some(ManagedApplicationFrame {
+                    message_type,
+                    body: body.to_vec(),
+                    wire_correlation_id,
+                }),
+            )),
         }
     }
 }
@@ -1861,6 +2119,16 @@ impl BootstrapProvider for BootstrapHttpProvider {
             )));
         }
 
+        if let Some(expected_sha256_hex) = &self.source.expected_sha256_hex {
+            let actual_sha256_hex = sha256_hex(body);
+            if &actual_sha256_hex != expected_sha256_hex {
+                return Err(BootstrapProviderError::Integrity(format!(
+                    "bootstrap source {} expected sha256 {} but got {}",
+                    self.source.url, expected_sha256_hex, actual_sha256_hex
+                )));
+            }
+        }
+
         serde_json::from_slice(body).map_err(|error| {
             BootstrapProviderError::Unavailable(format!(
                 "could not parse bootstrap source {}: {error}",
@@ -1970,7 +2238,8 @@ fn resolve_bootstrap_source(base_dir: &Path, source: &str) -> BootstrapSource {
 }
 
 fn parse_http_bootstrap_source(source: &str) -> Option<BootstrapHttpSource> {
-    let remainder = source.strip_prefix("http://")?;
+    let (base_source, expected_sha256_hex) = split_bootstrap_source_pin(source)?;
+    let remainder = base_source.strip_prefix("http://")?;
     if remainder.is_empty() {
         return None;
     }
@@ -1994,7 +2263,26 @@ fn parse_http_bootstrap_source(source: &str) -> Option<BootstrapHttpSource> {
         endpoint,
         host_header: authority.to_string(),
         request_target,
+        expected_sha256_hex,
     })
+}
+
+fn split_bootstrap_source_pin(source: &str) -> Option<(&str, Option<String>)> {
+    let (base, fragment) = match source.split_once('#') {
+        Some((base, fragment)) => (base, Some(fragment)),
+        None => (source, None),
+    };
+    let expected_sha256_hex = match fragment {
+        Some(fragment) => {
+            let hex = fragment.strip_prefix("sha256=")?;
+            if hex.len() != 64 || !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                return None;
+            }
+            Some(hex.to_ascii_lowercase())
+        }
+        None => None,
+    };
+    Some((base, expected_sha256_hex))
 }
 
 fn http_authority_to_endpoint(authority: &str) -> Option<String> {
@@ -2099,6 +2387,24 @@ fn hex_value(byte: u8) -> Option<u8> {
     }
 }
 
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut encoded = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        use std::fmt::Write as _;
+        write!(&mut encoded, "{byte:02x}").expect("hex encoding should succeed");
+    }
+    encoded
+}
+
+fn local_service_reachability_ref(
+    node_id: NodeId,
+    app_namespace: &str,
+    service_name: &str,
+) -> Vec<u8> {
+    format!("service://{node_id}/{app_namespace}/{service_name}").into_bytes()
+}
+
 fn current_unix_ms() -> u64 {
     unix_duration_ms(
         SystemTime::now()
@@ -2130,7 +2436,7 @@ mod tests {
     use serde::Serialize;
 
     use super::{
-        unix_ms_to_s, NodeContext, NodeRuntime, NodeRuntimeError, NodeRuntimeState,
+        sha256_hex, unix_ms_to_s, NodeContext, NodeRuntime, NodeRuntimeError, NodeRuntimeState,
         RuntimeTickSummary,
     };
     use crate::{
@@ -2176,7 +2482,7 @@ mod tests {
             .startup(START_UNIX_MS)
             .expect("startup should succeed");
 
-        assert_eq!(REPOSITORY_STAGE, "milestone-18-real-pilot");
+        assert_eq!(REPOSITORY_STAGE, "milestone-19-pilot-closure");
         assert_eq!(runtime.state(), NodeRuntimeState::Running);
         assert_eq!(
             runtime.context().node_id(),
@@ -2238,6 +2544,95 @@ mod tests {
                 entry.component == crate::metrics::LogComponent::Bootstrap
                     && entry.event == "bootstrap_fetch"
                     && entry.result == "accepted"
+            }));
+    }
+
+    #[test]
+    fn startup_fetches_bootstrap_over_http_with_matching_sha256_pin() {
+        let dir = unique_test_dir("runtime-startup-http-pinned");
+        let key_path = dir.join("node.key");
+        let config_path = dir.join("overlay-config.json");
+        let signing_key = Ed25519SigningKey::from_seed([34_u8; 32]);
+        let bootstrap_body =
+            serde_json::to_vec(&sample_bootstrap_response()).expect("bootstrap should serialize");
+        let bootstrap_sha256 = sha256_hex(&bootstrap_body);
+        let (bootstrap_url, server_handle) =
+            match start_test_http_server(http_ok_response(&bootstrap_body), 1) {
+                Ok(server) => server,
+                Err(error) if error.kind() == io::ErrorKind::PermissionDenied => return,
+                Err(error) => panic!("http server should bind: {error}"),
+            };
+
+        fs::write(&key_path, signing_key.as_bytes()).expect("key file should be written");
+        write_json(
+            &config_path,
+            &sample_config(
+                "node.key",
+                vec![format!("{bootstrap_url}#sha256={bootstrap_sha256}")],
+            ),
+        )
+        .expect("config file should be written");
+
+        let mut runtime =
+            NodeRuntime::from_config_path(&config_path).expect("runtime should load from config");
+        runtime
+            .startup(START_UNIX_MS)
+            .expect("startup should accept a matching pinned bootstrap artifact");
+        server_handle
+            .join()
+            .expect("http server should exit cleanly");
+
+        assert_eq!(runtime.state(), NodeRuntimeState::Running);
+        assert_eq!(runtime.snapshot().active_peers, 3);
+        assert_eq!(runtime.health_snapshot().bootstrap.last_accepted_sources, 1);
+    }
+
+    #[test]
+    fn startup_rejects_tampered_http_bootstrap_when_sha256_pin_mismatches() {
+        let dir = unique_test_dir("runtime-startup-http-pin-mismatch");
+        let key_path = dir.join("node.key");
+        let config_path = dir.join("overlay-config.json");
+        let signing_key = Ed25519SigningKey::from_seed([35_u8; 32]);
+        let bootstrap_body =
+            serde_json::to_vec(&sample_bootstrap_response()).expect("bootstrap should serialize");
+        let (bootstrap_url, server_handle) =
+            match start_test_http_server(http_ok_response(&bootstrap_body), 1) {
+                Ok(server) => server,
+                Err(error) if error.kind() == io::ErrorKind::PermissionDenied => return,
+                Err(error) => panic!("http server should bind: {error}"),
+            };
+
+        fs::write(&key_path, signing_key.as_bytes()).expect("key file should be written");
+        write_json(
+            &config_path,
+            &sample_config(
+                "node.key",
+                vec![format!("{bootstrap_url}#sha256={}", "0".repeat(64))],
+            ),
+        )
+        .expect("config file should be written");
+
+        let mut runtime =
+            NodeRuntime::from_config_path(&config_path).expect("runtime should load from config");
+        runtime
+            .startup(START_UNIX_MS)
+            .expect("startup should degrade rather than fail on a rejected pin");
+        server_handle
+            .join()
+            .expect("http server should exit cleanly");
+
+        assert_eq!(runtime.state(), NodeRuntimeState::Degraded);
+        assert_eq!(runtime.snapshot().active_peers, 0);
+        assert_eq!(runtime.health_snapshot().bootstrap.last_accepted_sources, 0);
+        assert!(runtime
+            .context()
+            .observability()
+            .logs()
+            .iter()
+            .any(|entry| {
+                entry.component == crate::metrics::LogComponent::Bootstrap
+                    && entry.event == "bootstrap_fetch"
+                    && entry.result == "rejected"
             }));
     }
 
@@ -3010,6 +3405,7 @@ mod tests {
     fn sample_handshake_outcome() -> HandshakeOutcome {
         HandshakeOutcome {
             peer_node_id: NodeId::from_bytes([9_u8; 32]),
+            peer_signing_public_key: crate::crypto::sign::Ed25519PublicKey::from_bytes([8_u8; 32]),
             transcript_hash: [7_u8; 32] as Blake3Digest,
             session_keys: crate::session::SessionKeys {
                 client_to_server_key: ChaCha20Poly1305Key::from_bytes([1_u8; 32]),

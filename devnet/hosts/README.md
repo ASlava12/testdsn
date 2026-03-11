@@ -1,12 +1,12 @@
 # Host-Style Devnet Layouts
 
 This directory contains the Milestone 16 host-style devnet assets carried into
-the current Milestone 18 real-pilot stage.
+the current Milestone 19 pilot-closure stage.
 
 ## Layouts
 
 - `localhost/`: runnable configs for the repo-local multi-host smoke.
-  These use real `http://127.0.0.1:*` bootstrap sources and real
+  These use real pinned `http://127.0.0.1:*#sha256=<pin>` bootstrap sources and real
   `tcp://127.0.0.1:*` listener addresses.
 - `examples/`: copy-and-edit examples for separate hosts or VMs.
   These use RFC 5737 documentation addresses and assume three static bootstrap
@@ -27,7 +27,7 @@ the current Milestone 18 real-pilot stage.
 The host-style configs intentionally keep bootstrap minimal:
 
 - bootstrap responses stay static JSON with the existing schema;
-- nodes fetch them over plain `http://`;
+- nodes fetch them over static pinned `http://...#sha256=<pin>` URLs;
 - nodes may list more than one seed URL for conservative fallback;
 - the seed server is `overlay-cli bootstrap-serve`, not a public provider stack.
 

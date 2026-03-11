@@ -966,7 +966,7 @@ fn write_step(writer: &mut dyn Write, value: serde_json::Value) -> Result<(), St
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::{fs, path::PathBuf};
 
     use super::{
         run_smoke_with_writer, run_smoke_with_writer_and_options, SmokeFault, SmokeOptions,
@@ -1057,6 +1057,18 @@ mod tests {
         assert!(rendered.contains("\"step\":\"relay_fallback_unavailable\""));
         assert!(!rendered.contains("\"step\":\"relay_fallback_bound\""));
         assert!(rendered.contains("\"result\":\"degraded\""));
+    }
+
+    #[test]
+    fn distributed_smoke_script_uses_host_bootstrap_artifacts() {
+        let script = fs::read_to_string(repo_devnet_dir().join("run-distributed-smoke.sh"))
+            .expect("distributed smoke script should be readable");
+        assert!(script.contains("devnet/hosts/examples/bootstrap/node-foundation.json"));
+        assert!(script.contains("devnet/hosts/examples/bootstrap/node-a-seed.json"));
+        assert!(script.contains("devnet/hosts/examples/bootstrap/node-ab-seed.json"));
+        assert!(!script.contains("devnet/bootstrap/node-foundation.json"));
+        assert!(!script.contains("devnet/bootstrap/node-a-seed.json"));
+        assert!(!script.contains("devnet/bootstrap/node-ab-seed.json"));
     }
 
     fn repo_devnet_dir() -> PathBuf {

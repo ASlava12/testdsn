@@ -83,9 +83,9 @@ start_bootstrap_server() {
   exit 1
 }
 
-bootstrap_a_pid="$(start_bootstrap_server "127.0.0.1:4201" "devnet/bootstrap/node-foundation.json" "$bootstrap_a_log")"
-bootstrap_b_pid="$(start_bootstrap_server "127.0.0.1:4202" "devnet/bootstrap/node-a-seed.json" "$bootstrap_b_log")"
-bootstrap_relay_pid="$(start_bootstrap_server "127.0.0.1:4203" "devnet/bootstrap/node-ab-seed.json" "$bootstrap_relay_log")"
+bootstrap_a_pid="$(start_bootstrap_server "127.0.0.1:4201" "devnet/hosts/examples/bootstrap/node-foundation.json" "$bootstrap_a_log")"
+bootstrap_b_pid="$(start_bootstrap_server "127.0.0.1:4202" "devnet/hosts/examples/bootstrap/node-a-seed.json" "$bootstrap_b_log")"
+bootstrap_relay_pid="$(start_bootstrap_server "127.0.0.1:4203" "devnet/hosts/examples/bootstrap/node-ab-seed.json" "$bootstrap_relay_log")"
 
 "$overlay_cli" run \
   --config devnet/hosts/localhost/configs/node-b.json \

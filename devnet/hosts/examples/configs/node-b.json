@@ -1,8 +1,8 @@
 {
   "node_key_path": "./keys/node-b.key",
   "bootstrap_sources": [
-    "http://198.51.100.11:4202/node-a-seed.json",
-    "http://198.51.100.10:4201/node-foundation.json"
+    "http://198.51.100.11:4202/node-a-seed.json#sha256=d1ca80fea7c4ea233bb89ff8a0ab2fbb76c0c9c8d38132eeb573980845b9d27f",
+    "http://198.51.100.10:4201/node-foundation.json#sha256=37f92c258791d5d620b6d60febdcd81bef72e7f7d1e41b28ee468aca2f4dd106"
   ],
   "tcp_listener_addr": "198.51.100.11:4102",
   "max_total_neighbors": 8,

@@ -1,10 +1,10 @@
 {
-  "node_key_path": "../../../keys/node-b.key",
+  "node_key_path": "../../../keys/node-relay-b.key",
   "bootstrap_sources": [
-    "http://198.51.100.11:4302/node-a-seed.json#sha256=e829f3e6891146ab17914b2e60605b2c1c9ed2a897d3410c66645cf69b056fc3",
+    "http://198.51.100.13:4303/node-ab-seed.json#sha256=5564fd1300e02c2505ef2a8bec44ca7279b55c452899621fc7224e957d654f9b",
     "http://198.51.100.10:4301/node-foundation.json#sha256=2580f74d3ed8005ef278bdbb6a130f2c58574036dd1bdea4d1f23a65efcd034b"
   ],
-  "tcp_listener_addr": "198.51.100.11:4112",
+  "tcp_listener_addr": "198.51.100.15:4197",
   "max_total_neighbors": 8,
   "max_presence_records": 64,
   "max_service_records": 16,
@@ -12,6 +12,6 @@
   "epoch_duration_s": 60,
   "path_probe_interval_ms": 5000,
   "max_transport_buffer_bytes": 65536,
-  "relay_mode": false,
+  "relay_mode": true,
   "log_level": "info"
 }

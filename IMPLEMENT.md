@@ -6,9 +6,9 @@ This file is the execution plan for Codex.
 
 The repository has a closed Milestone 1-12 baseline, a landed Milestone 14
 pilot launch gate, a landed Milestone 16 network-bootstrap stage, a landed
-Milestone 17 operator-runtime stage, and the current Milestone 18 real-pilot
-stage.
-The current repository stage marker is `milestone-18-real-pilot`.
+Milestone 17 operator-runtime stage, a landed Milestone 18 real-pilot stage,
+and the current Milestone 19 pilot-closure stage.
+The current repository stage marker is `milestone-19-pilot-closure`.
 
 - Milestone 0 bootstrap is complete.
 - Milestone 1 foundations are implemented, vectorized, and validated in
@@ -135,6 +135,17 @@ The current repository stage marker is `milestone-18-real-pilot`.
   smoke output, a bootstrap-seed-unavailable checklist path, and synchronized
   current-stage docs. The repository stage marker now advances to
   `milestone-18-real-pilot`.
+- Milestone 19 pilot-closure support is now implemented in
+  `crates/overlay-cli/src/main.rs`, `crates/overlay-cli/src/operator_client.rs`,
+  `crates/overlay-core/src/runtime.rs`, `crates/overlay-core/src/config.rs`,
+  `devnet/run-multihost-smoke.sh`, `devnet/run-distributed-pilot-checklist.sh`,
+  and the current pilot docs, with bounded operator commands for networked
+  `publish`, `lookup`, `open-service`, and `relay-intro` flows over real
+  runtime sessions, `overlay-cli run --service` local service registration, a
+  second relay-capable pilot path, conservative `http://...#sha256=<pin>`
+  bootstrap-artifact integrity checks, the expanded pilot fault matrix, and
+  synchronized post-pilot-closure docs. The repository stage marker now
+  advances to `milestone-19-pilot-closure`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -142,18 +153,18 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Use `prompts/codex-milestone-18.md` as the recommended next-task prompt for the
-current `milestone-18-real-pilot` stage and keep work conservative from the
-current pilot boundary:
+Use `prompts/codex-milestone-19.md` as the recommended next-task prompt for the
+current `milestone-19-pilot-closure` stage and keep work conservative from the
+current pilot-closure boundary:
 
 1. preserve the current launch surface documented in
    `docs/LAUNCH_CHECKLIST.md`, `docs/RUNBOOK.md`, `docs/DEVNET.md`,
    `docs/PILOT_RUNBOOK.md`, and `devnet/pilot/README.md`;
 2. keep Milestones 1-12 limited to regression fixes, launch-maintenance
    updates, vector maintenance, or conservative spec-conformance fixes;
-3. prefer pilot execution support, validation maintenance, and documentation
-   sync over feature expansion;
-4. rerun the documented launch gate and pilot checklist whenever
+3. prefer pilot execution support, validation maintenance, documentation sync,
+   and operator-surface hardening over feature expansion;
+4. rerun the documented launch gate and distributed pilot checklist whenever
    `REPOSITORY_STAGE`, launch docs, pilot docs, or current-stage scripts
    change;
 5. keep public bootstrap infrastructure, protocol redesign, and scope expansion
@@ -550,7 +561,7 @@ without changing the protocol surface.
 
 ## Milestone 18 — real pilot network on separate hosts
 
-Status: current repository stage.
+Status: landed baseline.
 
 ### Goal
 Prepare and rehearse the first real pilot network stage on separate hosts
@@ -581,3 +592,44 @@ without widening the protocol surface.
 - the current smoke output reports lookup latency and relay usage for pilot
   reporting;
 - validation and status docs report the same Milestone 18 stage marker.
+
+## Milestone 19 — pilot-closure blockers after the first real pilot
+
+Status: current repository stage.
+
+### Goal
+Close the pilot blockers exposed by the first real pilot without widening the
+scope into hostile-environment or public-Internet rollout work.
+
+### Tasks
+1. Add minimal distributed operator commands or equivalent bounded surfaces for
+   `publish`, `lookup`, `open-service`, and `relay-intro` on top of the landed
+   runtime.
+2. Extend the pilot topology/config pack to 3-5 hosts with two relay-capable
+   fallback paths.
+3. Add the distributed pilot-closure checklist with the documented node-down,
+   primary-relay-down, bootstrap-seed-down, service-restart, and tampered
+   bootstrap-artifact scenarios.
+4. Replace the plain-HTTP bootstrap blocker with conservative integrity checks
+   for static bootstrap artifacts while keeping the existing pilot-only static
+   bootstrap model.
+5. Synchronize launch, pilot, validation, and status docs to the new
+   post-pilot-closure stage marker.
+
+### Important constraints
+- Do not claim hostile-environment or public-production readiness.
+- Do not add public bootstrap infrastructure, orchestration, or rollout
+  automation.
+- Do not redesign the protocol or collapse subsystem layering.
+- Keep the operator surfaces explicit, bounded, and honest about their
+  point-to-point, operator-directed nature.
+
+### Done when
+- the repo exposes minimal networked operator flows for `publish`, `lookup`,
+  `open-service`, and relay fallback without local in-process injection;
+- the pilot pack documents two relay-capable paths and the expanded fault
+  matrix;
+- the current checklist proves the closure work through
+  `./devnet/run-distributed-pilot-checklist.sh`;
+- validation and status docs report the same Milestone 19 stage marker and
+  current limitations.

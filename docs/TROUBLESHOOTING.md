@@ -27,8 +27,8 @@ TMPDIR=/tmp cargo run -p overlay-cli -- status --config <config-path>
 
 | Symptom | Real signals to inspect | Likely cause in the current repo | Action |
 | --- | --- | --- | --- |
-| Bootstrap failure | `health.runtime.state == "degraded"`, `health.bootstrap.last_accepted_sources == 0`, `bootstrap_fetch`=`unavailable` or `rejected`, `bootstrap_ingest`=`rejected` | missing file, invalid JSON, expired bootstrap seed, unsupported source such as `https://...`, or schema rejection | fix the bootstrap source path or file contents; use only local `.json`, `file:`, or static `http://...` sources; rerun with `--max-ticks 0 --status-every 1` first |
-| Lookup timeout | external caller waits, or smoke never reaches `lookup_node`; if you have observability around a lookup call, `lookup_node` results are `missing`, `negative_cache_hit`, or `budget_exhausted` | the stock runtime has no networked lookup RPC or built-in lookup timeout path; lookups are against the local rendezvous store only | first reproduce with `overlay-cli smoke --devnet-dir devnet`; if smoke passes, your timeout is outside the current runtime boundary; if smoke fails before `lookup_node`, fix publish or record injection first |
+| Bootstrap failure | `health.runtime.state == "degraded"`, `health.bootstrap.last_accepted_sources == 0`, `bootstrap_fetch`=`unavailable` or `rejected`, `bootstrap_ingest`=`rejected` | missing file, invalid JSON, expired bootstrap seed, unsupported source such as `https://...`, schema rejection, or a SHA-256 pin mismatch on `http://...#sha256=<hex>` | fix the bootstrap source path, file contents, or integrity pin; use only local `.json`, `file:`, or static pinned `http://...` sources; rerun with `--max-ticks 0 --status-every 1` first |
+| Lookup timeout or `not_found` | external caller waits, or `overlay-cli lookup` returns `not_found`; if you have observability around a lookup call, `lookup_node` results are `missing`, `negative_cache_hit`, or `budget_exhausted` | the target runtime does not have the record in its local rendezvous store, the publish was sent to a different runtime, or the exact `node_id` is wrong | first reproduce with `overlay-cli lookup --config <path> --target <tcp://host:port> --node-id <hex>` against the runtime that received the publish; if it still fails, fix publish target, exact ID, or record freshness first |
 | Relay quota rejection | relay log `resolve_intro`=`rejected_rate_limited`, relay log `bind_tunnel`=`rejected`, `health.metrics.dropped_rate_limited_total` increments, `health.relay.active_tunnels` or `recent_intro_requests` approaches `health.resource_limits` | intro request or tunnel quota hit, or relay mode is disabled on that node | use a node with `relay_mode: true`; reduce concurrent relay load; confirm the relay-enabled config was actually the one started |
 | Service policy denial | service log `open_app_session`=`rejected_policy` | local service policy is deny-all in the embedding or harness | the stock JSON schema cannot change this; inspect the caller code that registers the service because checked-in configs alone cannot produce allow or deny policy changes |
 | Degraded route churn | `health.metrics.path_switch_total` rises, routing log `route_selection`=`switched`, routing `probe_feedback` shows `lost` or `expired`, `probe_loss_ratio` stays high | path quality oscillation in embedded runtime use; only `path_probe_interval_ms` is operator-configurable today, not hysteresis thresholds | reduce path volatility in the test setup, inspect the path candidates, and remember this is mostly a code-level tuning issue in the current repo rather than a rich operator-configurable surface |
@@ -56,9 +56,10 @@ TMPDIR=/tmp cargo run -p overlay-cli -- status --config <config-path>
 ## Limits worth remembering during triage
 
 - `overlay-cli run` is single-node inspection, not distributed orchestration.
-- `overlay-cli smoke` is the supported end-to-end local proof path.
-- The current CLI does not expose a standalone publish, lookup, relay-intro, or
-  service-open command outside the smoke harness.
+- `overlay-cli smoke` is the supported repo-local proof path.
+- `overlay-cli publish`, `lookup`, `open-service`, and `relay-intro` are
+  explicit point-to-point operator commands; they do not provide discovery or
+  autonomous distributed routing.
 - A relay-enabled node still uses compiled default quotas; there is no JSON knob
   for per-minute intro rate or tunnel cap.
 - `overlay-cli run` now handles `SIGINT` and `SIGTERM` gracefully, but any

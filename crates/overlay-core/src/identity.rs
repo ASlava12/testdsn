@@ -163,6 +163,7 @@ mod tests {
     use serde::Deserialize;
 
     use super::{derive_app_id, derive_node_id, AppId, NodeId};
+    use crate::crypto::sign::Ed25519SigningKey;
     use blake3::Hasher;
 
     #[test]
@@ -240,6 +241,17 @@ mod tests {
                 vector.node_id_hex, vector.app_namespace, vector.app_name
             );
         }
+    }
+
+    #[test]
+    fn relay_b_seed_derives_stable_node_id() {
+        let node_id = derive_node_id(
+            Ed25519SigningKey::from_seed([5_u8; 32])
+                .public_key()
+                .as_bytes(),
+        );
+        println!("{node_id}");
+        assert_eq!(node_id.to_string().len(), 64);
     }
 
     #[derive(Debug, Deserialize)]

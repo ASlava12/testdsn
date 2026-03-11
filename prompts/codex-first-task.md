@@ -4,11 +4,11 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `VALIDATION.md`, `docs/OPEN_QUESTIONS.md`,
 
 Goal:
 Synchronize on the current repository stage,
-`milestone-18-real-pilot`, and use the dedicated Milestone 18 prompt
+`milestone-19-pilot-closure`, and use the dedicated Milestone 19 prompt
 for the next concrete current-stage task.
 
 Current repository baseline:
-- The current repository stage is `milestone-18-real-pilot`.
+- The current repository stage is `milestone-19-pilot-closure`.
 - Milestone 0 is already complete.
 - Milestone 1 foundations are already implemented, vectorized, and validated in
   `overlay-core` (`identity`, `records`, `wire`).
@@ -48,9 +48,12 @@ Current repository baseline:
   signal-aware `overlay-cli run`, config-local `.overlay-runtime/` operator
   state, `overlay-cli status`, stricter startup/config validation, and the
   bounded soak in the current gate.
-- Milestone 18 real pilot is now active with `docs/PILOT_RUNBOOK.md`,
-  `docs/PILOT_REPORT_TEMPLATE.md`, `devnet/pilot/`, and
-  `./devnet/run-pilot-checklist.sh`.
+- Milestone 18 real pilot remains part of the landed baseline with
+  `docs/PILOT_RUNBOOK.md`, `docs/PILOT_REPORT_TEMPLATE.md`, `devnet/pilot/`,
+  and `./devnet/run-pilot-checklist.sh`.
+- Milestone 19 pilot closure is now active with distributed operator commands,
+  pinned static bootstrap artifacts, the expanded pilot topology, and
+  `./devnet/run-distributed-pilot-checklist.sh`.
 
 Constraints:
 - do not restart the repository from Milestone 0;
@@ -60,8 +63,8 @@ Constraints:
 
 Tasks:
 - confirm the repository already sits at the closed Milestone 1-8 baseline;
-- use `prompts/codex-milestone-18.md` for the next concrete
-  `milestone-18-real-pilot` task;
+- use `prompts/codex-milestone-19.md` for the next concrete
+  `milestone-19-pilot-closure` task;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the repository baseline changes;
 - treat Milestones 1-12 as closed baseline work, touching them only for

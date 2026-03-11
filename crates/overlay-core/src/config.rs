@@ -46,6 +46,23 @@ pub struct OverlayConfig {
 }
 
 impl OverlayConfig {
+    pub fn template() -> Self {
+        Self {
+            node_key_path: PathBuf::from("./keys/node.key"),
+            bootstrap_sources: vec!["./bootstrap/node-foundation.json".to_string()],
+            tcp_listener_addr: Some("127.0.0.1:4101".to_string()),
+            max_total_neighbors: 8,
+            max_presence_records: 64,
+            max_service_records: 16,
+            presence_ttl_s: 120,
+            epoch_duration_s: 60,
+            path_probe_interval_ms: 5_000,
+            max_transport_buffer_bytes: 65_536,
+            relay_mode: false,
+            log_level: LogLevel::Info,
+        }
+    }
+
     pub fn validate(self) -> Result<Self, ConfigError> {
         if path_is_empty(&self.node_key_path) {
             return Err(ConfigError::EmptyField {
@@ -199,6 +216,17 @@ fn bootstrap_source_supported(source: &str) -> bool {
 }
 
 fn parse_http_bootstrap_source(source: &str) -> Option<()> {
+    let (source, fragment) = match source.split_once('#') {
+        Some((source, fragment)) => (source, Some(fragment)),
+        None => (source, None),
+    };
+    if let Some(fragment) = fragment {
+        let hex = fragment.strip_prefix("sha256=")?;
+        if hex.len() != 64 || !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return None;
+        }
+    }
+
     let remainder = source.strip_prefix("http://")?;
     if remainder.is_empty() {
         return None;
@@ -262,6 +290,53 @@ mod tests {
             relay_mode: false,
             log_level: LogLevel::Info,
         }
+    }
+
+    #[test]
+    fn overlay_config_template_is_valid_with_current_defaults() {
+        let config = OverlayConfig::template()
+            .validate()
+            .expect("template config should be valid");
+
+        assert_eq!(config.node_key_path, PathBuf::from("./keys/node.key"));
+        assert_eq!(
+            config.bootstrap_sources,
+            vec!["./bootstrap/node-foundation.json".to_string()]
+        );
+        assert_eq!(config.tcp_listener_addr.as_deref(), Some("127.0.0.1:4101"));
+        assert_eq!(config.max_total_neighbors, 8);
+        assert_eq!(config.max_presence_records, 64);
+        assert_eq!(config.max_service_records, 16);
+        assert_eq!(config.presence_ttl_s, 120);
+        assert_eq!(config.epoch_duration_s, 60);
+        assert_eq!(config.path_probe_interval_ms, 5_000);
+        assert_eq!(config.max_transport_buffer_bytes, 65_536);
+        assert!(!config.relay_mode);
+        assert_eq!(config.log_level, LogLevel::Info);
+    }
+
+    #[test]
+    fn overlay_config_template_serializes_to_the_expected_json_shape() {
+        let value = serde_json::to_value(OverlayConfig::template())
+            .expect("template config should serialize");
+
+        assert_eq!(
+            value,
+            json!({
+                "node_key_path": "./keys/node.key",
+                "bootstrap_sources": ["./bootstrap/node-foundation.json"],
+                "tcp_listener_addr": "127.0.0.1:4101",
+                "max_total_neighbors": 8,
+                "max_presence_records": 64,
+                "max_service_records": 16,
+                "presence_ttl_s": 120,
+                "epoch_duration_s": 60,
+                "path_probe_interval_ms": 5000,
+                "max_transport_buffer_bytes": 65536,
+                "relay_mode": false,
+                "log_level": "info"
+            })
+        );
     }
 
     #[test]
@@ -339,6 +414,14 @@ mod tests {
             invalid_listener.validate(),
             Err(ConfigError::InvalidTcpListenerAddr { .. })
         ));
+
+        let mut invalid_pinned_http_source = sample_config();
+        invalid_pinned_http_source.bootstrap_sources[1] =
+            "http://127.0.0.1:4201/bootstrap.json#sha256=xyz".to_string();
+        assert!(matches!(
+            invalid_pinned_http_source.validate(),
+            Err(ConfigError::UnsupportedBootstrapSource { index: 1, .. })
+        ));
     }
 
     #[test]
@@ -384,6 +467,20 @@ mod tests {
         assert_eq!(peer.max_neighbors, 3);
         assert_eq!(peer.max_relay_neighbors, 3);
         assert_eq!(peer.max_neighbors_per_transport, 3);
+    }
+
+    #[test]
+    fn overlay_config_accepts_http_bootstrap_with_sha256_pin() {
+        let mut config = sample_config();
+        config.bootstrap_sources[1] = "http://127.0.0.1:4201/bootstrap.json#sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string();
+
+        let validated = config
+            .validate()
+            .expect("pinned http source should validate");
+        assert_eq!(
+            validated.bootstrap_sources[1],
+            "http://127.0.0.1:4201/bootstrap.json#sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        );
     }
 
     #[test]

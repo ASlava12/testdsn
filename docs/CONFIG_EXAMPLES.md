@@ -6,6 +6,39 @@ Role-based runnable examples live in
 These examples intentionally reuse the checked-in `devnet/` keys and bootstrap
 seed files so they can be loaded and validated directly in this repository.
 
+## Generate a template
+
+To generate a valid starting config with the current conservative defaults:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- config-template
+```
+
+To write the same template directly into a new file:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- config-template --output /path/to/node.json
+```
+
+The generated JSON uses the current baseline defaults:
+
+- `node_key_path`: `./keys/node.key`
+- `bootstrap_sources`: `["./bootstrap/node-foundation.json"]`
+- `tcp_listener_addr`: `127.0.0.1:4101`
+- `max_total_neighbors`: `8`
+- `max_presence_records`: `64`
+- `max_service_records`: `16`
+- `presence_ttl_s`: `120`
+- `epoch_duration_s`: `60`
+- `path_probe_interval_ms`: `5000`
+- `max_transport_buffer_bytes`: `65536`
+- `relay_mode`: `false`
+- `log_level`: `info`
+
+Before the first real run, replace at least `node_key_path` and
+`bootstrap_sources`, and adjust `tcp_listener_addr` or remove it if the node
+should not listen for inbound TCP sessions.
+
 ## Accepted top-level config fields
 
 The current `OverlayConfig` JSON schema accepts only these fields:
@@ -122,7 +155,8 @@ transport and capability values before peer ingest.
 - The examples are local and repository-relative on purpose.
 - A bootstrap anchor is still just a node plus a seed file, not a bootstrap
   service process.
-- Service-host behavior in the stock repo comes from the smoke harness and
-  caller-side service registration, not from extra JSON fields.
+- Service-host behavior in the stock repo comes from
+  `overlay-cli run --service ...` or caller-side service registration, not from
+  extra JSON fields.
 - Relay-enabled behavior is controlled only by `relay_mode`; other relay limits
   come from built-in profile defaults.

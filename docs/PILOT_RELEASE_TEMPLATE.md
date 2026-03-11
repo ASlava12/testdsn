@@ -1,6 +1,6 @@
 # Pilot Release Template
 
-Use this template for each Milestone 18 pilot candidate tag.
+Use this template for each Milestone 19 pilot-closure candidate tag.
 
 Do not describe the release as GA, production-ready, or ready for hostile
 public deployment.
@@ -8,7 +8,7 @@ public deployment.
 ## Release metadata
 
 - Tag: `pilot-v0.1.0-rcN`
-- Repository stage: `milestone-18-real-pilot`
+- Repository stage: `milestone-19-pilot-closure`
 - Commit: `<git-sha>`
 - Release date: `<YYYY-MM-DD>`
 - Operator: `<name>`
@@ -38,7 +38,8 @@ Short statement of what this pilot candidate is intended to prove.
 - `cargo test -p overlay-core --test integration_service_open`: `<pass/fail>`
 - `./devnet/run-smoke.sh`: `<pass/fail>`
 - `./devnet/run-distributed-smoke.sh`: `<pass/fail>`
-- `./devnet/run-pilot-checklist.sh`: `<pass/fail>`
+- `./devnet/run-multihost-smoke.sh`: `<pass/fail>`
+- `./devnet/run-distributed-pilot-checklist.sh`: `<pass/fail>`
 - `./devnet/run-restart-smoke.sh`: `<pass/fail>`
 
 ## Smoke summary
@@ -55,13 +56,12 @@ Short statement of what this pilot candidate is intended to prove.
 ## Known limitations
 
 - in-memory runtime state only; restart rebuilds state from config and bootstrap
-- minimal static bootstrap over plain `http://` only
-- no standalone distributed operator CLI for publish, lookup, relay intro, or
-  service open
-- the full publish/lookup/service-open/relay proof still runs through the smoke
-  harness against the validated config model
-- relay fallback validated only on the documented `node-a -> node-relay ->
-  node-b` path
+- static bootstrap over pinned `http://...#sha256=<pin>` artifacts only
+- distributed operator commands are one-shot and operator-directed
+- off-box evidence must still be collected manually from separate hosts
+- relay fallback validated only on the documented
+  `node-a -> node-relay -> node-b` and `node-a -> node-relay-b -> node-b`
+  paths
 - pilot-only release; not a public-production deployment claim
 
 ## Go / no-go

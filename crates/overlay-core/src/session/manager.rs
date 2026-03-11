@@ -5,6 +5,7 @@ use thiserror::Error;
 
 use crate::{
     crypto::hash::Blake3Digest,
+    crypto::sign::Ed25519PublicKey,
     identity::NodeId,
     metrics::{LogComponent, LogContext, Observability},
     transport::{
@@ -321,6 +322,7 @@ pub struct SessionTimerSchedule {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SessionSecurityContext {
     pub peer_node_id: NodeId,
+    pub peer_signing_public_key: Ed25519PublicKey,
     pub transcript_hash: Blake3Digest,
     pub session_keys: SessionKeys,
 }
@@ -329,6 +331,7 @@ impl From<HandshakeOutcome> for SessionSecurityContext {
     fn from(outcome: HandshakeOutcome) -> Self {
         Self {
             peer_node_id: outcome.peer_node_id,
+            peer_signing_public_key: outcome.peer_signing_public_key,
             transcript_hash: outcome.transcript_hash,
             session_keys: outcome.session_keys,
         }
@@ -1921,11 +1924,13 @@ mod tests {
         let first = handshake_outcome();
         let second = HandshakeOutcome {
             peer_node_id: NodeId::from_bytes([10_u8; 32]),
+            peer_signing_public_key: crate::crypto::sign::Ed25519PublicKey::from_bytes([4_u8; 32]),
             transcript_hash: [8_u8; 32],
             session_keys: first.session_keys,
         };
         let third = HandshakeOutcome {
             peer_node_id: NodeId::from_bytes([11_u8; 32]),
+            peer_signing_public_key: crate::crypto::sign::Ed25519PublicKey::from_bytes([5_u8; 32]),
             transcript_hash: [9_u8; 32],
             session_keys: first.session_keys,
         };
@@ -1995,6 +2000,7 @@ mod tests {
     fn handshake_outcome() -> HandshakeOutcome {
         HandshakeOutcome {
             peer_node_id: NodeId::from_bytes([9_u8; 32]),
+            peer_signing_public_key: crate::crypto::sign::Ed25519PublicKey::from_bytes([6_u8; 32]),
             transcript_hash: [7_u8; 32],
             session_keys: SessionKeys {
                 client_to_server_key: ChaCha20Poly1305Key::from_bytes([1_u8; 32]),

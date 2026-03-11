@@ -1,188 +1,111 @@
 # Devnet
 
 This directory contains the checked-in devnet and pilot assets for the current
-Milestone 18 stage:
+Milestone 19 stage:
 
-- the original four-node local-file devnet under `configs/` and `bootstrap/`;
-- the host-style multi-host devnet layouts under `hosts/`;
-- the dedicated Milestone 18 pilot pack under `pilot/`;
-- wrapper scripts for the local, distributed, and network-bootstrap smoke
-  paths, plus the pilot checklist.
+- the original four-node local-file devnet under `configs/` and `bootstrap/`
+- the host-style multi-host devnet layouts under `hosts/`
+- the dedicated Milestone 19 pilot pack under `pilot/`
+- wrapper scripts for the local, distributed, network-bootstrap, and
+  pilot-closure proof paths
 
 Nodes:
-- `node-a`: bootstrap anchor and smoke-flow client.
-- `node-b`: presence publisher and service host.
-- `node-c`: extra peer so the seed set is not a 2-node degenerate case.
-- `node-relay`: relay-enabled node for the fallback scenario.
+
+- `node-a`: bootstrap anchor and lookup client
+- `node-b`: presence publisher and service host
+- `node-c`: extra peer so the seed set is not a 2-node degenerate case
+- `node-relay`: primary relay node
+- `node-relay-b`: alternate relay node in the pilot pack
 
 ## Files
 
-- `configs/*.json`: example `OverlayConfig` files.
-- `keys/*.key`: deterministic Ed25519 seed files in hex form.
-- `bootstrap/*.json`: local bootstrap seed files used by the runtime startup path.
-- `hosts/`: host-style config layouts for the runnable localhost network
-  bootstrap path and copy-and-edit multi-host examples.
-- `run-smoke.sh`: wrapper around `overlay-cli smoke`.
-- `run-restart-smoke.sh`: wrapper that runs the same checked-in service-host
-  config twice for a bounded restart smoke.
-- `run-distributed-smoke.sh`: wrapper around the minimal multi-process localhost
-  TCP smoke.
-- `run-multihost-smoke.sh`: wrapper around the host-style network-bootstrap
-  smoke.
-- `run-launch-gate.sh`: wrapper around the full Milestone 17 pilot gate.
-- `run-pilot-checklist.sh`: wrapper around the Milestone 18 pilot rehearsal and
-  fault scenarios.
-- `run-soak.sh`: wrapper around `overlay-cli smoke --soak-seconds ...` for the
-  logical long-run runtime soak.
+- `configs/*.json`: example `OverlayConfig` files
+- `keys/*.key`: deterministic Ed25519 seed files in hex form
+- `bootstrap/*.json`: local bootstrap seed files used by runtime startup
+- `hosts/`: host-style config layouts for localhost proof and multi-host copy/edit use
+- `pilot/`: dedicated Milestone 19 pilot configs and pinned bootstrap artifacts
+- `run-smoke.sh`: wrapper around `overlay-cli smoke`
+- `run-distributed-smoke.sh`: wrapper around the minimal multi-process localhost TCP smoke
+- `run-multihost-smoke.sh`: wrapper around the host-style network-bootstrap smoke
+- `run-distributed-pilot-checklist.sh`: wrapper around the Milestone 19 pilot-closure checklist
+- `run-pilot-checklist.sh`: retained Milestone 18 localhost rehearsal pack
+- `run-launch-gate.sh`: wrapper around the Milestone 17 launch gate
+- `run-restart-smoke.sh`: wrapper around the bounded restart smoke
+- `run-soak.sh`: wrapper around the logical long-run runtime soak
 
-## Run The Smoke Flow
-
-From the repository root:
+## Run the local smoke flow
 
 ```bash
 ./devnet/run-smoke.sh
 ```
 
-The smoke command prints one JSON object per step so failures stop on the exact
-stage:
+The repo-local smoke still prints one JSON object per step and exercises:
 
-1. start `node-a`, `node-b`, `node-c`, and `node-relay`;
-2. establish a real handshake-backed TCP session from `node-a` to `node-b`;
-3. sign and publish `node-b` presence, then inject the verified record into `node-a`'s local lookup store;
-4. exact-lookup `node-b` from `node-a`;
-5. register a `devnet/terminal` service on `node-b` and open an app session to it;
-6. build a reachability plan for `node-b`, force the direct path to fail locally, and bind the fallback tunnel on `node-relay`.
+1. `startup`
+2. `session_established`
+3. `publish_presence`
+4. `lookup_node`
+5. `open_service`
+6. `relay_fallback_planned`
+7. `relay_fallback_bound`
+8. `smoke_complete`
 
-## Inspect A Single Node
-
-To watch the existing runtime startup and tick logs for one config:
-
-```bash
-TMPDIR=/tmp cargo run -p overlay-cli -- run --config devnet/configs/node-a.json --max-ticks 2
-```
-
-To emit periodic runtime health snapshots while the node ticks:
+## Inspect a single node
 
 ```bash
-TMPDIR=/tmp cargo run -p overlay-cli -- run --config devnet/configs/node-a.json --max-ticks 120 --status-every 30
+TMPDIR=/tmp cargo run -p overlay-cli -- run --config devnet/configs/node-a.json --max-ticks 2 --status-every 1
 ```
 
-Each status dump includes:
-- runtime state plus peer/session/path/service counts;
-- publish/lookup/session/relay/probe observability counters;
-- relay usage, cleanup totals, and the effective local resource limits.
-
-## Long-Run Soak
-
-For a logical 30-minute local soak without wall-clock sleeps:
+Register a local service on startup:
 
 ```bash
-./devnet/run-soak.sh
+TMPDIR=/tmp cargo run -p overlay-cli -- run --config devnet/configs/node-b.json --service devnet:terminal --status-every 30
 ```
 
-This drives the same 4-node in-process devnet, advances logical time through
-repeated runtime ticks, and checks that:
-- stale placeholder sessions are reaped after timeout;
-- stale service-open sessions are pruned;
-- relay tunnels are cleaned up after the local retention window;
-- expired path probes are converted into bounded local loss observations;
-- node-b keeps refreshing its installed local presence with rolled freshness
-  during the soak.
-
-## Restart Smoke
-
-For the bounded restart smoke:
+Read the persisted status surface:
 
 ```bash
-./devnet/run-restart-smoke.sh
+TMPDIR=/tmp cargo run -p overlay-cli -- status --config devnet/configs/node-a.json
 ```
 
-This starts the same checked-in service-host config, stops it with `SIGTERM`,
-verifies the persisted `overlay-cli status` surface, then runs the same config
-again with a bounded clean shutdown.
-
-## Distributed TCP Smoke
-
-For the minimal multi-process localhost TCP path:
+## Distributed TCP smoke
 
 ```bash
 ./devnet/run-distributed-smoke.sh
 ```
 
-This builds `overlay-cli`, starts static `http://` bootstrap seed servers,
-starts `node-b` and `node-a` as separate processes from
-`devnet/hosts/localhost/configs/*.json`, and checks for accepted bootstrap
-fetches, listener bind, dial, accept, and session-establishment logs.
+This starts static bootstrap seed servers, starts `node-a` and `node-b` as
+separate processes, and checks accepted bootstrap fetches, listener bind, dial,
+accept, and session-establishment logs.
 
-## Multi-Host Smoke
-
-For the host-style network-bootstrap smoke:
+## Multi-host smoke
 
 ```bash
 ./devnet/run-multihost-smoke.sh
 ```
 
-This starts the same static bootstrap seed servers, then runs
-`overlay-cli smoke --devnet-dir devnet/hosts/localhost` so the host-style
-configs prove bootstrap, TCP session establishment, publish, lookup, service
-open, and relay fallback in one bounded command.
+This starts the static seed servers, then starts the host-style runtimes and
+drives bounded `publish`, `lookup`, `open-service`, and `relay-intro` commands
+across them.
 
-## Full Launch Gate
-
-For the full Milestone 17 pilot gate:
+## Pilot checklist
 
 ```bash
-./devnet/run-launch-gate.sh
+./devnet/run-distributed-pilot-checklist.sh
 ```
 
-This executes the required launch-order checks:
-- `cargo fmt --all --check`
-- `cargo clippy --workspace --all-targets --all-features -- -D warnings`
-- `cargo check --workspace`
-- `cargo test --workspace`
-- the stage-boundary integration tests
-- the devnet smoke
-- the distributed network-bootstrap smoke
-- the multi-host network-bootstrap smoke
-- the bounded logical soak
-- the restart smoke
+This starts the dedicated pilot bootstrap servers, runs the current distributed
+operator flow against `pilot/localhost/`, exercises the documented fault
+scenarios, checks service-host restart/status behavior, validates tampered
+bootstrap rejection, and emits a final `pilot_checklist_complete` summary.
 
-## Pilot Checklist
+## Current limits
 
-For the current Milestone 18 pilot rehearsal:
-
-```bash
-./devnet/run-pilot-checklist.sh
-```
-
-This starts the dedicated pilot bootstrap servers, runs the baseline pilot
-smoke against `pilot/localhost/`, exercises the documented fault scenarios,
-checks pilot-config restart/status behavior, and emits a final
-`pilot_checklist_complete` summary.
-
-## Relay Fallback Scenario
-
-The documented fallback path is `node-a -> node-relay -> node-b`.
-
-- `node-b` publishes a hybrid presence record with direct `quic`/`tcp` attempts plus relay support.
-- The smoke harness creates a fresh intro ticket for `node-a`.
-- The direct path is intentionally treated as unavailable inside the smoke harness.
-- `node-relay` accepts `ResolveIntro` and binds a relay tunnel for the fallback.
-
-## Current Limits
-
-- The network bootstrap path is static JSON over plain `http://` only.
-- The main `run-smoke.sh` path remains repo-local even though it now uses a
-  real TCP session path for the session-establish step.
-- `run-distributed-smoke.sh` proves network bootstrap and the first real
-  distributed TCP session path, but it does not move publish, lookup, service
-  open, or relay control messages over that socket path.
-- `run-multihost-smoke.sh` uses host-style configs and real network bootstrap,
-  but publish, lookup, service open, and relay fallback are still orchestrated
-  inside the smoke harness after signature verification.
-- `run-pilot-checklist.sh` adds the current real-pilot rehearsal pack and
-  report fields, but it still uses the same smoke harness for the full
-  publish/lookup/service-open/relay proof path.
-- The checked-in `tcp://127.0.0.1:*` dial hints in `hosts/localhost/` are the
-  runnable localhost stand-in for the separate-host example addresses in
-  `hosts/examples/`.
+- bootstrap remains static JSON served over `http://`; integrity comes from
+  pinned SHA-256 artifact URLs rather than HTTPS or a public trust root
+- the local `run-smoke.sh` path remains repo-local and harness-driven for the
+  publish/lookup/service/relay steps
+- the distributed operator flows are explicit point-to-point CLI surfaces, not
+  a general distributed control plane
+- lookup is still exact-by-`node_id` only, and service resolution is still
+  exact-by-`app_id` only

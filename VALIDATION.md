@@ -79,6 +79,12 @@ cargo test -p overlay-core --test integration_service_open
 ./devnet/run-pilot-checklist.sh
 ```
 
+## Milestone 19 pilot-closure checklist
+
+```bash
+./devnet/run-distributed-pilot-checklist.sh
+```
+
 Equivalent explicit command order:
 
 ```bash
@@ -97,6 +103,7 @@ TMPDIR=/tmp cargo test -p overlay-core --test integration_service_open
 ./devnet/run-soak.sh
 ./devnet/run-restart-smoke.sh
 ./devnet/run-pilot-checklist.sh
+./devnet/run-distributed-pilot-checklist.sh
 ```
 
 ## Milestone 11 local devnet smoke
@@ -188,12 +195,12 @@ cargo test -p overlay-core --test integration_service_open
 ## Notes
 
 - Milestones 1-12 are considered implemented baseline work, and the current
-  repository stage marker is `milestone-18-real-pilot` (Milestone 18 real pilot
-  support on top of the landed Milestone 17 operator-runtime baseline).
+  repository stage marker is `milestone-19-pilot-closure` (Milestone 19 pilot
+  closure support on top of the landed Milestone 18 real-pilot baseline).
 - Use the Milestone 1-12 regression runs, stage-boundary smoke tests, the
   distributed localhost smoke, the bounded soak, the Milestone 17 launch gate,
-  and the Milestone 18 pilot checklist as the primary checks for the current
-  pilot baseline.
+  and the Milestone 19 distributed pilot checklist as the primary checks for
+  the current pilot-closure baseline.
 - If `REPOSITORY_STAGE`, `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, milestone
   prompts, or other status markers change, rerun the stage-boundary smoke
   tests so code and docs stay aligned.
@@ -234,17 +241,19 @@ cargo test -p overlay-core --test integration_service_open
   step instead of the earlier placeholder-only path.
 - `./devnet/run-multihost-smoke.sh` is the current network-bootstrap and
   host-style devnet proof path. It starts static bootstrap seed servers over
-  `http://`, then runs `overlay-cli smoke --devnet-dir devnet/hosts/localhost`
-  to validate bootstrap, session establishment, publish, lookup, service open,
-  and relay fallback against the multi-host config layout.
+  `http://`, then uses the bounded distributed operator commands to validate
+  bootstrap, session establishment, publish, lookup, service open, and relay
+  fallback against the multi-host config layout.
 - The Milestone 17 gate keeps the distributed and multi-host network-bootstrap
   smoke commands, upgrades the restart smoke to validate signal-driven clean
   shutdown plus `overlay-cli status`, and folds the bounded logical soak into
   the required launch order.
-- `./devnet/run-pilot-checklist.sh` is the current Milestone 18 proof path for
-  the dedicated pilot topology pack, the node-down / relay-unavailable /
-  bootstrap-seed-unavailable rehearsals, pilot lookup-latency and relay-usage
-  reporting, and the pilot-config restart/status check.
+- `./devnet/run-pilot-checklist.sh` remains the Milestone 18 localhost
+  rehearsal pack for the smoke-harness pilot boundary.
+- `./devnet/run-distributed-pilot-checklist.sh` is the current Milestone 19
+  pilot-closure proof path for the dedicated pilot topology pack, the expanded
+  fault matrix, the two relay-capable fallback paths, and the pinned-bootstrap
+  rejection path.
 - The Milestone 12 soak path also stays in-process and advances logical time
   through repeated runtime ticks so stale-session/service/relay/probe cleanup,
   bootstrap retry, and health snapshots can be exercised without a separate

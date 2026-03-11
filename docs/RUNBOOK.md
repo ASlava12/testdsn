@@ -1,59 +1,58 @@
 # Runbook
 
-This runbook is for the repository's current local or pilot launch surface, not
-for hostile-Internet or public-production deployment.
+This runbook is for the repository's current local and pilot launch surface,
+not for hostile-Internet or public-production deployment.
 
 Use [docs/LAUNCH_CHECKLIST.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/LAUNCH_CHECKLIST.md)
 as the release gate, this runbook as the operator flow behind that gate, and
 [docs/PILOT_RUNBOOK.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RUNBOOK.md)
-for the dedicated Milestone 18 separate-host pilot exercise.
+for the dedicated Milestone 19 off-box pilot-closure exercise.
 
 ## Current boundary
 
 What exists today:
 
 - `overlay-cli run` loads one JSON node config, reads one Ed25519 seed file,
-  ingests bootstrap seed files from local paths or plain `http://` URLs, ticks
-  the in-memory runtime, prints structured JSON logs to stdout, and handles
-  `SIGINT` / `SIGTERM` through the runtime shutdown path.
-- `overlay-cli run --status-every <ticks>` also prints periodic
-  `runtime_status` JSON snapshots with runtime state, metrics, relay usage,
-  cleanup totals, bootstrap status, resource limits, and operator lifecycle
-  state.
+  ingests bootstrap seed files from local paths or pinned `http://` URLs,
+  ticks the in-memory runtime, prints structured JSON logs, and handles
+  `SIGINT` / `SIGTERM` through the runtime shutdown path
+- `overlay-cli run --service <namespace:name[:version]>` registers a bounded
+  local service record on startup
 - `overlay-cli status --config <path>` reads the last-known health and
-  lifecycle snapshot from the config-local `.overlay-runtime/` directory.
-- `overlay-cli smoke --devnet-dir <path>` starts the local four-node devnet
-  in-process and exercises the bootstrap, session, presence, lookup, service,
-  and relay-fallback path that the repository currently validates.
+  lifecycle snapshot from the config-local `.overlay-runtime/` directory
+- `overlay-cli publish`, `lookup`, `open-service`, and `relay-intro` provide
+  bounded one-shot operator flows over established runtime sessions
+- `overlay-cli smoke --devnet-dir <path>` still starts the local four-node
+  devnet in-process for the checked-in repo-local proof path
 - `overlay-cli bootstrap-serve --bind <addr> --bootstrap-file <path>` serves
-  one static bootstrap response over minimal `http://` for devnet or lab use.
+  one static bootstrap response over minimal `http://` for devnet or lab use
 
 What does not exist today:
 
-- no public bootstrap-provider infrastructure or HTTPS bootstrap fetch;
-- no full distributed control plane beyond the checked-in bootstrap and session
-  smoke paths;
+- no public bootstrap-provider infrastructure or HTTPS bootstrap fetch
+- no general distributed control plane beyond the explicit operator commands
 - no persistent on-disk runtime state for peers, presence, services, or relay
-  tunnels beyond bounded operator metadata and last-known health;
-- no rolling upgrade or orchestration framework.
+  tunnels beyond bounded operator metadata and last-known health
+- no rolling upgrade or orchestration framework
 
 ## Prerequisites
 
-- Rust and Cargo installed locally.
-- A writable temp directory. In this repository, use `TMPDIR=/tmp` when needed.
-- One node config JSON file.
-- One node key file. The runtime accepts either:
-  - exactly 32 raw Ed25519 seed bytes; or
-  - exactly 64 hex characters.
-- At least one bootstrap seed JSON file.
+- Rust and Cargo installed locally
+- a writable temp directory; in this repository, use `TMPDIR=/tmp` when needed
+- one node config JSON file
+- one node key file as either exactly 32 raw Ed25519 seed bytes or exactly 64
+  hex characters
+- at least one bootstrap seed JSON file
 
 ## Startup checklist
 
-1. Pick a role example from [docs/CONFIG_EXAMPLES.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/CONFIG_EXAMPLES.md).
+1. Generate a starter config with `overlay-cli config-template --output <path>`
+   or pick a role example from [docs/CONFIG_EXAMPLES.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/CONFIG_EXAMPLES.md).
 2. Verify the config only uses supported top-level fields.
-3. Verify `node_key_path` points to an existing 32-byte or 64-hex seed file.
+3. Verify `node_key_path` points to an existing seed file.
 4. Verify every `bootstrap_sources[]` entry points to a local `.json` file,
-   uses `file:<path>`, or uses a devnet/lab `http://host:port/path` seed URL.
+   uses `file:<path>`, or uses a static `http://host:port/path#sha256=<hex>`
+   seed URL.
 5. Start the node with a bounded run first.
 6. Confirm the first stdout records include `bootstrap_fetch`,
    `bootstrap_ingest`, and a runtime `state_transition`.
@@ -62,10 +61,16 @@ What does not exist today:
 8. Confirm `overlay-cli status --config <path>` returns a matching
    `runtime_status` payload with `lifecycle.clean_shutdown == false` while the
    process is still active.
-9. For cross-node behavior, use the smoke harness after single-node startup
-   looks healthy.
+9. For cross-node behavior, use the distributed operator commands or the
+   checked-in smoke/checklist wrappers after single-node startup looks healthy.
 
 ## Launch commands
+
+Generate a new template config:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- config-template --output /path/to/node.json
+```
 
 Single-node bounded startup:
 
@@ -73,10 +78,10 @@ Single-node bounded startup:
 TMPDIR=/tmp cargo run -p overlay-cli -- run --config docs/config-examples/bootstrap-node.json --max-ticks 2 --status-every 1
 ```
 
-Continuous ticking with periodic status:
+Continuous ticking with a local service and periodic status:
 
 ```bash
-TMPDIR=/tmp cargo run -p overlay-cli -- run --config docs/config-examples/relay-enabled-node.json --status-every 30
+TMPDIR=/tmp cargo run -p overlay-cli -- run --config docs/config-examples/service-host-node.json --service devnet:terminal --status-every 30
 ```
 
 Read the persisted operator status:
@@ -85,22 +90,22 @@ Read the persisted operator status:
 TMPDIR=/tmp cargo run -p overlay-cli -- status --config docs/config-examples/relay-enabled-node.json
 ```
 
-Repository devnet smoke:
+One-shot distributed operator commands:
 
 ```bash
-TMPDIR=/tmp cargo run -p overlay-cli -- smoke --devnet-dir devnet
+TMPDIR=/tmp cargo run -p overlay-cli -- publish --config /path/to/node-b.json --target tcp://127.0.0.1:4111 --relay-ref 16f52d6fea63ef086405aa71b537dd4833bd0b36ffe054be0fd07fb525af157d --capability service-host
 ```
 
-Repository devnet logical soak:
-
 ```bash
-TMPDIR=/tmp cargo run -p overlay-cli -- smoke --devnet-dir devnet --soak-seconds 1800 --status-interval-seconds 300
+TMPDIR=/tmp cargo run -p overlay-cli -- lookup --config /path/to/node-a.json --target tcp://127.0.0.1:4111 --node-id 1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b
 ```
 
-Host-style network-bootstrap smoke:
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- open-service --config /path/to/node-a.json --target tcp://127.0.0.1:4112 --target-node-id 1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b --service-namespace devnet --service-name terminal
+```
 
 ```bash
-./devnet/run-multihost-smoke.sh
+TMPDIR=/tmp cargo run -p overlay-cli -- relay-intro --config /path/to/node-b.json --target tcp://127.0.0.1:4198 --relay-node-id 16f52d6fea63ef086405aa71b537dd4833bd0b36ffe054be0fd07fb525af157d --requester-node-id 83561adb398fd87f8e7ed8331bff2fcb945733cc3012879cb9fab07928667062
 ```
 
 Wrapper scripts:
@@ -109,17 +114,11 @@ Wrapper scripts:
 ./devnet/run-smoke.sh
 ./devnet/run-distributed-smoke.sh
 ./devnet/run-multihost-smoke.sh
-./devnet/run-pilot-checklist.sh
+./devnet/run-distributed-pilot-checklist.sh
 ./devnet/run-restart-smoke.sh
 ./devnet/run-launch-gate.sh
 ./devnet/run-soak.sh
 ```
-
-`./devnet/run-launch-gate.sh` is the CI-friendly Milestone 17 pilot gate. It
-runs formatting, lint, build, workspace tests, the stage-boundary integration
-tests, the local devnet smoke, the distributed network-bootstrap smoke, the
-multi-host network-bootstrap smoke, the bounded logical soak, and the restart
-smoke in the documented order.
 
 ## Multi-host bootstrap runbook
 
@@ -128,39 +127,33 @@ as the host-style layout reference and
 [devnet/pilot/README.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot/README.md)
 for the current pilot pack.
 
-Suggested four-host pilot topology:
+Suggested five-host pilot topology:
 
-- host-a: `node-a`, bootstrap seed server for `node-foundation.json`
-- host-b: `node-b`, bootstrap seed server for `node-a-seed.json`
-- host-c: `node-c`
-- host-relay: `node-relay`, bootstrap seed server for `node-ab-seed.json`
+- `host-a`: `node-a`, seed server for `node-foundation.json`
+- `host-b`: `node-b`, seed server for `node-a-seed.json`
+- `host-c`: `node-c`
+- `host-relay-a`: `node-relay`, seed server for `node-ab-seed.json`
+- `host-relay-b-ops`: `node-relay-b`, operator/report collection host
 
 Bring the lab up in this order:
 
-1. Copy the example configs and bootstrap JSON from `devnet/hosts/examples/`.
-2. Start one static seed server on each designated bootstrap host, for example:
-
-   ```bash
-   TMPDIR=/tmp cargo run -p overlay-cli -- bootstrap-serve --bind 0.0.0.0:4201 --bootstrap-file devnet/hosts/examples/bootstrap/node-foundation.json
-   ```
-
-3. Start each node with its host-local config:
-
-   ```bash
-   TMPDIR=/tmp cargo run -p overlay-cli -- run --config /path/to/node-a.json --status-every 30
-   ```
-
+1. Copy the example configs and bootstrap JSON from `devnet/hosts/examples/`
+   or `devnet/pilot/examples/`.
+2. Start one static seed server on each designated bootstrap host.
+3. Start each node with its host-local config; start service hosts with
+   `overlay-cli run --service ...`.
 4. Confirm each node logs `bootstrap_fetch`, `bootstrap_ingest`, and
    `state_transition`.
 5. Confirm `overlay-cli status --config /path/to/node-a.json` reports the same
    node's latest `health` and `.overlay-runtime/` lifecycle state.
-6. Use `./devnet/run-distributed-smoke.sh` for the repo-local real-process
-   proof of network bootstrap plus session establishment.
-7. Use `./devnet/run-multihost-smoke.sh` for the repo-local host-style proof of
-   bootstrap, publish, lookup, service open, and relay fallback against the
-   same config layout.
-8. Use `./devnet/run-pilot-checklist.sh` for the dedicated Milestone 18 pilot
-   rehearsal, fault scenarios, and report fields.
+6. Use `./devnet/run-distributed-smoke.sh` for the repo-local bootstrap plus
+   session-establishment proof.
+7. Use `./devnet/run-multihost-smoke.sh` for the repo-local host-style proof
+   of bootstrap, publish, lookup, service open, and relay fallback.
+8. Use `./devnet/run-distributed-pilot-checklist.sh` for the localhost
+   pilot-closure checklist.
+9. Use [docs/PILOT_RUNBOOK.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RUNBOOK.md)
+   for the actual off-box operator-command run and evidence collection order.
 
 ## What healthy output looks like
 
@@ -173,14 +166,14 @@ Structured log records are emitted as one JSON object per line, for example:
 `runtime_status` snapshots contain:
 
 - `lifecycle`: config-local state path, pid, startup count, clean/unclean
-  shutdown markers, and the most recent shutdown reason;
+  shutdown markers, and the most recent shutdown reason
 - `health.runtime`: node state plus peer, session, path, presence, and service
-  counts;
-- `health.metrics`: bounded counters and latest samples;
-- `health.relay`: current relay tunnel and byte-usage snapshot;
-- `health.bootstrap`: last bootstrap attempt and success counters;
-- `health.cleanup_totals`: how many stale objects have been pruned;
-- `health.resource_limits`: effective local limits after config projection.
+  counts
+- `health.metrics`: bounded counters and latest samples
+- `health.relay`: current relay tunnel and byte-usage snapshot
+- `health.bootstrap`: last bootstrap attempt and success counters
+- `health.cleanup_totals`: how many stale objects have been pruned
+- `health.resource_limits`: effective local limits after config projection
 
 Important fields to watch first:
 
@@ -189,56 +182,27 @@ Important fields to watch first:
 - `health.bootstrap.last_accepted_sources`
 - `health.metrics.lookup_total`
 - `health.metrics.relay_bind_total`
-- `health.metrics.path_switch_total`
 - `health.relay.active_tunnels`
 
 ## Restart procedure
 
 The current runtime is in-memory only. A restart means:
 
-- peer state is rebuilt from bootstrap files;
-- sessions are reopened from scratch;
-- published presence and service-open session state are lost unless your caller
-  recreates them;
-- relay tunnels and path probes are rebuilt from scratch.
+- peer state is rebuilt from bootstrap files
+- sessions are reopened from scratch
+- published presence and service-open session state are lost unless the caller
+  recreates them
+- relay tunnels and path probes are rebuilt from scratch
 
 What does persist across restarts:
 
-- `.overlay-runtime/<config-stem>/runtime.lock` while the process is active;
+- `.overlay-runtime/<config-stem>/runtime.lock` while the process is active
 - `.overlay-runtime/<config-stem>/runtime-status.json` with the last known
-  `runtime_status` payload;
-- startup counters plus clean/unclean shutdown markers for operator recovery.
-
-Use the same key and config files, then rerun `overlay-cli run ...`.
+  `runtime_status` payload
+- startup counters plus clean/unclean shutdown markers for operator recovery
 
 For a bounded restart check:
 
 ```bash
 ./devnet/run-restart-smoke.sh
 ```
-
-## Shutdown notes
-
-`overlay-cli run` now routes `SIGINT` and `SIGTERM` through the runtime
-shutdown path, emits a `runtime_control` shutdown-signal record, updates the
-persisted `runtime_status`, and releases the config-local lock file on clean
-exit.
-
-If the process dies without that path completing, the lock file remains. The
-next startup treats that as stale operator state, recovers it conservatively,
-and reports `lifecycle.recovered_from_unclean_shutdown == true`.
-
-## Operator limits to remember
-
-- A "bootstrap node" in this repository may be represented either by a static
-  seed file or by `overlay-cli bootstrap-serve` exposing that file over
-  `http://`. It is still not a public bootstrap-provider framework.
-- `.overlay-runtime/` is bounded operator metadata only, not a protocol-state
-  database.
-- `relay_mode` is the only relay-related JSON switch. Relay quotas are compiled
-  profile defaults and are surfaced through `runtime_status`, not configured in
-  the JSON file.
-- Local service allow or deny policy is code-driven today. It is not exposed in
-  the node config schema.
-- Lookup is exact-by-`node_id` only.
-- Service resolution is exact-by-`app_id` only.

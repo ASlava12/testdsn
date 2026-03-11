@@ -1,41 +1,62 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$repo_root"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/.." && pwd)"
+cd "${repo_root}"
 
 tmpdir="$(mktemp -d)"
-bootstrap_a_log="$tmpdir/bootstrap-a.log"
-bootstrap_b_log="$tmpdir/bootstrap-b.log"
-bootstrap_relay_log="$tmpdir/bootstrap-relay.log"
-smoke_log="$tmpdir/multihost-smoke.log"
+bootstrap_a_log="${tmpdir}/bootstrap-a.log"
+bootstrap_b_log="${tmpdir}/bootstrap-b.log"
+bootstrap_relay_log="${tmpdir}/bootstrap-relay.log"
+node_a_log="${tmpdir}/node-a.log"
+node_b_log="${tmpdir}/node-b.log"
+node_c_log="${tmpdir}/node-c.log"
+relay_log="${tmpdir}/node-relay.log"
+publish_log="${tmpdir}/publish.log"
+lookup_log="${tmpdir}/lookup.log"
+service_log="${tmpdir}/service.log"
+relay_intro_log="${tmpdir}/relay-intro.log"
+relay_status_log="${tmpdir}/relay-status.json"
 bootstrap_a_pid=""
 bootstrap_b_pid=""
 bootstrap_relay_pid=""
+node_a_pid=""
+node_b_pid=""
+node_c_pid=""
+relay_pid=""
 
 cleanup() {
   status=$?
   if [[ $status -ne 0 ]]; then
-    if [[ -f "$smoke_log" ]]; then
-      echo "--- multihost-smoke.log ---" >&2
-      cat "$smoke_log" >&2
-    fi
-    for log in "$bootstrap_a_log" "$bootstrap_b_log" "$bootstrap_relay_log"; do
-      if [[ -f "$log" ]]; then
-        echo "--- $(basename "$log") ---" >&2
-        cat "$log" >&2
+    for log in \
+      "${publish_log}" \
+      "${lookup_log}" \
+      "${service_log}" \
+      "${relay_intro_log}" \
+      "${node_a_log}" \
+      "${node_b_log}" \
+      "${node_c_log}" \
+      "${relay_log}" \
+      "${bootstrap_a_log}" \
+      "${bootstrap_b_log}" \
+      "${bootstrap_relay_log}" \
+      "${relay_status_log}"; do
+      if [[ -f "${log}" ]]; then
+        echo "--- $(basename "${log}") ---" >&2
+        cat "${log}" >&2
       fi
     done
   fi
-  for pid_var in bootstrap_a_pid bootstrap_b_pid bootstrap_relay_pid; do
+  for pid_var in node_a_pid node_b_pid node_c_pid relay_pid bootstrap_a_pid bootstrap_b_pid bootstrap_relay_pid; do
     pid="${!pid_var}"
     if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
-      kill "${pid}" 2>/dev/null || true
+      kill -TERM "${pid}" 2>/dev/null || true
       wait "${pid}" 2>/dev/null || true
     fi
   done
-  rm -rf "$tmpdir"
-  exit $status
+  rm -rf "${tmpdir}"
+  exit "${status}"
 }
 trap cleanup EXIT
 
@@ -46,41 +67,173 @@ start_bootstrap_server() {
   local bind_addr="$1"
   local bootstrap_file="$2"
   local log_file="$3"
-  "$overlay_cli" bootstrap-serve \
-    --bind "$bind_addr" \
-    --bootstrap-file "$bootstrap_file" \
-    >"$log_file" 2>&1 &
+  "${overlay_cli}" bootstrap-serve \
+    --bind "${bind_addr}" \
+    --bootstrap-file "${bootstrap_file}" \
+    >"${log_file}" 2>&1 &
   local pid="$!"
   for _ in $(seq 1 200); do
-    if grep -q '"step":"bootstrap_server_listen"' "$log_file"; then
-      printf '%s\n' "$pid"
+    if grep -q '"step":"bootstrap_server_listen"' "${log_file}"; then
+      printf '%s\n' "${pid}"
       return 0
     fi
-    if ! kill -0 "$pid" 2>/dev/null; then
-      cat "$log_file" >&2
-      echo "multihost smoke: bootstrap server $bind_addr exited before startup" >&2
+    if ! kill -0 "${pid}" 2>/dev/null; then
+      cat "${log_file}" >&2
+      echo "multihost smoke: bootstrap server ${bind_addr} exited before startup" >&2
       exit 1
     fi
     sleep 0.05
   done
-  cat "$log_file" >&2
-  echo "multihost smoke: bootstrap server $bind_addr did not report readiness" >&2
+  cat "${log_file}" >&2
+  echo "multihost smoke: bootstrap server ${bind_addr} did not report readiness" >&2
   exit 1
 }
 
-bootstrap_a_pid="$(start_bootstrap_server "127.0.0.1:4201" "devnet/bootstrap/node-foundation.json" "$bootstrap_a_log")"
-bootstrap_b_pid="$(start_bootstrap_server "127.0.0.1:4202" "devnet/bootstrap/node-a-seed.json" "$bootstrap_b_log")"
-bootstrap_relay_pid="$(start_bootstrap_server "127.0.0.1:4203" "devnet/bootstrap/node-ab-seed.json" "$bootstrap_relay_log")"
+start_node() {
+  local name="$1"
+  local config_path="$2"
+  local log_file="$3"
+  shift 3
+  "${overlay_cli}" run \
+    --config "${config_path}" \
+    --tick-ms 25 \
+    --max-ticks 600 \
+    "$@" \
+    >"${log_file}" 2>&1 &
+  printf '%s\n' "$!"
+}
 
-"$overlay_cli" smoke --devnet-dir devnet/hosts/localhost >"$smoke_log" 2>&1
+status_probe_file() {
+  local config_path="$1"
+  printf '%s/%s.status.json\n' "${tmpdir}" "$(basename "${config_path}" .json)"
+}
 
-grep -q '"step":"startup"' "$smoke_log"
-grep -q '"step":"session_established"' "$smoke_log"
-grep -q '"step":"publish_presence"' "$smoke_log"
-grep -q '"step":"lookup_node"' "$smoke_log"
-grep -q '"step":"open_service"' "$smoke_log"
-grep -q '"step":"relay_fallback_planned"' "$smoke_log"
-grep -q '"step":"relay_fallback_bound"' "$smoke_log"
-grep -q '"step":"smoke_complete"' "$smoke_log"
+status_matches_pid() {
+  local status_file="$1"
+  local pid="$2"
+  grep -q "\"pid\":${pid}" "${status_file}"
+}
 
-cat "$smoke_log"
+wait_for_runtime() {
+  local pid="$1"
+  local config_path="$2"
+  local log_file="$3"
+  local listener_log="${4:-}"
+  local status_file
+  status_file="$(status_probe_file "${config_path}")"
+  for _ in $(seq 1 240); do
+    if [[ -n "${listener_log}" ]] && ! grep -q "${listener_log}" "${log_file}"; then
+      :
+    elif "${overlay_cli}" status --config "${config_path}" >"${status_file}" 2>/dev/null \
+      && status_matches_pid "${status_file}" "${pid}"; then
+      return 0
+    fi
+    if ! kill -0 "${pid}" 2>/dev/null; then
+      cat "${log_file}" >&2
+      echo "multihost smoke: runtime ${config_path} exited before status became available" >&2
+      exit 1
+    fi
+    sleep 0.05
+  done
+  cat "${log_file}" >&2
+  echo "multihost smoke: runtime ${config_path} did not become ready" >&2
+  exit 1
+}
+
+wait_for_status_pattern() {
+  local pid="$1"
+  local config_path="$2"
+  local status_file="$3"
+  local pattern="$4"
+  local description="$5"
+  for _ in $(seq 1 240); do
+    if "${overlay_cli}" status --config "${config_path}" >"${status_file}" 2>/dev/null \
+      && status_matches_pid "${status_file}" "${pid}" \
+      && grep -q "${pattern}" "${status_file}"; then
+      return 0
+    fi
+    if ! kill -0 "${pid}" 2>/dev/null; then
+      echo "multihost smoke: runtime ${config_path} exited before ${description}" >&2
+      exit 1
+    fi
+    sleep 0.05
+  done
+  echo "multihost smoke: runtime ${config_path} did not reach ${description}" >&2
+  exit 1
+}
+
+extract_node_id() {
+  local pid="$1"
+  local config_path="$2"
+  local status_file
+  status_file="$(status_probe_file "${config_path}")"
+  wait_for_status_pattern "${pid}" "${config_path}" "${status_file}" '"node_id":"' "fresh node status"
+  sed -n 's/.*"node_id":"\([0-9a-f]\{64\}\)".*/\1/p' "${status_file}" | head -n 1
+}
+
+bootstrap_a_pid="$(start_bootstrap_server "127.0.0.1:4201" "devnet/hosts/examples/bootstrap/node-foundation.json" "${bootstrap_a_log}")"
+bootstrap_b_pid="$(start_bootstrap_server "127.0.0.1:4202" "devnet/hosts/examples/bootstrap/node-a-seed.json" "${bootstrap_b_log}")"
+bootstrap_relay_pid="$(start_bootstrap_server "127.0.0.1:4203" "devnet/hosts/examples/bootstrap/node-ab-seed.json" "${bootstrap_relay_log}")"
+
+node_a_pid="$(start_node "node-a" "devnet/hosts/localhost/configs/node-a.json" "${node_a_log}")"
+node_b_pid="$(start_node "node-b" "devnet/hosts/localhost/configs/node-b.json" "${node_b_log}" --service devnet:terminal)"
+node_c_pid="$(start_node "node-c" "devnet/hosts/localhost/configs/node-c.json" "${node_c_log}")"
+relay_pid="$(start_node "node-relay" "devnet/hosts/localhost/configs/node-relay.json" "${relay_log}")"
+
+wait_for_runtime "${node_a_pid}" "devnet/hosts/localhost/configs/node-a.json" "${node_a_log}" '"event":"listen","result":"ok"'
+wait_for_runtime "${node_b_pid}" "devnet/hosts/localhost/configs/node-b.json" "${node_b_log}" '"event":"listen","result":"ok"'
+wait_for_runtime "${node_c_pid}" "devnet/hosts/localhost/configs/node-c.json" "${node_c_log}" '"event":"listen","result":"ok"'
+wait_for_runtime "${relay_pid}" "devnet/hosts/localhost/configs/node-relay.json" "${relay_log}" '"event":"listen","result":"ok"'
+
+node_a_id="$(extract_node_id "${node_a_pid}" "devnet/hosts/localhost/configs/node-a.json")"
+node_b_id="$(extract_node_id "${node_b_pid}" "devnet/hosts/localhost/configs/node-b.json")"
+relay_node_id="$(extract_node_id "${relay_pid}" "devnet/hosts/localhost/configs/node-relay.json")"
+
+echo "{\"step\":\"startup\",\"node\":\"node-a\",\"node_id\":\"${node_a_id}\"}"
+echo "{\"step\":\"startup\",\"node\":\"node-b\",\"node_id\":\"${node_b_id}\"}"
+echo "{\"step\":\"startup\",\"node\":\"node-c\"}"
+echo "{\"step\":\"startup\",\"node\":\"node-relay\",\"node_id\":\"${relay_node_id}\"}"
+
+"${overlay_cli}" publish \
+  --config devnet/hosts/localhost/configs/node-b.json \
+  --target tcp://127.0.0.1:4101 \
+  --relay-ref "${relay_node_id}" \
+  --capability service-host \
+  >"${publish_log}"
+
+"${overlay_cli}" lookup \
+  --config devnet/hosts/localhost/configs/node-a.json \
+  --target tcp://127.0.0.1:4101 \
+  --node-id "${node_b_id}" \
+  >"${lookup_log}"
+
+"${overlay_cli}" open-service \
+  --config devnet/hosts/localhost/configs/node-a.json \
+  --target tcp://127.0.0.1:4102 \
+  --target-node-id "${node_b_id}" \
+  --service-namespace devnet \
+  --service-name terminal \
+  >"${service_log}"
+
+echo "{\"step\":\"relay_fallback_planned\",\"client_node\":\"node-a\",\"target_node\":\"node-b\",\"relay_node\":\"node-relay\",\"requester_node_id\":\"${node_a_id}\"}"
+
+"${overlay_cli}" relay-intro \
+  --config devnet/hosts/localhost/configs/node-b.json \
+  --target tcp://127.0.0.1:4199 \
+  --relay-node-id "${relay_node_id}" \
+  --requester-node-id "${node_a_id}" \
+  >"${relay_intro_log}"
+
+wait_for_status_pattern \
+  "${relay_pid}" \
+  "devnet/hosts/localhost/configs/node-relay.json" \
+  "${relay_status_log}" \
+  '"active_tunnels":1' \
+  'relay tunnel bind'
+
+cat "${publish_log}"
+cat "${lookup_log}"
+cat "${service_log}"
+cat "${relay_intro_log}"
+
+echo "{\"step\":\"smoke_complete\",\"result\":\"ok\",\"node_a_id\":\"${node_a_id}\",\"node_b_id\":\"${node_b_id}\",\"relay_node_id\":\"${relay_node_id}\"}"

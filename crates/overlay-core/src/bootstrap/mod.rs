@@ -221,6 +221,8 @@ pub enum BootstrapValidationError {
 pub enum BootstrapProviderError {
     #[error("bootstrap provider is unavailable: {0}")]
     Unavailable(String),
+    #[error("bootstrap provider artifact integrity check failed: {0}")]
+    Integrity(String),
     #[error(transparent)]
     Validation(#[from] BootstrapValidationError),
 }
