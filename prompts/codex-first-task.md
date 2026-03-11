@@ -4,11 +4,11 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `VALIDATION.md`, `docs/OPEN_QUESTIONS.md`,
 
 Goal:
 Synchronize on the current repository stage,
-`milestone-16-network-bootstrap`, and use the dedicated Milestone 16 prompt
+`milestone-17-operator-runtime`, and use the dedicated Milestone 17 prompt
 for the next concrete current-stage task.
 
 Current repository baseline:
-- The current repository stage is `milestone-16-network-bootstrap`.
+- The current repository stage is `milestone-17-operator-runtime`.
 - Milestone 0 is already complete.
 - Milestone 1 foundations are already implemented, vectorized, and validated in
   `overlay-core` (`identity`, `records`, `wire`).
@@ -39,10 +39,14 @@ Current repository baseline:
   frozen baseline.
 - Milestone 14 launch gate and pilot tag remains part of the landed pilot
   baseline.
-- Milestone 16 network bootstrap and multi-host devnet is now active with
-  `overlay-cli bootstrap-serve`, host-style devnet configs under
-  `devnet/hosts/`, the updated `docs/LAUNCH_CHECKLIST.md`, a documented
-  green-path validation sequence, and explicit pilot-only limitations.
+- Milestone 16 network bootstrap and multi-host devnet is now part of the
+  landed baseline with `overlay-cli bootstrap-serve`, host-style devnet
+  configs under `devnet/hosts/`, and a documented green-path validation
+  sequence.
+- Milestone 17 operator-grade runtime hardening is now active with
+  signal-aware `overlay-cli run`, config-local `.overlay-runtime/` operator
+  state, `overlay-cli status`, stricter startup/config validation, and the
+  bounded soak in the current gate.
 
 Constraints:
 - do not restart the repository from Milestone 0;
@@ -52,8 +56,8 @@ Constraints:
 
 Tasks:
 - confirm the repository already sits at the closed Milestone 1-8 baseline;
-- use `prompts/codex-milestone-16.md` for the next concrete
-  `milestone-16-network-bootstrap` task;
+- use `prompts/codex-milestone-17.md` for the next concrete
+  `milestone-17-operator-runtime` task;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the repository baseline changes;
 - treat Milestones 1-12 as closed baseline work, touching them only for

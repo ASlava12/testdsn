@@ -3,11 +3,15 @@ use std::{
     io::{Read, Write},
     net::TcpListener,
     path::Path,
+    thread,
     time::Duration,
 };
 
+use crate::signal::{install_shutdown_handlers, pending_shutdown_signal};
+
 const MAX_HTTP_REQUEST_BYTES: usize = 8 * 1024;
 const READ_TIMEOUT_MS: u64 = 250;
+const ACCEPT_POLL_MS: u64 = 50;
 
 pub fn run(
     bind_addr: &str,
@@ -24,6 +28,10 @@ pub fn run(
 
     let listener = TcpListener::bind(bind_addr)
         .map_err(|error| format!("failed to bind bootstrap server on {bind_addr}: {error}"))?;
+    listener.set_nonblocking(true).map_err(|error| {
+        format!("failed to configure bootstrap listener nonblocking mode: {error}")
+    })?;
+    install_shutdown_handlers()?;
     let local_addr = listener
         .local_addr()
         .map_err(|error| format!("failed to read bootstrap server local address: {error}"))?;
@@ -39,9 +47,28 @@ pub fn run(
 
     let mut served = 0usize;
     loop {
-        let (mut stream, _) = listener
-            .accept()
-            .map_err(|error| format!("failed to accept bootstrap connection: {error}"))?;
+        if let Some(signal) = pending_shutdown_signal() {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "step": "bootstrap_server_shutdown",
+                    "bind": local_addr.to_string(),
+                    "signal": signal.as_str(),
+                    "served_requests": served,
+                })
+            );
+            break;
+        }
+        let (mut stream, _) = match listener.accept() {
+            Ok(connection) => connection,
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                thread::sleep(Duration::from_millis(ACCEPT_POLL_MS));
+                continue;
+            }
+            Err(error) => {
+                return Err(format!("failed to accept bootstrap connection: {error}"));
+            }
+        };
         stream
             .set_read_timeout(Some(Duration::from_millis(READ_TIMEOUT_MS)))
             .map_err(|error| format!("failed to configure bootstrap read timeout: {error}"))?;

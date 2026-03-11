@@ -1,0 +1,52 @@
+Read `AGENTS.md`, `IMPLEMENT.md`, `README.md`, `HANDOFF.md`, `VALIDATION.md`,
+`docs/LAUNCH_CHECKLIST.md`, `docs/RUNBOOK.md`, `docs/DEVNET.md`,
+`docs/OPEN_QUESTIONS.md`, `devnet/hosts/README.md`, `spec/mvp-scope.md`,
+`spec/architecture.md`, `spec/wire-protocol.md`, `spec/records.md`, and
+`spec/state-machines.md`.
+
+Goal:
+Work within the current repository stage, `milestone-17-operator-runtime`,
+from the landed Milestone 1-16 baseline plus the current operator-runtime
+hardening surface.
+
+Current repository baseline:
+- The current repository stage marker is `milestone-17-operator-runtime`.
+- Milestones 0-12 are implemented, validated, and considered closed.
+- Milestone 14 launch gate and pilot tag are implemented and remain part of the
+  pilot baseline.
+- Milestone 16 network bootstrap and multi-host devnet are implemented with
+  minimal static `http://` bootstrap fetch, `overlay-cli bootstrap-serve`,
+  host-style devnet configs under `devnet/hosts/`, `run-distributed-smoke.sh`,
+  and `run-multihost-smoke.sh`.
+- Milestone 17 operator-grade runtime hardening is implemented with
+  signal-aware `overlay-cli run`, config-local `.overlay-runtime/` operator
+  state, `overlay-cli status`, stricter startup/config validation, the bounded
+  soak in the current gate, and the upgraded restart smoke.
+
+Requirements:
+- preserve the current launch surface documented in
+  `docs/LAUNCH_CHECKLIST.md`, `docs/RUNBOOK.md`, `docs/DEVNET.md`, and
+  `devnet/hosts/README.md`;
+- keep Milestones 1-12 limited to regression fixes, validation maintenance,
+  vector maintenance, or conservative spec-conformance fixes;
+- keep explicit layering between identity, bootstrap, transport/session, peer,
+  rendezvous, relay, routing, and service code;
+- keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, prompts, and
+  `docs/OPEN_QUESTIONS.md` synchronized if the current stage boundary changes;
+- prefer bounded operator metadata and conservative runtime behavior over new
+  protocol or persistence scope.
+
+Constraints:
+- do not add a database or persist protocol-layer state;
+- do not add public bootstrap-provider infrastructure;
+- do not add global discovery or anonymity features;
+- do not redesign protocol semantics;
+- do not broaden scope beyond the documented Milestone 17 surface unless
+  explicitly requested.
+
+Validation:
+- run the applicable commands from `VALIDATION.md`;
+- rerun the documented gate whenever `REPOSITORY_STAGE`, launch docs, or launch
+  scripts change;
+- report exactly what passed, what failed, and whether any failure is an
+  environment issue rather than a code regression.

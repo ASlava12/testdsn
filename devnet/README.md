@@ -1,6 +1,6 @@
 # Devnet
 
-This directory contains the checked-in Milestone 16 devnet assets:
+This directory contains the checked-in Milestone 17 devnet assets:
 
 - the original four-node local-file devnet under `configs/` and `bootstrap/`;
 - the host-style multi-host devnet layouts under `hosts/`;
@@ -27,7 +27,7 @@ Nodes:
   TCP smoke.
 - `run-multihost-smoke.sh`: wrapper around the host-style network-bootstrap
   smoke.
-- `run-launch-gate.sh`: wrapper around the full Milestone 16 pilot gate.
+- `run-launch-gate.sh`: wrapper around the full Milestone 17 pilot gate.
 - `run-soak.sh`: wrapper around `overlay-cli smoke --soak-seconds ...` for the
   logical long-run runtime soak.
 
@@ -93,9 +93,9 @@ For the bounded restart smoke:
 ./devnet/run-restart-smoke.sh
 ```
 
-This runs the same checked-in service-host config twice with `overlay-cli run
---max-ticks 0 --status-every 1` so the current in-memory runtime restart path
-is covered by a reproducible local command.
+This starts the same checked-in service-host config, stops it with `SIGTERM`,
+verifies the persisted `overlay-cli status` surface, then runs the same config
+again with a bounded clean shutdown.
 
 ## Distributed TCP Smoke
 
@@ -125,7 +125,7 @@ open, and relay fallback in one bounded command.
 
 ## Full Launch Gate
 
-For the full Milestone 16 pilot gate:
+For the full Milestone 17 pilot gate:
 
 ```bash
 ./devnet/run-launch-gate.sh
@@ -140,6 +140,7 @@ This executes the required launch-order checks:
 - the devnet smoke
 - the distributed network-bootstrap smoke
 - the multi-host network-bootstrap smoke
+- the bounded logical soak
 - the restart smoke
 
 ## Relay Fallback Scenario

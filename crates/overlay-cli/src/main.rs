@@ -1,5 +1,7 @@
 mod bootstrap_server;
 mod devnet;
+mod operator_state;
+mod signal;
 
 use std::{
     env,
@@ -10,7 +12,9 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use operator_state::{OperatorStateManager, RuntimeShutdownReason};
 use overlay_core::{runtime::NodeRuntime, REPOSITORY_STAGE};
+use signal::{install_shutdown_handlers, pending_shutdown_signal, ShutdownSignal};
 
 fn main() -> ExitCode {
     match try_main() {
@@ -32,6 +36,7 @@ fn try_main() -> Result<(), String> {
             print_usage();
             Ok(())
         }
+        Command::Status { config_path } => print_status_command(config_path),
         Command::Run {
             config_path,
             tick_ms,
@@ -74,6 +79,9 @@ fn try_main() -> Result<(), String> {
 enum Command {
     Stage,
     Help,
+    Status {
+        config_path: PathBuf,
+    },
     Run {
         config_path: PathBuf,
         tick_ms: u64,
@@ -102,11 +110,36 @@ fn parse_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, St
 
     match command.to_string_lossy().as_ref() {
         "-h" | "--help" => Ok(Command::Help),
+        "status" => parse_status_command(args),
         "run" => parse_run_command(args),
         "smoke" => parse_smoke_command(args),
         "bootstrap-serve" => parse_bootstrap_serve_command(args),
         other => Err(format!("unknown command '{other}'")),
     }
+}
+
+fn parse_status_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, String> {
+    let mut config_path = None;
+    let mut args = args.into_iter();
+
+    while let Some(arg) = args.next() {
+        match arg.to_string_lossy().as_ref() {
+            "--config" => {
+                let Some(value) = args.next() else {
+                    return Err("--config requires a path".to_string());
+                };
+                config_path = Some(PathBuf::from(value));
+            }
+            "-h" | "--help" => return Ok(Command::Help),
+            other => return Err(format!("unknown status flag '{other}'")),
+        }
+    }
+
+    let Some(config_path) = config_path else {
+        return Err("status requires --config <path>".to_string());
+    };
+
+    Ok(Command::Status { config_path })
 }
 
 fn parse_run_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, String> {
@@ -284,35 +317,89 @@ fn run_command(
     status_every_ticks: Option<u64>,
     dial_hints: Vec<String>,
 ) -> Result<(), String> {
+    install_shutdown_handlers()?;
+
     let mut runtime =
         NodeRuntime::from_config_path(&config_path).map_err(|error| error.to_string())?;
-    runtime.startup_now().map_err(|error| error.to_string())?;
+    let startup_timestamp = current_unix_ms()?;
+    let mut operator_state = OperatorStateManager::acquire(
+        &config_path,
+        runtime.context().node_id().to_string(),
+        startup_timestamp,
+    )?;
+
+    if let Err(error) = runtime.startup(startup_timestamp) {
+        let _ = operator_state.write_status(&runtime, 0, startup_timestamp);
+        return Err(error.to_string());
+    }
     for dial_hint in dial_hints {
-        let timestamp_unix_ms = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|error| error.to_string())?
-            .as_millis() as u64;
-        runtime
-            .open_tcp_session(&dial_hint, timestamp_unix_ms)
-            .map_err(|error| error.to_string())?;
+        let timestamp_unix_ms = current_unix_ms()?;
+        if let Err(error) = runtime.open_tcp_session(&dial_hint, timestamp_unix_ms) {
+            let _ = operator_state.write_status(&runtime, 0, timestamp_unix_ms);
+            return Err(error.to_string());
+        }
     }
 
+    operator_state.write_status(&runtime, 0, startup_timestamp)?;
     let mut emitted_logs = 0usize;
     print_new_logs(&runtime, &mut emitted_logs)?;
-    print_status_snapshot(&runtime, status_every_ticks, 0)?;
+    print_status_snapshot(&runtime, operator_state.lifecycle(), status_every_ticks, 0)?;
 
     let mut ticks_run = 0_u64;
+    let mut shutdown_reason = RuntimeShutdownReason::NaturalEnd;
     while max_ticks.map(|limit| ticks_run < limit).unwrap_or(true) {
-        thread::sleep(Duration::from_millis(tick_ms));
-        runtime.tick_now().map_err(|error| error.to_string())?;
+        if let Some(signal) = pending_shutdown_signal() {
+            shutdown_reason = signal.into();
+            emit_shutdown_signal(signal)?;
+            break;
+        }
+        if let Some(signal) = sleep_until_next_tick(tick_ms) {
+            shutdown_reason = signal.into();
+            emit_shutdown_signal(signal)?;
+            break;
+        }
+        if let Err(error) = runtime.tick_now() {
+            let timestamp_unix_ms = current_unix_ms()?;
+            let _ = operator_state.write_status(&runtime, ticks_run, timestamp_unix_ms);
+            return Err(error.to_string());
+        }
         print_new_logs(&runtime, &mut emitted_logs)?;
         ticks_run = ticks_run.saturating_add(1);
-        print_status_snapshot(&runtime, status_every_ticks, ticks_run)?;
+        let timestamp_unix_ms = current_unix_ms()?;
+        operator_state.write_status(&runtime, ticks_run, timestamp_unix_ms)?;
+        print_status_snapshot(
+            &runtime,
+            operator_state.lifecycle(),
+            status_every_ticks,
+            ticks_run,
+        )?;
     }
 
-    runtime.shutdown_now().map_err(|error| error.to_string())?;
+    let shutdown_timestamp = current_unix_ms()?;
+    operator_state.begin_shutdown(shutdown_reason, shutdown_timestamp);
+    if let Err(error) = runtime.shutdown(shutdown_timestamp) {
+        let _ = operator_state.write_status(&runtime, ticks_run, shutdown_timestamp);
+        return Err(error.to_string());
+    }
     print_new_logs(&runtime, &mut emitted_logs)?;
-    print_status_snapshot(&runtime, status_every_ticks, ticks_run)?;
+    operator_state.finalize_clean_shutdown(
+        &runtime,
+        ticks_run,
+        shutdown_reason,
+        shutdown_timestamp,
+    )?;
+    print_status_snapshot(
+        &runtime,
+        operator_state.lifecycle(),
+        status_every_ticks,
+        ticks_run,
+    )?;
+    Ok(())
+}
+
+fn print_status_command(config_path: PathBuf) -> Result<(), String> {
+    let status = OperatorStateManager::read_status_file(&config_path)?;
+    println!("{status}");
     Ok(())
 }
 
@@ -330,6 +417,7 @@ fn print_new_logs(runtime: &NodeRuntime, emitted_logs: &mut usize) -> Result<(),
 
 fn print_status_snapshot(
     runtime: &NodeRuntime,
+    lifecycle: &operator_state::RuntimeLifecycleStatus,
     status_every_ticks: Option<u64>,
     ticks_run: u64,
 ) -> Result<(), String> {
@@ -345,7 +433,41 @@ fn print_status_snapshot(
         serde_json::to_string(&serde_json::json!({
             "kind": "runtime_status",
             "ticks_run": ticks_run,
+            "lifecycle": lifecycle,
             "health": runtime.health_snapshot(),
+        }))
+        .map_err(|error| error.to_string())?
+    );
+    Ok(())
+}
+
+fn current_unix_ms() -> Result<u64, String> {
+    Ok(SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| error.to_string())?
+        .as_millis() as u64)
+}
+
+fn sleep_until_next_tick(tick_ms: u64) -> Option<ShutdownSignal> {
+    let mut remaining_ms = tick_ms;
+    while remaining_ms > 0 {
+        let sleep_ms = remaining_ms.min(100);
+        thread::sleep(Duration::from_millis(sleep_ms));
+        if let Some(signal) = pending_shutdown_signal() {
+            return Some(signal);
+        }
+        remaining_ms -= sleep_ms;
+    }
+    None
+}
+
+fn emit_shutdown_signal(signal: ShutdownSignal) -> Result<(), String> {
+    println!(
+        "{}",
+        serde_json::to_string(&serde_json::json!({
+            "kind": "runtime_control",
+            "event": "shutdown_signal_received",
+            "signal": signal.as_str(),
         }))
         .map_err(|error| error.to_string())?
     );
@@ -356,6 +478,7 @@ fn print_usage() {
     println!("overlay-cli: {}", REPOSITORY_STAGE);
     println!("usage:");
     println!("  overlay-cli");
+    println!("  overlay-cli status --config <path>");
     println!(
         "  overlay-cli run --config <path> [--tick-ms <ms>] [--max-ticks <count>] [--status-every <ticks>] [--dial <tcp://host:port> ...]"
     );
@@ -401,6 +524,22 @@ mod tests {
                 max_ticks: Some(3),
                 status_every_ticks: None,
                 dial_hints: Vec::new(),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_command_parses_status_flags() {
+        assert_eq!(
+            parse_command([
+                OsString::from("overlay-cli"),
+                OsString::from("status"),
+                OsString::from("--config"),
+                OsString::from("devnet/configs/node-a.json"),
+            ])
+            .unwrap(),
+            Command::Status {
+                config_path: PathBuf::from("devnet/configs/node-a.json"),
             }
         );
     }

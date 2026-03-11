@@ -727,6 +727,43 @@ impl NodeRuntime {
             .map(|managed| &mut managed.session)
     }
 
+    pub fn close_managed_sessions(
+        &mut self,
+        timestamp_unix_ms: u64,
+        reason: &str,
+    ) -> Result<usize, NodeRuntimeError> {
+        self.ensure_state(
+            "close_managed_sessions",
+            !matches!(self.state, NodeRuntimeState::ShuttingDown),
+        )?;
+
+        let node_id = self.context.node_id;
+        let signing_key = self.context.signing_key().clone();
+        for managed in self.managed_sessions.values_mut() {
+            match managed.session.state() {
+                SessionState::Opening | SessionState::Established | SessionState::Degraded => {
+                    let event = managed
+                        .session
+                        .begin_close(timestamp_unix_ms, Some(reason.to_string()))?;
+                    event.record_with_observability(node_id, &mut self.context.observability);
+                    let actions = managed.session.drain_io_actions();
+                    apply_managed_session_actions(
+                        managed,
+                        actions,
+                        timestamp_unix_ms,
+                        node_id,
+                        &signing_key,
+                        &mut self.context.observability,
+                    );
+                }
+                SessionState::Idle | SessionState::Closing | SessionState::Closed => {}
+            }
+        }
+
+        let (_, _, reaped_sessions) = self.poll_managed_sessions(timestamp_unix_ms)?;
+        Ok(reaped_sessions)
+    }
+
     fn allocate_correlation_id(&mut self) -> u64 {
         let correlation_id = self.next_correlation_id;
         self.next_correlation_id = self.next_correlation_id.saturating_add(1);
@@ -2139,7 +2176,7 @@ mod tests {
             .startup(START_UNIX_MS)
             .expect("startup should succeed");
 
-        assert_eq!(REPOSITORY_STAGE, "milestone-16-network-bootstrap");
+        assert_eq!(REPOSITORY_STAGE, "milestone-17-operator-runtime");
         assert_eq!(runtime.state(), NodeRuntimeState::Running);
         assert_eq!(
             runtime.context().node_id(),
@@ -2253,7 +2290,7 @@ mod tests {
         let signing_key = Ed25519SigningKey::from_seed([41_u8; 32]);
         let mut runtime = NodeRuntime::new(
             NodeContext::new(
-                sample_config("node.key", vec!["static:seed-a".to_string()]),
+                sample_config("node.key", vec!["bootstrap.json".to_string()]),
                 signing_key.clone(),
             )
             .expect("context should initialize"),
@@ -2476,7 +2513,7 @@ mod tests {
         let signing_key = Ed25519SigningKey::from_seed([63_u8; 32]);
         let mut runtime = NodeRuntime::new(
             NodeContext::new(
-                sample_config("node.key", vec!["static:seed-a".to_string()]),
+                sample_config("node.key", vec!["bootstrap.json".to_string()]),
                 signing_key,
             )
             .expect("context should initialize"),
@@ -2520,7 +2557,7 @@ mod tests {
         let signing_key = Ed25519SigningKey::from_seed([64_u8; 32]);
         let mut runtime = NodeRuntime::new(
             NodeContext::new(
-                sample_config("node.key", vec!["static:seed-a".to_string()]),
+                sample_config("node.key", vec!["bootstrap.json".to_string()]),
                 signing_key.clone(),
             )
             .expect("context should initialize"),
@@ -2570,7 +2607,7 @@ mod tests {
         let signing_key = Ed25519SigningKey::from_seed([51_u8; 32]);
         let mut runtime = NodeRuntime::new(
             NodeContext::new(
-                sample_config("node.key", vec!["static:seed-a".to_string()]),
+                sample_config("node.key", vec!["bootstrap.json".to_string()]),
                 signing_key,
             )
             .expect("context should initialize"),
@@ -2615,9 +2652,9 @@ mod tests {
 
     #[test]
     fn real_tcp_runtime_path_establishes_session_over_localhost() {
-        let mut server_config = sample_config("server.key", vec!["static:seed-a".to_string()]);
+        let mut server_config = sample_config("server.key", vec!["bootstrap.json".to_string()]);
         server_config.tcp_listener_addr = Some("127.0.0.1:0".to_string());
-        let client_config = sample_config("client.key", vec!["static:seed-a".to_string()]);
+        let client_config = sample_config("client.key", vec!["bootstrap.json".to_string()]);
 
         let mut server = NodeRuntime::new(
             NodeContext::new(server_config, Ed25519SigningKey::from_seed([71_u8; 32]))

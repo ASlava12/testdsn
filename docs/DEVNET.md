@@ -24,7 +24,7 @@ the Milestone 16 host-style network-bootstrap layout under
 - [devnet/run-restart-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-restart-smoke.sh): wrapper for the bounded restart smoke.
 - [devnet/run-distributed-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-smoke.sh): wrapper for the real-process localhost network-bootstrap smoke.
 - [devnet/run-multihost-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-multihost-smoke.sh): wrapper for the host-style network-bootstrap smoke.
-- [devnet/run-launch-gate.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-launch-gate.sh): wrapper for the full Milestone 16 launch gate.
+- [devnet/run-launch-gate.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-launch-gate.sh): wrapper for the full Milestone 17 launch gate.
 - [devnet/run-soak.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-soak.sh): wrapper for the logical soak.
 
 ## Smoke flow
@@ -111,9 +111,9 @@ Run:
 ```
 
 This performs two consecutive bounded `overlay-cli run` startups against the
-same checked-in service-host config. The goal is to prove the current in-memory
-runtime can be restarted reproducibly with the same config, key, and bootstrap
-files.
+same checked-in service-host config. The first run is terminated with `SIGTERM`
+and validated through `overlay-cli status`; the second run proves the same
+config restarts cleanly with bounded operator state reuse.
 
 ## Full launch gate
 
@@ -123,7 +123,7 @@ Run:
 ./devnet/run-launch-gate.sh
 ```
 
-This executes the Milestone 16 pilot gate in documented order:
+This executes the Milestone 17 pilot gate in documented order:
 
 - `fmt`
 - `clippy`
@@ -133,6 +133,7 @@ This executes the Milestone 16 pilot gate in documented order:
 - devnet smoke
 - distributed network-bootstrap smoke
 - multi-host network-bootstrap smoke
+- bounded logical soak
 - restart smoke
 
 ## Single-node inspection
@@ -142,6 +143,13 @@ without the in-process orchestration:
 
 ```bash
 TMPDIR=/tmp cargo run -p overlay-cli -- run --config devnet/configs/node-a.json --max-ticks 2 --status-every 1
+```
+
+Use `overlay-cli status` when you want the same node's last-known persisted
+health and lifecycle state:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- status --config devnet/configs/node-a.json
 ```
 
 ## Devnet limits

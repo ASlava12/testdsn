@@ -1,7 +1,7 @@
 # Launch Checklist
 
-This checklist defines the Milestone 16 network-bootstrap and multi-host
-devnet gate for the current pilot-ready network surface.
+This checklist defines the Milestone 17 operator-runtime gate for the current
+pilot-ready network surface.
 
 It is a pilot gate, not a public-production or hostile-Internet readiness
 claim.
@@ -19,12 +19,14 @@ The current launchable MVP surface is frozen to:
 - bounded path metrics, deterministic scoring, and hysteresis;
 - exact service resolution by `app_id` and `OpenAppSession`;
 - structured logs, runtime health snapshots, and bounded counters;
-- `overlay-cli run` for single-node inspection;
+- `overlay-cli run` for single-node inspection with signal-aware graceful
+  shutdown;
+- `overlay-cli status` for last-known operator health and lifecycle state;
 - `overlay-cli bootstrap-serve` for static devnet seed serving;
 - `overlay-cli smoke` plus the checked-in devnet layouts for local and
   multi-host-style proof paths.
 
-Anything outside that list is out of the Milestone 16 gate unless a later task
+Anything outside that list is out of the Milestone 17 gate unless a later task
 explicitly reopens scope.
 
 ## Not in this gate
@@ -33,11 +35,12 @@ The current gate does not claim:
 
 - broad public bootstrap-provider infrastructure;
 - HTTPS, DNS-derived bootstrap, or bootstrap trust roots;
-- persistent on-disk peers, presence, services, sessions, or relay state;
+- persistent on-disk peers, presence, services, sessions, or relay state
+  beyond bounded operator metadata and last-known health;
 - global node or service discovery;
 - onion routing or stronger anonymity;
 - full post-quantum handshake;
-- daemon supervision, signal-driven graceful shutdown, or upgrade orchestration;
+- upgrade orchestration or rolling deploy automation;
 - public hostile-environment deployment readiness.
 
 ## Required command order
@@ -57,6 +60,7 @@ TMPDIR=/tmp cargo test -p overlay-core --test integration_service_open
 ./devnet/run-smoke.sh
 ./devnet/run-distributed-smoke.sh
 ./devnet/run-multihost-smoke.sh
+./devnet/run-soak.sh
 ./devnet/run-restart-smoke.sh
 ```
 
@@ -74,8 +78,10 @@ Pass criteria:
 - the multi-host smoke reaches `smoke_complete`;
 - the multi-host smoke includes `publish_presence`, `lookup_node`,
   `open_service`, `relay_fallback_planned`, and `relay_fallback_bound`;
-- the restart smoke completes two consecutive bounded `overlay-cli run`
-  startups against the same config.
+- the bounded soak completes with cleanup and presence-refresh checks;
+- the restart smoke proves a `SIGTERM`-driven clean shutdown, a readable
+  `overlay-cli status` surface, and a second clean startup against the same
+  config.
 
 ## Green path launch sequence
 
@@ -91,13 +97,15 @@ Pass criteria:
 4. Confirm the first logs include `bootstrap_fetch`, `bootstrap_ingest`, and
    `state_transition`, and that `runtime_status.health.runtime.state` becomes
    `running` or `degraded`.
-5. Use `./devnet/run-distributed-smoke.sh` as the real-process proof path for
+5. Confirm `overlay-cli status --config <path>` returns the same node's last
+   known `health` plus `lifecycle.clean_shutdown` / `lifecycle.startup_count`.
+6. Use `./devnet/run-distributed-smoke.sh` as the real-process proof path for
    network bootstrap, listener bind, outbound dial, accept, and handshake-backed
    session establishment.
-6. Use `./devnet/run-multihost-smoke.sh` as the repo-local proof path for
+7. Use `./devnet/run-multihost-smoke.sh` as the repo-local proof path for
    network bootstrap plus publish, lookup, service open, and relay fallback on
    the host-style devnet layout.
-7. Cut the pilot tag only after the gate stays green on the exact commit being
+8. Cut the pilot tag only after the gate stays green on the exact commit being
    tagged.
 
 ## Pilot tag workflow
@@ -129,6 +137,8 @@ Workflow:
 
 - The current runtime is in-memory only and loses peers, sessions, presence,
   service-open state, relay tunnels, and path probes on restart.
+- The current on-disk state is bounded to operator lock/status metadata under
+  `.overlay-runtime/`; it is not protocol-state persistence.
 - The new network bootstrap path is intentionally minimal: it fetches static
   bootstrap JSON over plain `http://` only.
 - `overlay-cli bootstrap-serve` is a devnet seed server, not a public bootstrap

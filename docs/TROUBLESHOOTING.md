@@ -10,16 +10,24 @@ Then inspect:
 
 - the first `bootstrap_fetch` and `bootstrap_ingest` log records;
 - `health.runtime.state`;
+- `lifecycle.clean_shutdown` and `lifecycle.recovered_from_unclean_shutdown`;
 - `health.bootstrap.last_accepted_sources`;
 - `health.metrics`;
 - `health.relay`;
 - `health.resource_limits`.
 
+If the process is still running or has already exited, also read the persisted
+status surface:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- status --config <config-path>
+```
+
 ## Matrix
 
 | Symptom | Real signals to inspect | Likely cause in the current repo | Action |
 | --- | --- | --- | --- |
-| Bootstrap failure | `health.runtime.state == "degraded"`, `health.bootstrap.last_accepted_sources == 0`, `bootstrap_fetch`=`unavailable` or `rejected`, `bootstrap_ingest`=`rejected` | missing file, invalid JSON, expired bootstrap seed, unsupported source such as `https://...`, or schema rejection | fix the bootstrap source path or file contents; use only local `.json` or `file:` sources; rerun with `--max-ticks 0 --status-every 1` first |
+| Bootstrap failure | `health.runtime.state == "degraded"`, `health.bootstrap.last_accepted_sources == 0`, `bootstrap_fetch`=`unavailable` or `rejected`, `bootstrap_ingest`=`rejected` | missing file, invalid JSON, expired bootstrap seed, unsupported source such as `https://...`, or schema rejection | fix the bootstrap source path or file contents; use only local `.json`, `file:`, or static `http://...` sources; rerun with `--max-ticks 0 --status-every 1` first |
 | Lookup timeout | external caller waits, or smoke never reaches `lookup_node`; if you have observability around a lookup call, `lookup_node` results are `missing`, `negative_cache_hit`, or `budget_exhausted` | the stock runtime has no networked lookup RPC or built-in lookup timeout path; lookups are against the local rendezvous store only | first reproduce with `overlay-cli smoke --devnet-dir devnet`; if smoke passes, your timeout is outside the current runtime boundary; if smoke fails before `lookup_node`, fix publish or record injection first |
 | Relay quota rejection | relay log `resolve_intro`=`rejected_rate_limited`, relay log `bind_tunnel`=`rejected`, `health.metrics.dropped_rate_limited_total` increments, `health.relay.active_tunnels` or `recent_intro_requests` approaches `health.resource_limits` | intro request or tunnel quota hit, or relay mode is disabled on that node | use a node with `relay_mode: true`; reduce concurrent relay load; confirm the relay-enabled config was actually the one started |
 | Service policy denial | service log `open_app_session`=`rejected_policy` | local service policy is deny-all in the embedding or harness | the stock JSON schema cannot change this; inspect the caller code that registers the service because checked-in configs alone cannot produce allow or deny policy changes |
@@ -53,5 +61,6 @@ Then inspect:
   service-open command outside the smoke harness.
 - A relay-enabled node still uses compiled default quotas; there is no JSON knob
   for per-minute intro rate or tunnel cap.
-- If you need a final structured shutdown record, use `--max-ticks`; manual
-  interruption is not a graceful shutdown path today.
+- `overlay-cli run` now handles `SIGINT` and `SIGTERM` gracefully, but any
+  crash or hard kill will leave `.overlay-runtime/` marked as an unclean exit
+  until the next startup recovers it.

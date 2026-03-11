@@ -67,7 +67,7 @@ cargo test -p overlay-core --test integration_routing
 cargo test -p overlay-core --test integration_service_open
 ```
 
-## Milestone 16 network-bootstrap gate
+## Milestone 17 operator-runtime gate
 
 ```bash
 ./devnet/run-launch-gate.sh
@@ -88,6 +88,7 @@ TMPDIR=/tmp cargo test -p overlay-core --test integration_service_open
 ./devnet/run-smoke.sh
 ./devnet/run-distributed-smoke.sh
 ./devnet/run-multihost-smoke.sh
+./devnet/run-soak.sh
 ./devnet/run-restart-smoke.sh
 ```
 
@@ -180,11 +181,12 @@ cargo test -p overlay-core --test integration_service_open
 ## Notes
 
 - Milestones 1-12 are considered implemented baseline work, and the current
-  repository stage marker is `milestone-16-network-bootstrap` (Milestone 16
-  network bootstrap and multi-host devnet).
+  repository stage marker is `milestone-17-operator-runtime` (Milestone 17
+  operator-grade runtime hardening on top of the Milestone 16 network-bootstrap
+  pilot baseline).
 - Use the Milestone 1-12 regression runs, stage-boundary smoke tests, the
-  distributed localhost smoke, and the Milestone 16 network-bootstrap gate as
-  the primary checks for the current pilot baseline.
+  distributed localhost smoke, the bounded soak, and the Milestone 17
+  operator-runtime gate as the primary checks for the current pilot baseline.
 - If `REPOSITORY_STAGE`, `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, milestone
   prompts, or other status markers change, rerun the stage-boundary smoke
   tests so code and docs stay aligned.
@@ -228,10 +230,10 @@ cargo test -p overlay-core --test integration_service_open
   `http://`, then runs `overlay-cli smoke --devnet-dir devnet/hosts/localhost`
   to validate bootstrap, session establishment, publish, lookup, service open,
   and relay fallback against the multi-host config layout.
-- The Milestone 16 gate keeps the bounded restart smoke and adds the
-  distributed and multi-host network-bootstrap smoke commands, but it does not
-  replace the Milestone 12 logical soak as an optional supporting hardening
-  check.
+- The Milestone 17 gate keeps the distributed and multi-host network-bootstrap
+  smoke commands, upgrades the restart smoke to validate signal-driven clean
+  shutdown plus `overlay-cli status`, and folds the bounded logical soak into
+  the required launch order.
 - The Milestone 12 soak path also stays in-process and advances logical time
   through repeated runtime ticks so stale-session/service/relay/probe cleanup,
   bootstrap retry, and health snapshots can be exercised without a separate

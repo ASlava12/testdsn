@@ -12,10 +12,14 @@ What exists today:
 
 - `overlay-cli run` loads one JSON node config, reads one Ed25519 seed file,
   ingests bootstrap seed files from local paths or plain `http://` URLs, ticks
-  the in-memory runtime, and prints structured JSON logs to stdout.
+  the in-memory runtime, prints structured JSON logs to stdout, and handles
+  `SIGINT` / `SIGTERM` through the runtime shutdown path.
 - `overlay-cli run --status-every <ticks>` also prints periodic
   `runtime_status` JSON snapshots with runtime state, metrics, relay usage,
-  cleanup totals, bootstrap status, and resource limits.
+  cleanup totals, bootstrap status, resource limits, and operator lifecycle
+  state.
+- `overlay-cli status --config <path>` reads the last-known health and
+  lifecycle snapshot from the config-local `.overlay-runtime/` directory.
 - `overlay-cli smoke --devnet-dir <path>` starts the local four-node devnet
   in-process and exercises the bootstrap, session, presence, lookup, service,
   and relay-fallback path that the repository currently validates.
@@ -27,9 +31,9 @@ What does not exist today:
 - no public bootstrap-provider infrastructure or HTTPS bootstrap fetch;
 - no full distributed control plane beyond the checked-in bootstrap and session
   smoke paths;
-- no daemon management, PID files, or signal-driven graceful shutdown path;
 - no persistent on-disk runtime state for peers, presence, services, or relay
-  tunnels.
+  tunnels beyond bounded operator metadata and last-known health;
+- no rolling upgrade or orchestration framework.
 
 ## Prerequisites
 
@@ -53,7 +57,10 @@ What does not exist today:
    `bootstrap_ingest`, and a runtime `state_transition`.
 7. Confirm `health.runtime.state` becomes `running` or, if bootstrap failed,
    `degraded`.
-8. For cross-node behavior, use the smoke harness after single-node startup
+8. Confirm `overlay-cli status --config <path>` returns a matching
+   `runtime_status` payload with `lifecycle.clean_shutdown == false` while the
+   process is still active.
+9. For cross-node behavior, use the smoke harness after single-node startup
    looks healthy.
 
 ## Launch commands
@@ -68,6 +75,12 @@ Continuous ticking with periodic status:
 
 ```bash
 TMPDIR=/tmp cargo run -p overlay-cli -- run --config docs/config-examples/relay-enabled-node.json --status-every 30
+```
+
+Read the persisted operator status:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- status --config docs/config-examples/relay-enabled-node.json
 ```
 
 Repository devnet smoke:
@@ -99,11 +112,11 @@ Wrapper scripts:
 ./devnet/run-soak.sh
 ```
 
-`./devnet/run-launch-gate.sh` is the CI-friendly Milestone 16 pilot gate. It
+`./devnet/run-launch-gate.sh` is the CI-friendly Milestone 17 pilot gate. It
 runs formatting, lint, build, workspace tests, the stage-boundary integration
 tests, the local devnet smoke, the distributed network-bootstrap smoke, the
-multi-host network-bootstrap smoke, and the restart smoke in the documented
-order.
+multi-host network-bootstrap smoke, the bounded logical soak, and the restart
+smoke in the documented order.
 
 ## Multi-host bootstrap runbook
 
@@ -134,9 +147,11 @@ Bring the lab up in this order:
 
 4. Confirm each node logs `bootstrap_fetch`, `bootstrap_ingest`, and
    `state_transition`.
-5. Use `./devnet/run-distributed-smoke.sh` for the repo-local real-process
+5. Confirm `overlay-cli status --config /path/to/node-a.json` reports the same
+   node's latest `health` and `.overlay-runtime/` lifecycle state.
+6. Use `./devnet/run-distributed-smoke.sh` for the repo-local real-process
    proof of network bootstrap plus session establishment.
-6. Use `./devnet/run-multihost-smoke.sh` for the repo-local host-style proof of
+7. Use `./devnet/run-multihost-smoke.sh` for the repo-local host-style proof of
    bootstrap, publish, lookup, service open, and relay fallback against the
    same config layout.
 
@@ -150,6 +165,8 @@ Structured log records are emitted as one JSON object per line, for example:
 
 `runtime_status` snapshots contain:
 
+- `lifecycle`: config-local state path, pid, startup count, clean/unclean
+  shutdown markers, and the most recent shutdown reason;
 - `health.runtime`: node state plus peer, session, path, presence, and service
   counts;
 - `health.metrics`: bounded counters and latest samples;
@@ -178,6 +195,13 @@ The current runtime is in-memory only. A restart means:
   recreates them;
 - relay tunnels and path probes are rebuilt from scratch.
 
+What does persist across restarts:
+
+- `.overlay-runtime/<config-stem>/runtime.lock` while the process is active;
+- `.overlay-runtime/<config-stem>/runtime-status.json` with the last known
+  `runtime_status` payload;
+- startup counters plus clean/unclean shutdown markers for operator recovery.
+
 Use the same key and config files, then rerun `overlay-cli run ...`.
 
 For a bounded restart check:
@@ -188,17 +212,22 @@ For a bounded restart check:
 
 ## Shutdown notes
 
-`overlay-cli run` calls the runtime shutdown path only when the process reaches
-its natural end, such as `--max-ticks <count>`.
+`overlay-cli run` now routes `SIGINT` and `SIGTERM` through the runtime
+shutdown path, emits a `runtime_control` shutdown-signal record, updates the
+persisted `runtime_status`, and releases the config-local lock file on clean
+exit.
 
-The current CLI does not install signal handling. If you interrupt the process
-manually, do not assume a final structured shutdown record will be emitted.
+If the process dies without that path completing, the lock file remains. The
+next startup treats that as stale operator state, recovers it conservatively,
+and reports `lifecycle.recovered_from_unclean_shutdown == true`.
 
 ## Operator limits to remember
 
 - A "bootstrap node" in this repository may be represented either by a static
   seed file or by `overlay-cli bootstrap-serve` exposing that file over
   `http://`. It is still not a public bootstrap-provider framework.
+- `.overlay-runtime/` is bounded operator metadata only, not a protocol-state
+  database.
 - `relay_mode` is the only relay-related JSON switch. Relay quotas are compiled
   profile defaults and are surfaced through `runtime_status`, not configured in
   the JSON file.

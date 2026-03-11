@@ -2,6 +2,7 @@ target/
 Cargo.lock
 *.log
 *.tmp
+.overlay-runtime/
 .DS_Store
 .idea/
 .vscode/

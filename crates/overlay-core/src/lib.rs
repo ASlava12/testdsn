@@ -15,7 +15,7 @@ pub mod session;
 pub mod transport;
 pub mod wire;
 
-pub const REPOSITORY_STAGE: &str = "milestone-16-network-bootstrap";
+pub const REPOSITORY_STAGE: &str = "milestone-17-operator-runtime";
 
 #[cfg(test)]
 mod tests {
@@ -23,6 +23,6 @@ mod tests {
 
     #[test]
     fn reports_repository_stage() {
-        assert_eq!(REPOSITORY_STAGE, "milestone-16-network-bootstrap");
+        assert_eq!(REPOSITORY_STAGE, "milestone-17-operator-runtime");
     }
 }

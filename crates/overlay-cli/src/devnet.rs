@@ -657,6 +657,14 @@ fn run_long_soak(
             "status_interval_seconds": options.status_interval_seconds,
         }),
     )?;
+    node_a
+        .runtime
+        .close_managed_sessions(start_unix_ms, "devnet soak pre-close")
+        .map_err(|error| format!("{} soak session close failed: {error}", node_a.name))?;
+    node_b
+        .runtime
+        .close_managed_sessions(start_unix_ms + 10, "devnet soak pre-close")
+        .map_err(|error| format!("{} soak session close failed: {error}", node_b.name))?;
 
     for elapsed_s in 1..=options.soak_seconds {
         let tick_unix_ms = start_unix_ms.saturating_add(elapsed_s.saturating_mul(1_000));

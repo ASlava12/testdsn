@@ -1,6 +1,9 @@
 //! Top-level node configuration validation and conservative subsystem projection.
 
-use std::path::{Path, PathBuf};
+use std::{
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -25,6 +28,7 @@ pub enum LogLevel {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct OverlayConfig {
     pub node_key_path: PathBuf,
     pub bootstrap_sources: Vec<String>,
@@ -57,6 +61,12 @@ impl OverlayConfig {
             if source.trim().is_empty() {
                 return Err(ConfigError::EmptyBootstrapSource { index });
             }
+            if !bootstrap_source_supported(source) {
+                return Err(ConfigError::UnsupportedBootstrapSource {
+                    index,
+                    value: source.trim().to_string(),
+                });
+            }
         }
         if self
             .tcp_listener_addr
@@ -66,6 +76,13 @@ impl OverlayConfig {
             return Err(ConfigError::EmptyField {
                 field: "tcp_listener_addr",
             });
+        }
+        if let Some(addr) = self.tcp_listener_addr.as_deref() {
+            addr.trim().parse::<SocketAddr>().map_err(|detail| {
+                ConfigError::InvalidTcpListenerAddr {
+                    detail: detail.to_string(),
+                }
+            })?;
         }
 
         for (field, value) in [
@@ -143,6 +160,10 @@ pub enum ConfigError {
     EmptyField { field: &'static str },
     #[error("config bootstrap_sources[{index}] must not be empty")]
     EmptyBootstrapSource { index: usize },
+    #[error("config bootstrap_sources[{index}] is not a supported local .json, file:, or http:// source: {value}")]
+    UnsupportedBootstrapSource { index: usize, value: String },
+    #[error("config tcp_listener_addr must be a host:port socket address: {detail}")]
+    InvalidTcpListenerAddr { detail: String },
     #[error("config limit {field} must be non-zero")]
     ZeroLimit { field: &'static str },
     #[error(transparent)]
@@ -163,9 +184,63 @@ fn path_is_empty(path: &Path) -> bool {
     path.as_os_str().is_empty()
 }
 
+fn bootstrap_source_supported(source: &str) -> bool {
+    let trimmed = source.trim();
+    if let Some(path) = trimmed.strip_prefix("file:") {
+        return !Path::new(path.trim()).as_os_str().is_empty();
+    }
+
+    if parse_http_bootstrap_source(trimmed).is_some() {
+        return true;
+    }
+
+    let path = Path::new(trimmed);
+    path.extension().and_then(|ext| ext.to_str()) == Some("json") && !trimmed.contains("://")
+}
+
+fn parse_http_bootstrap_source(source: &str) -> Option<()> {
+    let remainder = source.strip_prefix("http://")?;
+    if remainder.is_empty() {
+        return None;
+    }
+
+    let authority = remainder
+        .split_once('/')
+        .map(|(authority, _)| authority)
+        .unwrap_or(remainder)
+        .trim();
+    if authority.is_empty() {
+        return None;
+    }
+
+    http_authority_to_socket_addr(authority)
+}
+
+fn http_authority_to_socket_addr(authority: &str) -> Option<()> {
+    if authority.starts_with('[') {
+        let close = authority.find(']')?;
+        let suffix = authority.get(close + 1..)?;
+        if suffix.is_empty() {
+            return Some(());
+        }
+        if suffix.starts_with(':') && suffix.len() > 1 {
+            return Some(());
+        }
+        return None;
+    }
+
+    if authority.contains(':') {
+        return Some(());
+    }
+
+    Some(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+
+    use serde_json::json;
 
     use super::{ConfigError, LogLevel, OverlayConfig};
 
@@ -173,8 +248,8 @@ mod tests {
         OverlayConfig {
             node_key_path: PathBuf::from("keys/node.pem"),
             bootstrap_sources: vec![
-                "https://bootstrap.example.net/bootstrap.json".to_string(),
-                "static:seed-a".to_string(),
+                "bootstrap.json".to_string(),
+                "http://127.0.0.1:4201/bootstrap.json".to_string(),
             ],
             tcp_listener_addr: None,
             max_total_neighbors: 16,
@@ -241,6 +316,14 @@ mod tests {
             Err(ConfigError::EmptyBootstrapSource { index: 1 })
         ));
 
+        let mut unsupported_source = sample_config();
+        unsupported_source.bootstrap_sources[0] =
+            "https://bootstrap.example.net/bootstrap.json".to_string();
+        assert!(matches!(
+            unsupported_source.validate(),
+            Err(ConfigError::UnsupportedBootstrapSource { index: 0, .. })
+        ));
+
         let mut blank_listener = sample_config();
         blank_listener.tcp_listener_addr = Some("   ".to_string());
         assert!(matches!(
@@ -248,6 +331,13 @@ mod tests {
             Err(ConfigError::EmptyField {
                 field: "tcp_listener_addr"
             })
+        ));
+
+        let mut invalid_listener = sample_config();
+        invalid_listener.tcp_listener_addr = Some("localhost".to_string());
+        assert!(matches!(
+            invalid_listener.validate(),
+            Err(ConfigError::InvalidTcpListenerAddr { .. })
         ));
     }
 
@@ -303,5 +393,25 @@ mod tests {
 
         let parsed: LogLevel = serde_json::from_str("\"warn\"").expect("log level should parse");
         assert_eq!(parsed, LogLevel::Warn);
+    }
+
+    #[test]
+    fn overlay_config_rejects_unknown_fields() {
+        let error = serde_json::from_value::<OverlayConfig>(json!({
+            "node_key_path": "keys/node.pem",
+            "bootstrap_sources": ["bootstrap.json"],
+            "max_total_neighbors": 8,
+            "max_presence_records": 64,
+            "max_service_records": 16,
+            "presence_ttl_s": 120,
+            "epoch_duration_s": 60,
+            "path_probe_interval_ms": 5000,
+            "max_transport_buffer_bytes": 65536,
+            "relay_mode": false,
+            "log_level": "info",
+            "unexpected_operator_knob": true
+        }))
+        .expect_err("unknown config fields should be rejected");
+        assert!(error.to_string().contains("unknown field"));
     }
 }

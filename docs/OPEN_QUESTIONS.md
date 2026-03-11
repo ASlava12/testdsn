@@ -263,12 +263,12 @@ For current work, treat the repository stage as:
   `crates/overlay-cli/src/devnet.rs`;
 - Milestone 12 launch hardening is implemented with bounded cleanup, degraded
   bootstrap retry, runtime health snapshots, and the logical soak path;
-- the current repository stage marker is `milestone-16-network-bootstrap`;
-- Milestone 16 network bootstrap and multi-host devnet is now the current
-  stage, with `docs/LAUNCH_CHECKLIST.md`, `docs/PILOT_RELEASE_TEMPLATE.md`,
-  the documented green-path validation and launch sequence, the checked-in
-  `overlay-cli bootstrap-serve` surface, host-style devnet layouts, and
-  explicit pilot-only limitations;
+- the current repository stage marker is `milestone-17-operator-runtime`;
+- Milestone 17 operator-grade runtime hardening is now the current stage, with
+  `docs/LAUNCH_CHECKLIST.md`, `docs/PILOT_RELEASE_TEMPLATE.md`, the documented
+  green-path validation and launch sequence, signal-aware `overlay-cli run`,
+  config-local `.overlay-runtime/` operator state, `overlay-cli status`, the
+  bounded soak in the launch gate, and explicit pilot-only limitations;
 
 That means:
 
@@ -286,8 +286,8 @@ That means:
   vectors, or spec mismatches;
 - Milestone 8 is closed and should be touched only for regressions,
   vectors, or spec mismatches;
-- Milestone 16 is the current stage and should stay limited to network
-  bootstrap, multi-host devnet maintenance, regression fixes, validation
+- Milestone 17 is the current stage and should stay limited to operator-runtime
+  hardening, network-bootstrap maintenance, regression fixes, validation
   maintenance, and documentation synchronization unless a task explicitly
   reopens scope;
 - public bootstrap infrastructure, discovery expansion, and simulation-focused
@@ -337,6 +337,18 @@ Rules:
 - when multiple candidate `PresenceRecord` values exist, higher epoch wins, then
   higher sequence, and equal epoch plus sequence must be byte-identical to be
   treated as the same record.
+
+### 12. Conservative operator-state persistence for the current pilot runtime
+
+For Milestone 17 operator-runtime hardening, persist only bounded operator
+metadata, not protocol-layer state.
+
+Rules:
+- derive `.overlay-runtime/<config-stem>/` from the config file directory;
+- keep only a live lock file plus the last known `runtime_status` JSON payload;
+- use that state to detect stale locks and mark clean versus unclean shutdown;
+- do not persist peers, presence, services, sessions, relay tunnels, or path
+  probes.
 
 ### 12. Conservative direct-first reachability policy for MVP
 

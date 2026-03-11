@@ -25,6 +25,7 @@ The current `OverlayConfig` JSON schema accepts only these fields:
 
 Unknown operator knobs are not available yet. In particular:
 
+- unknown top-level fields are rejected during JSON parse;
 - relay quota values are not JSON-configurable;
 - service open allow or deny policy is not JSON-configurable;
 - lookup budget, negative cache size, and open-service-session limits are not
@@ -36,11 +37,13 @@ Unknown operator knobs are not available yet. In particular:
 - `bootstrap_sources`: each entry must be:
   - a local `.json` path; or
   - a `file:<path>` URI.
-- `bootstrap_sources`: network URLs are not supported by the current runtime and
-  will be treated as unavailable.
+- `bootstrap_sources`: `http://host[:port]/path` URLs are also supported for
+  the current static bootstrap flow; unsupported schemes such as `https://`
+  fail config validation.
 - `tcp_listener_addr`: optional local bind address for the real TCP listener in
-  `host:port` form. If omitted, `overlay-cli run` stays single-node unless you
-  pass explicit `--dial tcp://...` targets.
+  `host:port` form. Invalid socket-address strings fail config validation. If
+  omitted, `overlay-cli run` stays single-node unless you pass explicit
+  `--dial tcp://...` targets.
 - `max_total_neighbors`: drives the peer-store cap and the runtime's managed
   session and tracked-path caps.
 - `max_presence_records`: projects into the local rendezvous published-record
@@ -57,6 +60,8 @@ Unknown operator knobs are not available yet. In particular:
 - `log_level`: accepted values are lowercase `error`, `warn`, `info`, `debug`,
   or `trace`, but the current runtime does not yet apply this field as a stdout
   log filter.
+- `overlay-cli run` now derives a config-local `.overlay-runtime/<config-stem>/`
+  directory for the operator lock file and persisted `runtime_status` snapshot.
 
 ## Role examples
 
@@ -73,6 +78,12 @@ All four are loadable with:
 
 ```bash
 TMPDIR=/tmp cargo run -p overlay-cli -- run --config <example-path> --max-ticks 0 --status-every 1
+```
+
+The last-known persisted status for any example can be read with:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- status --config <example-path>
 ```
 
 ## Bootstrap seed files

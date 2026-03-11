@@ -5,8 +5,9 @@ This file is the execution plan for Codex.
 ## Current repository stage
 
 The repository has a closed Milestone 1-12 baseline, a landed Milestone 14
-pilot launch gate, and the current Milestone 16 network-bootstrap stage.
-The current repository stage marker is `milestone-16-network-bootstrap`.
+pilot launch gate, a landed Milestone 16 network-bootstrap stage, and the
+current Milestone 17 operator-runtime stage.
+The current repository stage marker is `milestone-17-operator-runtime`.
 
 - Milestone 0 bootstrap is complete.
 - Milestone 1 foundations are implemented, vectorized, and validated in
@@ -116,6 +117,14 @@ The current repository stage marker is `milestone-16-network-bootstrap`.
   distributed and multi-host smoke scripts, and the current validation/docs
   updates for that surface. The repository stage marker now advances to
   `milestone-16-network-bootstrap`.
+- Milestone 17 operator-grade runtime hardening is now implemented in
+  `crates/overlay-cli/src/main.rs`, `crates/overlay-cli/src/operator_state.rs`,
+  `crates/overlay-cli/src/signal.rs`, `crates/overlay-cli/src/bootstrap_server.rs`,
+  and `crates/overlay-core/src/config.rs`, with signal-aware graceful
+  shutdown, restart-safe operator lock/status state under `.overlay-runtime/`,
+  `overlay-cli status`, stricter startup/config validation, an upgraded
+  restart smoke, and the bounded soak added to the current launch gate. The
+  repository stage marker now advances to `milestone-17-operator-runtime`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -123,8 +132,8 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Use `prompts/codex-milestone-16.md` as the recommended next-task prompt for the
-current `milestone-16-network-bootstrap` stage and keep work conservative from
+Use `prompts/codex-milestone-17.md` as the recommended next-task prompt for the
+current `milestone-17-operator-runtime` stage and keep work conservative from
 the current pilot boundary:
 
 1. preserve the current launch surface documented in
@@ -132,8 +141,8 @@ the current pilot boundary:
    `devnet/hosts/README.md`;
 2. keep Milestones 1-12 limited to regression fixes, launch-maintenance
    updates, vector maintenance, or conservative spec-conformance fixes;
-3. prefer network-bootstrap hardening, validation maintenance, and
-   documentation sync over feature expansion;
+3. prefer operator-runtime hardening, validation maintenance, and documentation
+   sync over feature expansion;
 4. rerun the documented launch gate whenever `REPOSITORY_STAGE`, launch docs,
    or launch scripts change;
 5. keep public bootstrap infrastructure, protocol redesign, and scope expansion
@@ -493,3 +502,35 @@ bootstrap flow and add a reproducible host-style devnet validation path.
 - the multi-host smoke proves bootstrap, publish, lookup, service open, and
   relay fallback against the host-style devnet layout;
 - status docs and prompts report the same Milestone 16 stage marker.
+
+---
+
+## Milestone 17 — operator-grade runtime hardening
+
+Status: current repository stage.
+
+### Goal
+Make the current pilot runtime predictable under service-style operation
+without changing the protocol surface.
+
+### Tasks
+1. Add signal-aware graceful shutdown for `overlay-cli run`.
+2. Add restart-safe operator metadata and bounded stale-lock recovery.
+3. Add an operator-facing status surface that survives process restarts.
+4. Tighten startup/config validation for operator use.
+5. Update the launch gate, restart smoke, soak path, and runbooks.
+
+### Important constraints
+- Do not add a database or persist protocol-layer state.
+- Do not redesign protocol layers or claim public-production readiness.
+- Keep persisted state bounded to operator metadata and last-known health.
+
+### Done when
+- `overlay-cli run` handles `SIGINT` and `SIGTERM` through the existing runtime
+  shutdown path;
+- `overlay-cli status --config ...` exposes the last known health plus
+  lifecycle state from `.overlay-runtime/`;
+- the restart smoke proves signal-driven clean shutdown and restart-safe reuse
+  of the same config;
+- the launch gate includes the bounded soak and status docs report the same
+  Milestone 17 stage marker.
