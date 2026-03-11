@@ -113,6 +113,12 @@ or
 ./devnet/run-soak.sh
 ```
 
+## Milestone 15 distributed localhost smoke
+
+```bash
+./devnet/run-distributed-smoke.sh
+```
+
 ## Milestone 5 regression runs
 
 ```bash
@@ -221,6 +227,9 @@ cargo test -p overlay-core --test integration_service_open
 - `overlay-cli run --status-every <ticks>` now emits JSON health snapshots with
   runtime counts, observability counters, relay usage, cleanup totals, and
   resource-limit surfaces for a single node.
+- `./devnet/run-distributed-smoke.sh` is the minimal real-socket regression
+  path for listener bind, outbound dial, accept, and handshake-backed session
+  establishment across separate localhost processes.
 - If the default temp directory is not writable in your environment, prefix the build, lint, and test commands with `TMPDIR=/tmp`.
 
 If a command fails, report exactly which command failed and whether it failed because:

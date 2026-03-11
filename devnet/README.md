@@ -16,6 +16,8 @@ Nodes:
 - `run-smoke.sh`: wrapper around `overlay-cli smoke`.
 - `run-restart-smoke.sh`: wrapper that runs the same checked-in service-host
   config twice for a bounded restart smoke.
+- `run-distributed-smoke.sh`: wrapper around the minimal multi-process localhost
+  TCP smoke.
 - `run-launch-gate.sh`: wrapper around the full Milestone 14 pilot launch gate.
 - `run-soak.sh`: wrapper around `overlay-cli smoke --soak-seconds ...` for the
   logical long-run runtime soak.
@@ -85,6 +87,19 @@ This runs the same checked-in service-host config twice with `overlay-cli run
 --max-ticks 0 --status-every 1` so the current in-memory runtime restart path
 is covered by a reproducible local command.
 
+## Distributed TCP Smoke
+
+For the minimal multi-process localhost TCP path:
+
+```bash
+./devnet/run-distributed-smoke.sh
+```
+
+This builds `overlay-cli`, starts `node-b` and `node-a` as separate processes,
+binds the checked-in TCP listeners from `devnet/configs/*.json`, dials
+`node-b` from `node-a` over a real TCP socket, and checks for listener, dial,
+accept, and session-establishment logs.
+
 ## Full Launch Gate
 
 For the full Milestone 14 pilot gate:
@@ -114,6 +129,12 @@ The documented fallback path is `node-a -> node-relay -> node-b`.
 ## Local-Only Assumptions
 
 - Bootstrap is local-file only because the Milestone 10 runtime does not fetch network bootstrap providers yet.
-- The session step uses the existing placeholder transport boundary with a real handshake outcome, not live sockets.
+- The main `run-smoke.sh` path still uses the existing in-process placeholder
+  session boundary so publish, lookup, service open, and relay fallback stay
+  reproducible without a distributed control plane.
+- `run-distributed-smoke.sh` proves only the first real TCP distributed session
+  path; it does not yet move publish, lookup, service open, or relay control
+  messages over that socket path.
 - Presence propagation, exact lookup visibility, and service open are orchestrated in-process after signature verification instead of over a distributed control plane.
-- Dial hints in the seed files are illustrative local endpoints for config coherence; the current runtime does not bind them to real listeners.
+- The checked-in `tcp://127.0.0.1:*` devnet dial hints now align with real local
+  listener binds in `devnet/configs/*.json`.

@@ -54,6 +54,7 @@ pub enum LogComponent {
     Runtime,
     Bootstrap,
     Peer,
+    Transport,
     Session,
     Rendezvous,
     Relay,

@@ -1,5 +1,5 @@
 use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
-use serde::{ser::Serializer, Deserialize, Serialize};
+use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 use crate::error::CryptoError;
 
@@ -72,5 +72,19 @@ impl Serialize for Ed25519Signature {
         S: Serializer,
     {
         self.0.as_slice().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Ed25519Signature {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let bytes = <Vec<u8>>::deserialize(deserializer)?;
+        let actual = bytes.len();
+        let array: [u8; ED25519_SIGNATURE_LEN] = bytes
+            .try_into()
+            .map_err(|_| serde::de::Error::invalid_length(actual, &"64-byte Ed25519 signature"))?;
+        Ok(Self(array))
     }
 }

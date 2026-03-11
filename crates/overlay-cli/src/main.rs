@@ -1,6 +1,13 @@
 mod devnet;
 
-use std::{env, ffi::OsString, path::PathBuf, process::ExitCode, thread, time::Duration};
+use std::{
+    env,
+    ffi::OsString,
+    path::PathBuf,
+    process::ExitCode,
+    thread,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 use overlay_core::{runtime::NodeRuntime, REPOSITORY_STAGE};
 
@@ -29,7 +36,14 @@ fn try_main() -> Result<(), String> {
             tick_ms,
             max_ticks,
             status_every_ticks,
-        } => run_command(config_path, tick_ms, max_ticks, status_every_ticks),
+            dial_hints,
+        } => run_command(
+            config_path,
+            tick_ms,
+            max_ticks,
+            status_every_ticks,
+            dial_hints,
+        ),
         Command::Smoke {
             devnet_dir,
             soak_seconds,
@@ -59,6 +73,7 @@ enum Command {
         tick_ms: u64,
         max_ticks: Option<u64>,
         status_every_ticks: Option<u64>,
+        dial_hints: Vec<String>,
     },
     Smoke {
         devnet_dir: PathBuf,
@@ -87,6 +102,7 @@ fn parse_run_command(args: impl IntoIterator<Item = OsString>) -> Result<Command
     let mut tick_ms = 1_000_u64;
     let mut max_ticks = None;
     let mut status_every_ticks = None;
+    let mut dial_hints = Vec::new();
     let mut args = args.into_iter();
 
     while let Some(arg) = args.next() {
@@ -115,6 +131,12 @@ fn parse_run_command(args: impl IntoIterator<Item = OsString>) -> Result<Command
                 };
                 status_every_ticks = Some(parse_non_zero_u64_flag("--status-every", &value)?);
             }
+            "--dial" => {
+                let Some(value) = args.next() else {
+                    return Err("--dial requires a tcp://host:port hint".to_string());
+                };
+                dial_hints.push(value.to_string_lossy().into_owned());
+            }
             "-h" | "--help" => return Ok(Command::Help),
             other => return Err(format!("unknown run flag '{other}'")),
         }
@@ -129,6 +151,7 @@ fn parse_run_command(args: impl IntoIterator<Item = OsString>) -> Result<Command
         tick_ms,
         max_ticks,
         status_every_ticks,
+        dial_hints,
     })
 }
 
@@ -193,10 +216,20 @@ fn run_command(
     tick_ms: u64,
     max_ticks: Option<u64>,
     status_every_ticks: Option<u64>,
+    dial_hints: Vec<String>,
 ) -> Result<(), String> {
     let mut runtime =
         NodeRuntime::from_config_path(&config_path).map_err(|error| error.to_string())?;
     runtime.startup_now().map_err(|error| error.to_string())?;
+    for dial_hint in dial_hints {
+        let timestamp_unix_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|error| error.to_string())?
+            .as_millis() as u64;
+        runtime
+            .open_tcp_session(&dial_hint, timestamp_unix_ms)
+            .map_err(|error| error.to_string())?;
+    }
 
     let mut emitted_logs = 0usize;
     print_new_logs(&runtime, &mut emitted_logs)?;
@@ -258,7 +291,7 @@ fn print_usage() {
     println!("usage:");
     println!("  overlay-cli");
     println!(
-        "  overlay-cli run --config <path> [--tick-ms <ms>] [--max-ticks <count>] [--status-every <ticks>]"
+        "  overlay-cli run --config <path> [--tick-ms <ms>] [--max-ticks <count>] [--status-every <ticks>] [--dial <tcp://host:port> ...]"
     );
     println!(
         "  overlay-cli smoke [--devnet-dir <path>] [--soak-seconds <seconds>] [--status-interval-seconds <seconds>]"
@@ -298,6 +331,7 @@ mod tests {
                 tick_ms: 250,
                 max_ticks: Some(3),
                 status_every_ticks: None,
+                dial_hints: Vec::new(),
             }
         );
     }
@@ -334,6 +368,8 @@ mod tests {
                 OsString::from("devnet/configs/node-a.json"),
                 OsString::from("--status-every"),
                 OsString::from("5"),
+                OsString::from("--dial"),
+                OsString::from("tcp://127.0.0.1:4102"),
             ])
             .unwrap(),
             Command::Run {
@@ -341,6 +377,7 @@ mod tests {
                 tick_ms: 1_000,
                 max_ticks: None,
                 status_every_ticks: Some(5),
+                dial_hints: vec!["tcp://127.0.0.1:4102".to_string()],
             }
         );
     }

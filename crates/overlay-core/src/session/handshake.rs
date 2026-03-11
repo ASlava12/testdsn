@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     crypto::{
@@ -23,7 +23,7 @@ const SERVER_TO_CLIENT_KEY_INFO: &[u8] = b"overlay-mvp/server-to-client";
 const CLIENT_FINISH_KEY_INFO: &[u8] = b"overlay-mvp/client-finish-key";
 const CLIENT_FINISH_NONCE_INFO: &[u8] = b"overlay-mvp/client-finish-nonce";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum HandshakeSuite {
     X25519Ed25519HkdfSha256ChaCha20Poly1305Blake3 = 1,
@@ -44,7 +44,7 @@ impl Default for HandshakeConfig {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClientHello {
     pub version: u8,
     pub suite: HandshakeSuite,
@@ -57,13 +57,17 @@ impl ClientHello {
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
         serde_json::to_vec(self)
     }
+
+    pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, serde_json::Error> {
+        serde_json::from_slice(bytes)
+    }
 }
 
 impl Message for ClientHello {
     const TYPE: MessageType = MessageType::ClientHello;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ServerHello {
     pub version: u8,
     pub suite: HandshakeSuite,
@@ -76,6 +80,10 @@ pub struct ServerHello {
 impl ServerHello {
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
         serde_json::to_vec(self)
+    }
+
+    pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, serde_json::Error> {
+        serde_json::from_slice(bytes)
     }
 
     fn unsigned(&self) -> UnsignedServerHello {
@@ -93,7 +101,7 @@ impl Message for ServerHello {
     const TYPE: MessageType = MessageType::ServerHello;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClientFinish {
     pub version: u8,
     pub suite: HandshakeSuite,
@@ -104,6 +112,10 @@ pub struct ClientFinish {
 impl ClientFinish {
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
         serde_json::to_vec(self)
+    }
+
+    pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, serde_json::Error> {
+        serde_json::from_slice(bytes)
     }
 
     fn unsigned(&self) -> UnsignedClientFinish {

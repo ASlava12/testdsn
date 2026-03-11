@@ -12,3 +12,6 @@ Required fields:
 - `max_transport_buffer_bytes`
 - `relay_mode`
 - `log_level`
+
+Optional fields:
+- `tcp_listener_addr`

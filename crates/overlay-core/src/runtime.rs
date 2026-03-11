@@ -3,17 +3,22 @@
 use std::{
     collections::BTreeMap,
     fs, io,
+    net::SocketAddr,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use getrandom::getrandom;
 use serde::Serialize;
 use thiserror::Error;
 
 use crate::{
     bootstrap::{BootstrapProvider, BootstrapProviderError, BootstrapResponse},
     config::{ConfigError, OverlayConfig},
-    crypto::sign::{Ed25519SigningKey, ED25519_SECRET_KEY_LEN},
+    crypto::{
+        kex::X25519StaticSecret,
+        sign::{Ed25519SigningKey, ED25519_SECRET_KEY_LEN},
+    },
     error::{PresenceVerificationError, RecordEncodingError},
     identity::{derive_node_id, NodeId},
     metrics::{LogComponent, LogContext, MetricsSnapshot, Observability},
@@ -27,10 +32,19 @@ use crate::{
     },
     service::{ServiceError, ServiceRegistry},
     session::{
-        ReplayCache, ReplayCacheConfig, ReplayCacheError, SessionError, SessionEvent,
-        SessionIoAction, SessionIoActionKind, SessionManager, SessionRunnerInput, SessionState,
+        ClientFinish, ClientHandshake, ClientHello, HandshakeConfig, ReplayCache,
+        ReplayCacheConfig, ReplayCacheError, ServerHandshake, ServerHello, SessionError,
+        SessionEvent, SessionIoAction, SessionIoActionKind, SessionManager, SessionRunnerInput,
+        SessionState,
     },
-    transport::{TransportRunner, TransportRunnerError},
+    transport::{
+        TcpListenerHandle, TcpSocketTransport, TcpTransportIoError, TransportRunner,
+        TransportRunnerError,
+    },
+    wire::{
+        decode_framed_message, decode_message_body, encode_framed_message, Close, MessageType,
+        Ping, Pong, WireCodecError,
+    },
 };
 
 const PRESENCE_REFRESH_DIVISOR: u64 = 2;
@@ -205,6 +219,10 @@ pub enum NodeRuntimeError {
     ReplayCache(#[from] ReplayCacheError),
     #[error(transparent)]
     Session(#[from] SessionError),
+    #[error(transparent)]
+    TcpTransport(#[from] TcpTransportIoError),
+    #[error("failed to load local handshake entropy: {detail}")]
+    Entropy { detail: String },
     #[error("local presence refresh sequence exhausted for node {node_id}")]
     LocalPresenceSequenceExhausted { node_id: NodeId },
 }
@@ -254,6 +272,10 @@ impl NodeContext {
 
     pub fn config(&self) -> &OverlayConfig {
         &self.config
+    }
+
+    pub fn config_mut(&mut self) -> &mut OverlayConfig {
+        &mut self.config
     }
 
     pub fn signing_key(&self) -> &Ed25519SigningKey {
@@ -321,6 +343,7 @@ impl NodeContext {
 struct ManagedSession {
     session: SessionManager,
     transport: Box<dyn TransportRunner>,
+    driver: ManagedSessionDriver,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -333,6 +356,7 @@ pub struct NodeRuntime {
     state: NodeRuntimeState,
     context: NodeContext,
     bootstrap_sources: Vec<BootstrapSource>,
+    tcp_listener: Option<TcpListenerHandle>,
     managed_sessions: BTreeMap<u64, ManagedSession>,
     max_managed_sessions: usize,
     next_correlation_id: u64,
@@ -349,6 +373,7 @@ impl NodeRuntime {
             state: NodeRuntimeState::Init,
             context,
             bootstrap_sources: Vec::new(),
+            tcp_listener: None,
             managed_sessions: BTreeMap::new(),
             max_managed_sessions,
             next_correlation_id: 1,
@@ -406,6 +431,12 @@ impl NodeRuntime {
         self.managed_sessions.len()
     }
 
+    pub fn tcp_listener_local_addr(&self) -> Option<SocketAddr> {
+        self.tcp_listener
+            .as_ref()
+            .map(TcpListenerHandle::local_addr)
+    }
+
     pub fn snapshot(&self) -> NodeRuntimeSnapshot {
         NodeRuntimeSnapshot {
             state: self.state,
@@ -443,6 +474,7 @@ impl NodeRuntime {
         self.ensure_state("startup", self.state == NodeRuntimeState::Init)?;
         self.log_state_transition(timestamp_unix_ms, NodeRuntimeState::Bootstrapping);
 
+        self.bind_tcp_listener(timestamp_unix_ms)?;
         let now_unix_s = unix_ms_to_s(timestamp_unix_ms);
         self.refresh_bootstrap_sources(timestamp_unix_ms, now_unix_s)?;
         self.sync_active_peer_gauge();
@@ -490,6 +522,7 @@ impl NodeRuntime {
         let presence_refreshed = self.refresh_presence_if_due(timestamp_unix_ms, now_unix_s)?;
         let route_decision = self.evaluate_routes(timestamp_unix_ms, now_unix_s);
         let scheduled_path_probes = self.schedule_path_probes(timestamp_unix_ms)?;
+        self.accept_tcp_sessions(timestamp_unix_ms)?;
         let (session_events, session_io_actions, managed_sessions_reaped) =
             self.poll_managed_sessions(timestamp_unix_ms)?;
 
@@ -575,6 +608,7 @@ impl NodeRuntime {
         self.log_state_transition(timestamp_unix_ms, NodeRuntimeState::ShuttingDown);
 
         let node_id = self.context.node_id;
+        let signing_key = self.context.signing_key().clone();
         for managed in self.managed_sessions.values_mut() {
             match managed.session.state() {
                 SessionState::Opening | SessionState::Established | SessionState::Degraded => {
@@ -582,9 +616,15 @@ impl NodeRuntime {
                         .session
                         .begin_close(timestamp_unix_ms, Some("runtime shutdown".to_string()))?;
                     event.record_with_observability(node_id, &mut self.context.observability);
-                    for action in managed.session.drain_io_actions() {
-                        apply_session_io_action(&mut *managed.transport, &action);
-                    }
+                    let actions = managed.session.drain_io_actions();
+                    apply_managed_session_actions(
+                        managed,
+                        actions,
+                        timestamp_unix_ms,
+                        node_id,
+                        &signing_key,
+                        &mut self.context.observability,
+                    );
                     let closed = managed.session.mark_closed(timestamp_unix_ms)?;
                     closed.record_with_observability(node_id, &mut self.context.observability);
                 }
@@ -597,6 +637,7 @@ impl NodeRuntime {
         }
 
         self.managed_sessions.clear();
+        self.tcp_listener = None;
         SessionManager::sync_established_session_gauge(
             std::iter::empty::<&SessionManager>(),
             &mut self.context.observability,
@@ -607,13 +648,105 @@ impl NodeRuntime {
     pub fn open_placeholder_session(
         &mut self,
         correlation_id: u64,
-        mut transport: Box<dyn TransportRunner>,
+        transport: Box<dyn TransportRunner>,
         timestamp_unix_ms: u64,
     ) -> Result<SessionEvent, NodeRuntimeError> {
         self.ensure_state(
             "open_placeholder_session",
             !matches!(self.state, NodeRuntimeState::ShuttingDown),
         )?;
+        self.open_managed_session(
+            correlation_id,
+            transport,
+            ManagedSessionDriver::Placeholder,
+            timestamp_unix_ms,
+        )
+    }
+
+    pub fn open_tcp_session(
+        &mut self,
+        dial_hint: &str,
+        timestamp_unix_ms: u64,
+    ) -> Result<u64, NodeRuntimeError> {
+        self.ensure_state(
+            "open_tcp_session",
+            !matches!(self.state, NodeRuntimeState::ShuttingDown),
+        )?;
+
+        let correlation_id = self.allocate_correlation_id();
+        let transport = Box::new(TcpSocketTransport::connect(
+            dial_hint,
+            self.context.config.transport_buffer_config(),
+        )?);
+        self.context.observability.push_log(
+            LogContext {
+                timestamp_unix_ms,
+                node_id: self.context.node_id,
+                correlation_id,
+            },
+            LogComponent::Transport,
+            "dial",
+            "started",
+        );
+        self.open_managed_session(
+            correlation_id,
+            transport,
+            ManagedSessionDriver::Tcp(Box::new(TcpSessionDriver::dial())),
+            timestamp_unix_ms,
+        )?;
+
+        Ok(correlation_id)
+    }
+
+    pub fn managed_session(&self, correlation_id: u64) -> Option<&SessionManager> {
+        self.managed_sessions
+            .get(&correlation_id)
+            .map(|managed| &managed.session)
+    }
+
+    pub fn managed_session_mut(&mut self, correlation_id: u64) -> Option<&mut SessionManager> {
+        self.managed_sessions
+            .get_mut(&correlation_id)
+            .map(|managed| &mut managed.session)
+    }
+
+    fn allocate_correlation_id(&mut self) -> u64 {
+        let correlation_id = self.next_correlation_id;
+        self.next_correlation_id = self.next_correlation_id.saturating_add(1);
+        correlation_id
+    }
+
+    fn bind_tcp_listener(&mut self, timestamp_unix_ms: u64) -> Result<(), NodeRuntimeError> {
+        let Some(bind_addr) = self.context.config.tcp_listener_addr.as_deref() else {
+            return Ok(());
+        };
+        if self.tcp_listener.is_some() {
+            return Ok(());
+        }
+
+        let listener =
+            TcpListenerHandle::bind(bind_addr, self.context.config.transport_buffer_config())?;
+        self.context.observability.push_log(
+            allocate_log_context(
+                &mut self.next_correlation_id,
+                self.context.node_id,
+                timestamp_unix_ms,
+            ),
+            LogComponent::Transport,
+            "listen",
+            "ok",
+        );
+        self.tcp_listener = Some(listener);
+        Ok(())
+    }
+
+    fn open_managed_session(
+        &mut self,
+        correlation_id: u64,
+        mut transport: Box<dyn TransportRunner>,
+        driver: ManagedSessionDriver,
+        timestamp_unix_ms: u64,
+    ) -> Result<SessionEvent, NodeRuntimeError> {
         if self.managed_sessions.contains_key(&correlation_id) {
             return Err(NodeRuntimeError::DuplicateSession { correlation_id });
         }
@@ -627,8 +760,23 @@ impl NodeRuntime {
         let mut session = SessionManager::with_node_id(correlation_id, self.context.node_id);
         let event = session.begin_open(timestamp_unix_ms, transport.as_ref())?;
         event.record_with_observability(self.context.node_id, &mut self.context.observability);
-        self.managed_sessions
-            .insert(correlation_id, ManagedSession { session, transport });
+
+        let mut managed = ManagedSession {
+            session,
+            transport,
+            driver,
+        };
+        let signing_key = self.context.signing_key().clone();
+        let actions = managed.session.drain_io_actions();
+        apply_managed_session_actions(
+            &mut managed,
+            actions,
+            timestamp_unix_ms,
+            self.context.node_id,
+            &signing_key,
+            &mut self.context.observability,
+        );
+        self.managed_sessions.insert(correlation_id, managed);
         SessionManager::sync_established_session_gauge(
             self.managed_sessions
                 .values()
@@ -639,16 +787,50 @@ impl NodeRuntime {
         Ok(event)
     }
 
-    pub fn managed_session(&self, correlation_id: u64) -> Option<&SessionManager> {
-        self.managed_sessions
-            .get(&correlation_id)
-            .map(|managed| &managed.session)
-    }
+    fn accept_tcp_sessions(&mut self, timestamp_unix_ms: u64) -> Result<(), NodeRuntimeError> {
+        loop {
+            let transport = {
+                let Some(listener) = self.tcp_listener.as_ref() else {
+                    return Ok(());
+                };
+                listener.accept()?
+            };
+            let Some(transport) = transport else {
+                return Ok(());
+            };
 
-    pub fn managed_session_mut(&mut self, correlation_id: u64) -> Option<&mut SessionManager> {
-        self.managed_sessions
-            .get_mut(&correlation_id)
-            .map(|managed| &mut managed.session)
+            if self.managed_sessions.len() == self.max_managed_sessions {
+                self.context.observability.push_log(
+                    allocate_log_context(
+                        &mut self.next_correlation_id,
+                        self.context.node_id,
+                        timestamp_unix_ms,
+                    ),
+                    LogComponent::Transport,
+                    "accept",
+                    "rejected",
+                );
+                continue;
+            }
+
+            let correlation_id = self.allocate_correlation_id();
+            self.context.observability.push_log(
+                LogContext {
+                    timestamp_unix_ms,
+                    node_id: self.context.node_id,
+                    correlation_id,
+                },
+                LogComponent::Transport,
+                "accept",
+                "accepted",
+            );
+            self.open_managed_session(
+                correlation_id,
+                Box::new(transport),
+                ManagedSessionDriver::Tcp(Box::new(TcpSessionDriver::accept())),
+                timestamp_unix_ms,
+            )?;
+        }
     }
 
     pub fn upsert_path_state(&mut self, path_state: PathState) -> Result<(), NodeRuntimeError> {
@@ -1074,58 +1256,102 @@ impl NodeRuntime {
         let mut session_events = Vec::new();
         let mut session_io_actions = Vec::new();
         let mut closed_ids = Vec::new();
-        let transport_buffer_config = self.context.config.transport_buffer_config();
         let node_id = self.context.node_id;
+        let signing_key = self.context.signing_key().clone();
+        let transport_buffer_config = self.context.config.transport_buffer_config();
+        let correlation_ids = self.managed_sessions.keys().copied().collect::<Vec<_>>();
 
-        for (correlation_id, managed) in self.managed_sessions.iter_mut() {
-            match managed.transport.poll_event(timestamp_unix_ms) {
-                Ok(Some(event)) => {
-                    match SessionRunnerInput::from_transport_poll_event(
-                        event,
-                        transport_buffer_config,
-                    ) {
-                        Ok(Some(input)) => {
-                            let session_event =
-                                managed.session.handle_runner_input_with_replay_cache(
-                                    timestamp_unix_ms,
-                                    input,
-                                    &mut self.context.replay_cache,
-                                )?;
-                            session_event.record_with_observability(
-                                node_id,
-                                &mut self.context.observability,
-                            );
-                            session_events.push(session_event);
-                        }
-                        Ok(None) => {}
-                        Err(error) => {
-                            let session_event =
-                                managed.session.fail(timestamp_unix_ms, error.to_string())?;
-                            session_event.record_with_observability(
-                                node_id,
-                                &mut self.context.observability,
-                            );
-                            session_events.push(session_event);
-                        }
-                    }
-                }
-                Ok(None) => {}
-                Err(TransportRunnerError::UnsupportedOperation { .. }) => {}
+        for correlation_id in correlation_ids {
+            let Some(managed) = self.managed_sessions.get_mut(&correlation_id) else {
+                continue;
+            };
+            if managed.session.state() == SessionState::Closed {
+                closed_ids.push(correlation_id);
+                continue;
             }
 
-            for event in managed.session.poll_timers(timestamp_unix_ms)? {
-                event.record_with_observability(node_id, &mut self.context.observability);
-                session_events.push(event);
+            for _ in 0..8 {
+                if managed.session.state() == SessionState::Closed {
+                    break;
+                }
+                let poll_result = managed.transport.poll_event(timestamp_unix_ms);
+                let session_input = match poll_result {
+                    Ok(Some(event)) => {
+                        self.context.observability.push_log(
+                            LogContext {
+                                timestamp_unix_ms,
+                                node_id,
+                                correlation_id,
+                            },
+                            LogComponent::Transport,
+                            match &event {
+                                crate::transport::TransportPollEvent::Opened => "open",
+                                crate::transport::TransportPollEvent::FrameReceived { .. } => {
+                                    "recv"
+                                }
+                                crate::transport::TransportPollEvent::Closed => "close",
+                                crate::transport::TransportPollEvent::Failed { .. } => "failure",
+                            },
+                            "ok",
+                        );
+                        managed.driver.handle_transport_event(
+                            event,
+                            managed.session.state(),
+                            transport_buffer_config,
+                            timestamp_unix_ms,
+                            &signing_key,
+                            &mut *managed.transport,
+                        )
+                    }
+                    Ok(None) => Ok(None),
+                    Err(TransportRunnerError::UnsupportedOperation { .. }) => Ok(None),
+                };
+
+                let Some(input) = (match session_input {
+                    Ok(input) => input,
+                    Err(detail) => {
+                        let session_event = managed.session.fail(timestamp_unix_ms, detail)?;
+                        session_event
+                            .record_with_observability(node_id, &mut self.context.observability);
+                        session_events.push(session_event);
+                        break;
+                    }
+                }) else {
+                    break;
+                };
+
+                let session_event = managed.session.handle_runner_input_with_replay_cache(
+                    timestamp_unix_ms,
+                    input,
+                    &mut self.context.replay_cache,
+                )?;
+                session_event.record_with_observability(node_id, &mut self.context.observability);
+                session_events.push(session_event);
+                if managed.session.state() == SessionState::Closed {
+                    break;
+                }
+            }
+
+            if managed.session.state() != SessionState::Closed {
+                for event in managed.session.poll_timers(timestamp_unix_ms)? {
+                    event.record_with_observability(node_id, &mut self.context.observability);
+                    session_events.push(event);
+                }
             }
 
             let actions = managed.session.drain_io_actions();
-            for action in &actions {
-                apply_session_io_action(&mut *managed.transport, action);
-            }
+            apply_managed_session_actions(
+                managed,
+                actions.clone(),
+                timestamp_unix_ms,
+                node_id,
+                &signing_key,
+                &mut self.context.observability,
+            );
             session_io_actions.extend(actions);
 
             if managed.session.state() == SessionState::Closed {
-                closed_ids.push(*correlation_id);
+                closed_ids.push(correlation_id);
             }
         }
 
@@ -1141,6 +1367,315 @@ impl NodeRuntime {
         );
 
         Ok((session_events, session_io_actions, reaped_sessions))
+    }
+}
+
+enum ManagedSessionDriver {
+    Placeholder,
+    Tcp(Box<TcpSessionDriver>),
+}
+
+impl ManagedSessionDriver {
+    fn apply_io_action(
+        &mut self,
+        transport: &mut dyn TransportRunner,
+        action: &SessionIoAction,
+        signing_key: &Ed25519SigningKey,
+    ) -> Result<(), String> {
+        match self {
+            Self::Placeholder => {
+                apply_placeholder_session_io_action(transport, action);
+                Ok(())
+            }
+            Self::Tcp(driver) => driver.apply_io_action(transport, action, signing_key),
+        }
+    }
+
+    fn handle_transport_event(
+        &mut self,
+        event: crate::transport::TransportPollEvent,
+        session_state: SessionState,
+        buffer_config: crate::transport::TransportBufferConfig,
+        timestamp_unix_ms: u64,
+        signing_key: &Ed25519SigningKey,
+        transport: &mut dyn TransportRunner,
+    ) -> Result<Option<SessionRunnerInput>, String> {
+        match self {
+            Self::Placeholder => {
+                SessionRunnerInput::from_transport_poll_event(event, buffer_config)
+                    .map_err(|error| error.to_string())
+            }
+            Self::Tcp(driver) => driver.handle_transport_event(
+                event,
+                session_state,
+                timestamp_unix_ms,
+                signing_key,
+                transport,
+            ),
+        }
+    }
+}
+
+enum TcpSessionDriverState {
+    DialPending,
+    AwaitServerHello { handshake: ClientHandshake },
+    AwaitClientHello,
+    AwaitClientFinish { handshake: Box<ServerHandshake> },
+    Established,
+}
+
+struct TcpSessionDriver {
+    state: TcpSessionDriverState,
+}
+
+impl TcpSessionDriver {
+    fn dial() -> Self {
+        Self {
+            state: TcpSessionDriverState::DialPending,
+        }
+    }
+
+    fn accept() -> Self {
+        Self {
+            state: TcpSessionDriverState::AwaitClientHello,
+        }
+    }
+
+    fn apply_io_action(
+        &mut self,
+        transport: &mut dyn TransportRunner,
+        action: &SessionIoAction,
+        signing_key: &Ed25519SigningKey,
+    ) -> Result<(), String> {
+        match action.action {
+            SessionIoActionKind::BeginHandshake => match self.state {
+                TcpSessionDriverState::DialPending => {
+                    let (handshake, client_hello) = ClientHandshake::start(
+                        HandshakeConfig::default(),
+                        signing_key.clone(),
+                        random_ephemeral_secret().map_err(|error| error.to_string())?,
+                    );
+                    send_transport_message(transport, action.correlation_id, &client_hello)?;
+                    self.state = TcpSessionDriverState::AwaitServerHello { handshake };
+                    Ok(())
+                }
+                TcpSessionDriverState::AwaitClientHello
+                | TcpSessionDriverState::AwaitServerHello { .. }
+                | TcpSessionDriverState::AwaitClientFinish { .. }
+                | TcpSessionDriverState::Established => Ok(()),
+            },
+            SessionIoActionKind::SendKeepalive => {
+                send_transport_message(transport, action.correlation_id, &Ping)
+            }
+            SessionIoActionKind::StartClose => {
+                if matches!(self.state, TcpSessionDriverState::Established) {
+                    send_transport_message(transport, action.correlation_id, &Close)?;
+                }
+                ignore_unsupported_runner_op(transport.begin_close(action.correlation_id));
+                Ok(())
+            }
+            SessionIoActionKind::AbortTransport => {
+                ignore_unsupported_runner_op(transport.abort(action.correlation_id));
+                Ok(())
+            }
+        }
+    }
+
+    fn handle_transport_event(
+        &mut self,
+        event: crate::transport::TransportPollEvent,
+        session_state: SessionState,
+        _timestamp_unix_ms: u64,
+        signing_key: &Ed25519SigningKey,
+        transport: &mut dyn TransportRunner,
+    ) -> Result<Option<SessionRunnerInput>, String> {
+        match event {
+            crate::transport::TransportPollEvent::Opened => Ok(None),
+            crate::transport::TransportPollEvent::Closed => {
+                Ok(Some(SessionRunnerInput::TransportClosed { detail: None }))
+            }
+            crate::transport::TransportPollEvent::Failed { detail } => {
+                Ok(Some(SessionRunnerInput::TransportFailed { detail }))
+            }
+            crate::transport::TransportPollEvent::FrameReceived { bytes } => {
+                let (header, body) =
+                    decode_framed_message(&bytes).map_err(|error| error.to_string())?;
+                let message_type = header.message_type().map_err(|error| error.to_string())?;
+                match session_state {
+                    SessionState::Opening => self.handle_handshake_frame(
+                        message_type,
+                        body,
+                        header.correlation_id,
+                        signing_key,
+                        transport,
+                    ),
+                    SessionState::Established | SessionState::Degraded => self
+                        .handle_established_frame(
+                            message_type,
+                            body,
+                            bytes.len(),
+                            header.correlation_id,
+                            transport,
+                        ),
+                    SessionState::Closing => {
+                        if message_type == MessageType::Close {
+                            let _: Close = decode_message_body(body)
+                                .map_err(|error: WireCodecError| error.to_string())?;
+                            ignore_unsupported_runner_op(
+                                transport.begin_close(header.correlation_id),
+                            );
+                            Ok(Some(SessionRunnerInput::TransportClosed {
+                                detail: Some("peer acknowledged close".to_string()),
+                            }))
+                        } else {
+                            Ok(None)
+                        }
+                    }
+                    SessionState::Idle | SessionState::Closed => Ok(None),
+                }
+            }
+        }
+    }
+
+    fn handle_handshake_frame(
+        &mut self,
+        message_type: MessageType,
+        body: &[u8],
+        wire_correlation_id: u64,
+        signing_key: &Ed25519SigningKey,
+        transport: &mut dyn TransportRunner,
+    ) -> Result<Option<SessionRunnerInput>, String> {
+        match std::mem::replace(&mut self.state, TcpSessionDriverState::Established) {
+            TcpSessionDriverState::AwaitServerHello { handshake } => {
+                if message_type != MessageType::ServerHello {
+                    return Err(format!(
+                        "expected server_hello while opening tcp session, got {message_type:?}"
+                    ));
+                }
+                let server_hello: ServerHello =
+                    decode_message_body(body).map_err(|error: WireCodecError| error.to_string())?;
+                let (client_finish, outcome) = handshake
+                    .handle_server_hello(&server_hello)
+                    .map_err(|error| error.to_string())?;
+                send_transport_message(transport, wire_correlation_id, &client_finish)?;
+                self.state = TcpSessionDriverState::Established;
+                Ok(Some(SessionRunnerInput::HandshakeSucceeded { outcome }))
+            }
+            TcpSessionDriverState::AwaitClientHello => {
+                if message_type != MessageType::ClientHello {
+                    return Err(format!(
+                        "expected client_hello while accepting tcp session, got {message_type:?}"
+                    ));
+                }
+                let client_hello: ClientHello =
+                    decode_message_body(body).map_err(|error: WireCodecError| error.to_string())?;
+                let (handshake, server_hello) = ServerHandshake::accept(
+                    HandshakeConfig::default(),
+                    signing_key.clone(),
+                    random_ephemeral_secret().map_err(|error| error.to_string())?,
+                    &client_hello,
+                )
+                .map_err(|error| error.to_string())?;
+                send_transport_message(transport, wire_correlation_id, &server_hello)?;
+                self.state = TcpSessionDriverState::AwaitClientFinish {
+                    handshake: Box::new(handshake),
+                };
+                Ok(None)
+            }
+            TcpSessionDriverState::AwaitClientFinish { handshake } => {
+                if message_type != MessageType::ClientFinish {
+                    return Err(format!(
+                        "expected client_finish while opening tcp session, got {message_type:?}"
+                    ));
+                }
+                let client_finish: ClientFinish =
+                    decode_message_body(body).map_err(|error: WireCodecError| error.to_string())?;
+                let outcome = handshake
+                    .handle_client_finish(&client_finish)
+                    .map_err(|error| error.to_string())?;
+                self.state = TcpSessionDriverState::Established;
+                Ok(Some(SessionRunnerInput::HandshakeSucceeded { outcome }))
+            }
+            TcpSessionDriverState::DialPending => {
+                Err("tcp session received a frame before begin_handshake was emitted".to_string())
+            }
+            TcpSessionDriverState::Established => {
+                Err("tcp session re-entered handshake handling after establishment".to_string())
+            }
+        }
+    }
+
+    fn handle_established_frame(
+        &mut self,
+        message_type: MessageType,
+        body: &[u8],
+        framed_len: usize,
+        wire_correlation_id: u64,
+        transport: &mut dyn TransportRunner,
+    ) -> Result<Option<SessionRunnerInput>, String> {
+        match message_type {
+            MessageType::Ping => {
+                let _: Ping =
+                    decode_message_body(body).map_err(|error: WireCodecError| error.to_string())?;
+                send_transport_message(transport, wire_correlation_id, &Pong)?;
+                Ok(Some(SessionRunnerInput::FrameReceived {
+                    byte_len: framed_len,
+                }))
+            }
+            MessageType::Pong => {
+                let _: Pong =
+                    decode_message_body(body).map_err(|error: WireCodecError| error.to_string())?;
+                Ok(Some(SessionRunnerInput::FrameReceived {
+                    byte_len: framed_len,
+                }))
+            }
+            MessageType::Close => {
+                let _: Close =
+                    decode_message_body(body).map_err(|error: WireCodecError| error.to_string())?;
+                ignore_unsupported_runner_op(transport.begin_close(wire_correlation_id));
+                Ok(Some(SessionRunnerInput::TransportClosed {
+                    detail: Some("peer requested close".to_string()),
+                }))
+            }
+            _ => Ok(Some(SessionRunnerInput::FrameReceived {
+                byte_len: framed_len,
+            })),
+        }
+    }
+}
+
+fn apply_managed_session_actions(
+    managed: &mut ManagedSession,
+    actions: Vec<SessionIoAction>,
+    timestamp_unix_ms: u64,
+    node_id: NodeId,
+    signing_key: &Ed25519SigningKey,
+    observability: &mut Observability,
+) {
+    for action in actions {
+        observability.push_log(
+            LogContext {
+                timestamp_unix_ms,
+                node_id,
+                correlation_id: action.correlation_id,
+            },
+            LogComponent::Transport,
+            match action.action {
+                SessionIoActionKind::BeginHandshake => "handshake",
+                SessionIoActionKind::SendKeepalive => "send",
+                SessionIoActionKind::StartClose => "close",
+                SessionIoActionKind::AbortTransport => "abort",
+            },
+            "started",
+        );
+        let result = managed
+            .driver
+            .apply_io_action(&mut *managed.transport, &action, signing_key);
+        if let Err(detail) = result {
+            if let Ok(event) = managed.session.fail(timestamp_unix_ms, detail) {
+                event.record_with_observability(node_id, observability);
+            }
+        }
     }
 }
 
@@ -1220,7 +1755,10 @@ fn allocate_log_context(
     }
 }
 
-fn apply_session_io_action(transport: &mut dyn TransportRunner, action: &SessionIoAction) {
+fn apply_placeholder_session_io_action(
+    transport: &mut dyn TransportRunner,
+    action: &SessionIoAction,
+) {
     match action.action {
         SessionIoActionKind::StartClose => {
             ignore_unsupported_runner_op(transport.begin_close(action.correlation_id));
@@ -1230,6 +1768,29 @@ fn apply_session_io_action(transport: &mut dyn TransportRunner, action: &Session
         }
         SessionIoActionKind::BeginHandshake | SessionIoActionKind::SendKeepalive => {}
     }
+}
+
+fn send_transport_message<T>(
+    transport: &mut dyn TransportRunner,
+    correlation_id: u64,
+    message: &T,
+) -> Result<(), String>
+where
+    T: crate::wire::Message + Serialize,
+{
+    let frame =
+        encode_framed_message(message, correlation_id).map_err(|error| error.to_string())?;
+    transport
+        .send_frame(correlation_id, &frame)
+        .map_err(|error| error.to_string())
+}
+
+fn random_ephemeral_secret() -> Result<X25519StaticSecret, NodeRuntimeError> {
+    let mut bytes = [0_u8; 32];
+    getrandom(&mut bytes).map_err(|error| NodeRuntimeError::Entropy {
+        detail: error.to_string(),
+    })?;
+    Ok(X25519StaticSecret::from_bytes(bytes))
 }
 
 fn ignore_unsupported_runner_op(result: Result<(), TransportRunnerError>) {
@@ -1355,7 +1916,7 @@ mod tests {
         rendezvous::VerifiedPublishPresence,
         routing::{PathMetrics, PathState, RouteDecision},
         service::{LocalServicePolicy, OpenAppSession, OpenAppSessionStatus},
-        session::{HandshakeOutcome, SessionIoActionKind},
+        session::{HandshakeOutcome, SessionIoActionKind, SessionState},
         transport::{Transport, TransportClass, TransportPollEvent, TransportRunner},
         wire::MAX_FRAME_BODY_LEN,
         REPOSITORY_STAGE,
@@ -1770,6 +2331,98 @@ mod tests {
             ));
     }
 
+    #[test]
+    fn real_tcp_runtime_path_establishes_session_over_localhost() {
+        let mut server_config = sample_config("server.key", vec!["static:seed-a".to_string()]);
+        server_config.tcp_listener_addr = Some("127.0.0.1:0".to_string());
+        let client_config = sample_config("client.key", vec!["static:seed-a".to_string()]);
+
+        let mut server = NodeRuntime::new(
+            NodeContext::new(server_config, Ed25519SigningKey::from_seed([71_u8; 32]))
+                .expect("server context should initialize"),
+        );
+        let mut client = NodeRuntime::new(
+            NodeContext::new(client_config, Ed25519SigningKey::from_seed([72_u8; 32]))
+                .expect("client context should initialize"),
+        );
+
+        server
+            .startup(START_UNIX_MS)
+            .expect("server startup should degrade, not fail");
+        client
+            .startup(START_UNIX_MS + 1)
+            .expect("client startup should degrade, not fail");
+
+        let listener_addr = server
+            .tcp_listener_local_addr()
+            .expect("server should bind a tcp listener");
+        let client_session_id = client
+            .open_tcp_session(&format!("tcp://{listener_addr}"), START_UNIX_MS + 10)
+            .expect("client dial should succeed");
+
+        let mut server_session_id = None;
+        for tick in 0..200_u64 {
+            server
+                .tick(START_UNIX_MS + 20 + tick)
+                .expect("server tick should succeed");
+            client
+                .tick(START_UNIX_MS + 20 + tick)
+                .expect("client tick should succeed");
+
+            if server_session_id.is_none() {
+                server_session_id = server.managed_sessions.keys().copied().next();
+            }
+
+            let client_established = client
+                .managed_session(client_session_id)
+                .map(|session| session.state())
+                == Some(SessionState::Established);
+            let server_established = server
+                .managed_sessions
+                .values()
+                .any(|managed| managed.session.state() == SessionState::Established);
+            if client_established && server_established {
+                break;
+            }
+        }
+
+        let server_session_id = server_session_id.expect("server should accept a session");
+        assert_eq!(
+            client
+                .managed_session(client_session_id)
+                .expect("client session should exist")
+                .state(),
+            SessionState::Established
+        );
+        assert_eq!(
+            server
+                .managed_session(server_session_id)
+                .expect("server session should exist")
+                .state(),
+            SessionState::Established
+        );
+        assert!(client
+            .context()
+            .observability()
+            .logs()
+            .iter()
+            .any(
+                |entry| entry.component == crate::metrics::LogComponent::Transport
+                    && entry.event == "dial"
+                    && entry.result == "started"
+            ));
+        assert!(server
+            .context()
+            .observability()
+            .logs()
+            .iter()
+            .any(
+                |entry| entry.component == crate::metrics::LogComponent::Transport
+                    && entry.event == "accept"
+                    && entry.result == "accepted"
+            ));
+    }
+
     fn assert_tick_summary(summary: &RuntimeTickSummary) {
         assert_eq!(summary.state, NodeRuntimeState::Degraded);
         assert!(summary.presence_refreshed);
@@ -1791,10 +2444,6 @@ mod tests {
             .session_events
             .iter()
             .any(|event| event.event == crate::session::SessionEventKind::KeepaliveDue));
-        assert!(summary
-            .session_io_actions
-            .iter()
-            .any(|action| action.action == SessionIoActionKind::BeginHandshake));
         assert!(summary
             .session_io_actions
             .iter()
@@ -1854,6 +2503,7 @@ mod tests {
         OverlayConfig {
             node_key_path: PathBuf::from(node_key_path),
             bootstrap_sources,
+            tcp_listener_addr: None,
             max_total_neighbors: 8,
             max_presence_records: 64,
             max_service_records: 32,

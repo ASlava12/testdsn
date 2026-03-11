@@ -12,6 +12,7 @@ The current `OverlayConfig` JSON schema accepts only these fields:
 
 - `node_key_path`
 - `bootstrap_sources`
+- `tcp_listener_addr`
 - `max_total_neighbors`
 - `max_presence_records`
 - `max_service_records`
@@ -37,6 +38,9 @@ Unknown operator knobs are not available yet. In particular:
   - a `file:<path>` URI.
 - `bootstrap_sources`: network URLs are not supported by the current runtime and
   will be treated as unavailable.
+- `tcp_listener_addr`: optional local bind address for the real TCP listener in
+  `host:port` form. If omitted, `overlay-cli run` stays single-node unless you
+  pass explicit `--dial tcp://...` targets.
 - `max_total_neighbors`: drives the peer-store cap and the runtime's managed
   session and tracked-path caps.
 - `max_presence_records`: projects into the local rendezvous published-record

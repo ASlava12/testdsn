@@ -1,4 +1,5 @@
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::error::FrameError;
 
@@ -152,6 +153,57 @@ pub trait Message {
     const TYPE: MessageType;
 }
 
+#[derive(Debug, Error)]
+pub enum WireCodecError {
+    #[error(transparent)]
+    Frame(#[from] FrameError),
+    #[error("frame body length mismatch: expected {expected} bytes, got {actual}")]
+    BodyLengthMismatch { expected: usize, actual: usize },
+    #[error(transparent)]
+    Serialization(#[from] serde_json::Error),
+}
+
+pub fn encode_framed_message<T>(message: &T, correlation_id: u64) -> Result<Vec<u8>, WireCodecError>
+where
+    T: Message + Serialize,
+{
+    let body = serde_json::to_vec(message)?;
+    let header = FrameHeader::new(1, T::TYPE, 0, body.len() as u32, correlation_id)?;
+    let mut framed = Vec::with_capacity(FRAME_HEADER_LEN + body.len());
+    framed.extend_from_slice(&header.encode()?);
+    framed.extend_from_slice(&body);
+    Ok(framed)
+}
+
+pub fn decode_framed_message(bytes: &[u8]) -> Result<(FrameHeader, &[u8]), WireCodecError> {
+    let header = FrameHeader::from_slice(bytes.get(..FRAME_HEADER_LEN).ok_or(
+        FrameError::InvalidHeaderLength {
+            expected: FRAME_HEADER_LEN,
+            actual: bytes.len(),
+        },
+    )?)?;
+    let body = bytes
+        .get(FRAME_HEADER_LEN..)
+        .ok_or(FrameError::InvalidHeaderLength {
+            expected: FRAME_HEADER_LEN,
+            actual: bytes.len(),
+        })?;
+    let expected = header.body_len as usize;
+    let actual = body.len();
+    if actual != expected {
+        return Err(WireCodecError::BodyLengthMismatch { expected, actual });
+    }
+
+    Ok((header, body))
+}
+
+pub fn decode_message_body<T>(body: &[u8]) -> Result<T, WireCodecError>
+where
+    T: DeserializeOwned,
+{
+    Ok(serde_json::from_slice(body)?)
+}
+
 macro_rules! define_message_markers {
     ($($name:ident => $message_type:ident),* $(,)?) => {
         $(
@@ -192,7 +244,10 @@ mod tests {
 
     use serde::Deserialize;
 
-    use super::{FrameHeader, MessageType};
+    use super::{
+        decode_framed_message, decode_message_body, encode_framed_message, FrameHeader,
+        MessageType, Ping,
+    };
 
     #[test]
     fn frame_header_round_trips_with_big_endian_encoding() {
@@ -240,6 +295,19 @@ mod tests {
             header.message_type().expect("message type should decode"),
             message_type
         );
+    }
+
+    #[test]
+    fn framed_message_helpers_round_trip_empty_message_bodies() {
+        let bytes = encode_framed_message(&Ping, 9).expect("message should encode");
+        let (header, body) = decode_framed_message(&bytes).expect("framed bytes should decode");
+
+        assert_eq!(
+            header.message_type().expect("message type should decode"),
+            MessageType::Ping
+        );
+        assert_eq!(header.correlation_id, 9);
+        let _: Ping = decode_message_body(body).expect("body should decode");
     }
 
     #[derive(Debug, Deserialize)]

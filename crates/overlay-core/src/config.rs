@@ -28,6 +28,8 @@ pub enum LogLevel {
 pub struct OverlayConfig {
     pub node_key_path: PathBuf,
     pub bootstrap_sources: Vec<String>,
+    #[serde(default)]
+    pub tcp_listener_addr: Option<String>,
     pub max_total_neighbors: usize,
     pub max_presence_records: usize,
     pub max_service_records: usize,
@@ -55,6 +57,15 @@ impl OverlayConfig {
             if source.trim().is_empty() {
                 return Err(ConfigError::EmptyBootstrapSource { index });
             }
+        }
+        if self
+            .tcp_listener_addr
+            .as_ref()
+            .is_some_and(|addr| addr.trim().is_empty())
+        {
+            return Err(ConfigError::EmptyField {
+                field: "tcp_listener_addr",
+            });
         }
 
         for (field, value) in [
@@ -165,6 +176,7 @@ mod tests {
                 "https://bootstrap.example.net/bootstrap.json".to_string(),
                 "static:seed-a".to_string(),
             ],
+            tcp_listener_addr: None,
             max_total_neighbors: 16,
             max_presence_records: 1_024,
             max_service_records: 256,
@@ -227,6 +239,15 @@ mod tests {
         assert!(matches!(
             blank_source.validate(),
             Err(ConfigError::EmptyBootstrapSource { index: 1 })
+        ));
+
+        let mut blank_listener = sample_config();
+        blank_listener.tcp_listener_addr = Some("   ".to_string());
+        assert!(matches!(
+            blank_listener.validate(),
+            Err(ConfigError::EmptyField {
+                field: "tcp_listener_addr"
+            })
         ));
     }
 

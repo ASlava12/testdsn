@@ -543,7 +543,10 @@ impl SessionManager {
             SessionEventResult::Accepted,
             SessionState::Opening,
             None,
-            Some("opening session over placeholder transport".to_string()),
+            Some(format!(
+                "opening session over {} transport",
+                transport.adapter_name()
+            )),
         ))
     }
 

@@ -368,12 +368,13 @@ fn run_smoke_with_writer_and_options(
 
 fn load_node(devnet_dir: &Path, name: &'static str) -> Result<DevnetNode, String> {
     let config_path = devnet_dir.join("configs").join(format!("{name}.json"));
-    let runtime = NodeRuntime::from_config_path(&config_path).map_err(|error| {
+    let mut runtime = NodeRuntime::from_config_path(&config_path).map_err(|error| {
         format!(
             "failed to load {name} config {}: {error}",
             config_path.display()
         )
     })?;
+    runtime.context_mut().config_mut().tcp_listener_addr = None;
     Ok(DevnetNode { name, runtime })
 }
 
