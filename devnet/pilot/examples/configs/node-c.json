@@ -1,0 +1,17 @@
+{
+  "node_key_path": "../../../keys/node-c.key",
+  "bootstrap_sources": [
+    "http://198.51.100.13:4303/node-ab-seed.json",
+    "http://198.51.100.10:4301/node-foundation.json"
+  ],
+  "tcp_listener_addr": "198.51.100.12:4113",
+  "max_total_neighbors": 8,
+  "max_presence_records": 64,
+  "max_service_records": 16,
+  "presence_ttl_s": 120,
+  "epoch_duration_s": 60,
+  "path_probe_interval_ms": 5000,
+  "max_transport_buffer_bytes": 65536,
+  "relay_mode": false,
+  "log_level": "info"
+}

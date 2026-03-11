@@ -4,7 +4,9 @@ This runbook is for the repository's current local or pilot launch surface, not
 for hostile-Internet or public-production deployment.
 
 Use [docs/LAUNCH_CHECKLIST.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/LAUNCH_CHECKLIST.md)
-as the release gate and this runbook as the operator flow behind that gate.
+as the release gate, this runbook as the operator flow behind that gate, and
+[docs/PILOT_RUNBOOK.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RUNBOOK.md)
+for the dedicated Milestone 18 separate-host pilot exercise.
 
 ## Current boundary
 
@@ -107,6 +109,7 @@ Wrapper scripts:
 ./devnet/run-smoke.sh
 ./devnet/run-distributed-smoke.sh
 ./devnet/run-multihost-smoke.sh
+./devnet/run-pilot-checklist.sh
 ./devnet/run-restart-smoke.sh
 ./devnet/run-launch-gate.sh
 ./devnet/run-soak.sh
@@ -121,7 +124,9 @@ smoke in the documented order.
 ## Multi-host bootstrap runbook
 
 Use [devnet/hosts/README.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/hosts/README.md)
-as the file layout reference.
+as the host-style layout reference and
+[devnet/pilot/README.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot/README.md)
+for the current pilot pack.
 
 Suggested four-host pilot topology:
 
@@ -154,6 +159,8 @@ Bring the lab up in this order:
 7. Use `./devnet/run-multihost-smoke.sh` for the repo-local host-style proof of
    bootstrap, publish, lookup, service open, and relay fallback against the
    same config layout.
+8. Use `./devnet/run-pilot-checklist.sh` for the dedicated Milestone 18 pilot
+   rehearsal, fault scenarios, and report fields.
 
 ## What healthy output looks like
 

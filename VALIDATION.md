@@ -67,10 +67,16 @@ cargo test -p overlay-core --test integration_routing
 cargo test -p overlay-core --test integration_service_open
 ```
 
-## Milestone 17 operator-runtime gate
+## Milestone 17 operator-runtime gate prerequisite
 
 ```bash
 ./devnet/run-launch-gate.sh
+```
+
+## Milestone 18 real-pilot checklist
+
+```bash
+./devnet/run-pilot-checklist.sh
 ```
 
 Equivalent explicit command order:
@@ -90,6 +96,7 @@ TMPDIR=/tmp cargo test -p overlay-core --test integration_service_open
 ./devnet/run-multihost-smoke.sh
 ./devnet/run-soak.sh
 ./devnet/run-restart-smoke.sh
+./devnet/run-pilot-checklist.sh
 ```
 
 ## Milestone 11 local devnet smoke
@@ -181,12 +188,12 @@ cargo test -p overlay-core --test integration_service_open
 ## Notes
 
 - Milestones 1-12 are considered implemented baseline work, and the current
-  repository stage marker is `milestone-17-operator-runtime` (Milestone 17
-  operator-grade runtime hardening on top of the Milestone 16 network-bootstrap
-  pilot baseline).
+  repository stage marker is `milestone-18-real-pilot` (Milestone 18 real pilot
+  support on top of the landed Milestone 17 operator-runtime baseline).
 - Use the Milestone 1-12 regression runs, stage-boundary smoke tests, the
-  distributed localhost smoke, the bounded soak, and the Milestone 17
-  operator-runtime gate as the primary checks for the current pilot baseline.
+  distributed localhost smoke, the bounded soak, the Milestone 17 launch gate,
+  and the Milestone 18 pilot checklist as the primary checks for the current
+  pilot baseline.
 - If `REPOSITORY_STAGE`, `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, milestone
   prompts, or other status markers change, rerun the stage-boundary smoke
   tests so code and docs stay aligned.
@@ -234,6 +241,10 @@ cargo test -p overlay-core --test integration_service_open
   smoke commands, upgrades the restart smoke to validate signal-driven clean
   shutdown plus `overlay-cli status`, and folds the bounded logical soak into
   the required launch order.
+- `./devnet/run-pilot-checklist.sh` is the current Milestone 18 proof path for
+  the dedicated pilot topology pack, the node-down / relay-unavailable /
+  bootstrap-seed-unavailable rehearsals, pilot lookup-latency and relay-usage
+  reporting, and the pilot-config restart/status check.
 - The Milestone 12 soak path also stays in-process and advances logical time
   through repeated runtime ticks so stale-session/service/relay/probe cleanup,
   bootstrap retry, and health snapshots can be exercised without a separate

@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "generated_at_unix_s": 1900000000,
+  "expires_at_unix_s": 2000000000,
+  "network_params": {
+    "network_id": "overlay-devnet"
+  },
+  "epoch_duration_s": 60,
+  "presence_ttl_s": 120,
+  "max_frame_body_len": 65519,
+  "handshake_version": 1,
+  "peers": [
+    {
+      "node_id": [131, 86, 26, 219, 57, 143, 216, 127, 142, 126, 216, 51, 27, 255, 47, 203, 148, 87, 51, 204, 48, 18, 135, 156, 185, 250, 176, 121, 40, 102, 112, 98],
+      "transport_classes": ["tcp"],
+      "capabilities": [],
+      "dial_hints": ["tcp://127.0.0.1:4111"],
+      "observed_role": "standard"
+    },
+    {
+      "node_id": [22, 245, 45, 111, 234, 99, 239, 8, 100, 5, 170, 113, 181, 55, 221, 72, 51, 189, 11, 54, 255, 224, 84, 190, 15, 208, 127, 181, 37, 175, 21, 125],
+      "transport_classes": ["relay", "tcp"],
+      "capabilities": ["relay-forward", "relay-intro"],
+      "dial_hints": ["tcp://127.0.0.1:4198"],
+      "observed_role": "relay"
+    }
+  ],
+  "bridge_hints": []
+}

@@ -54,8 +54,12 @@ fn try_main() -> Result<(), String> {
             devnet_dir,
             soak_seconds,
             status_interval_seconds,
+            fault,
         } => {
-            if soak_seconds == 0 && status_interval_seconds.is_none() {
+            if soak_seconds == 0
+                && status_interval_seconds.is_none()
+                && fault == devnet::SmokeFault::None
+            {
                 devnet::run_smoke(&devnet_dir)
             } else {
                 devnet::run_smoke_with_options(
@@ -63,6 +67,7 @@ fn try_main() -> Result<(), String> {
                     devnet::SmokeOptions {
                         soak_seconds,
                         status_interval_seconds,
+                        fault,
                     },
                 )
             }
@@ -93,6 +98,7 @@ enum Command {
         devnet_dir: PathBuf,
         soak_seconds: u64,
         status_interval_seconds: Option<u64>,
+        fault: devnet::SmokeFault,
     },
     BootstrapServe {
         bind_addr: String,
@@ -204,6 +210,7 @@ fn parse_smoke_command(args: impl IntoIterator<Item = OsString>) -> Result<Comma
     let mut devnet_dir = PathBuf::from("devnet");
     let mut soak_seconds = 0_u64;
     let mut status_interval_seconds = None;
+    let mut fault = devnet::SmokeFault::None;
     let mut args = args.into_iter();
 
     while let Some(arg) = args.next() {
@@ -229,6 +236,14 @@ fn parse_smoke_command(args: impl IntoIterator<Item = OsString>) -> Result<Comma
                     &value,
                 )?);
             }
+            "--fault" => {
+                let Some(value) = args.next() else {
+                    return Err(
+                        "--fault requires one of: none, node-c-down, relay-unavailable".to_string(),
+                    );
+                };
+                fault = devnet::SmokeFault::parse(&value.to_string_lossy())?;
+            }
             "-h" | "--help" => return Ok(Command::Help),
             other => return Err(format!("unknown smoke flag '{other}'")),
         }
@@ -238,6 +253,7 @@ fn parse_smoke_command(args: impl IntoIterator<Item = OsString>) -> Result<Comma
         devnet_dir,
         soak_seconds,
         status_interval_seconds,
+        fault,
     })
 }
 
@@ -483,7 +499,7 @@ fn print_usage() {
         "  overlay-cli run --config <path> [--tick-ms <ms>] [--max-ticks <count>] [--status-every <ticks>] [--dial <tcp://host:port> ...]"
     );
     println!(
-        "  overlay-cli smoke [--devnet-dir <path>] [--soak-seconds <seconds>] [--status-interval-seconds <seconds>]"
+        "  overlay-cli smoke [--devnet-dir <path>] [--soak-seconds <seconds>] [--status-interval-seconds <seconds>] [--fault <none|node-c-down|relay-unavailable>]"
     );
     println!(
         "  overlay-cli bootstrap-serve --bind <addr> --bootstrap-file <path> [--max-requests <count>]"
@@ -493,6 +509,8 @@ fn print_usage() {
 #[cfg(test)]
 mod tests {
     use std::{ffi::OsString, path::PathBuf};
+
+    use crate::devnet::SmokeFault;
 
     use super::{parse_command, Command};
 
@@ -562,6 +580,26 @@ mod tests {
                 devnet_dir: PathBuf::from("fixtures/devnet"),
                 soak_seconds: 600,
                 status_interval_seconds: Some(120),
+                fault: SmokeFault::None,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_command_parses_smoke_fault_flag() {
+        assert_eq!(
+            parse_command([
+                OsString::from("overlay-cli"),
+                OsString::from("smoke"),
+                OsString::from("--fault"),
+                OsString::from("relay-unavailable"),
+            ])
+            .unwrap(),
+            Command::Smoke {
+                devnet_dir: PathBuf::from("devnet"),
+                soak_seconds: 0,
+                status_interval_seconds: None,
+                fault: SmokeFault::RelayUnavailable,
             }
         );
     }

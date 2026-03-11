@@ -1,11 +1,13 @@
 # Devnet
 
-This directory contains the checked-in Milestone 17 devnet assets:
+This directory contains the checked-in devnet and pilot assets for the current
+Milestone 18 stage:
 
 - the original four-node local-file devnet under `configs/` and `bootstrap/`;
 - the host-style multi-host devnet layouts under `hosts/`;
+- the dedicated Milestone 18 pilot pack under `pilot/`;
 - wrapper scripts for the local, distributed, and network-bootstrap smoke
-  paths.
+  paths, plus the pilot checklist.
 
 Nodes:
 - `node-a`: bootstrap anchor and smoke-flow client.
@@ -28,6 +30,8 @@ Nodes:
 - `run-multihost-smoke.sh`: wrapper around the host-style network-bootstrap
   smoke.
 - `run-launch-gate.sh`: wrapper around the full Milestone 17 pilot gate.
+- `run-pilot-checklist.sh`: wrapper around the Milestone 18 pilot rehearsal and
+  fault scenarios.
 - `run-soak.sh`: wrapper around `overlay-cli smoke --soak-seconds ...` for the
   logical long-run runtime soak.
 
@@ -143,6 +147,19 @@ This executes the required launch-order checks:
 - the bounded logical soak
 - the restart smoke
 
+## Pilot Checklist
+
+For the current Milestone 18 pilot rehearsal:
+
+```bash
+./devnet/run-pilot-checklist.sh
+```
+
+This starts the dedicated pilot bootstrap servers, runs the baseline pilot
+smoke against `pilot/localhost/`, exercises the documented fault scenarios,
+checks pilot-config restart/status behavior, and emits a final
+`pilot_checklist_complete` summary.
+
 ## Relay Fallback Scenario
 
 The documented fallback path is `node-a -> node-relay -> node-b`.
@@ -163,6 +180,9 @@ The documented fallback path is `node-a -> node-relay -> node-b`.
 - `run-multihost-smoke.sh` uses host-style configs and real network bootstrap,
   but publish, lookup, service open, and relay fallback are still orchestrated
   inside the smoke harness after signature verification.
+- `run-pilot-checklist.sh` adds the current real-pilot rehearsal pack and
+  report fields, but it still uses the same smoke harness for the full
+  publish/lookup/service-open/relay proof path.
 - The checked-in `tcp://127.0.0.1:*` dial hints in `hosts/localhost/` are the
   runnable localhost stand-in for the separate-host example addresses in
   `hosts/examples/`.

@@ -1,7 +1,7 @@
 # Launch Checklist
 
-This checklist defines the Milestone 17 operator-runtime gate for the current
-pilot-ready network surface.
+This checklist defines the Milestone 17 operator-runtime gate that remains the
+prerequisite launch gate for the current Milestone 18 pilot stage.
 
 It is a pilot gate, not a public-production or hostile-Internet readiness
 claim.
@@ -83,6 +83,25 @@ Pass criteria:
   `overlay-cli status` surface, and a second clean startup against the same
   config.
 
+## Milestone 18 follow-on
+
+After the launch gate stays green on the target commit, run the current pilot
+checklist:
+
+```bash
+./devnet/run-pilot-checklist.sh
+```
+
+Pass criteria:
+
+- the baseline pilot rehearsal reaches `smoke_complete`;
+- the `node-c-down` scenario still reaches `smoke_complete`;
+- the `relay-unavailable` scenario reaches `relay_fallback_unavailable` and
+  reports a degraded-but-expected result;
+- the bootstrap-seed-unavailable scenario still reaches `smoke_complete`;
+- the pilot-config restart check reports a clean second startup;
+- the final output reaches `pilot_checklist_complete`.
+
 ## Green path launch sequence
 
 1. Confirm a clean repository state and record the target commit SHA.
@@ -105,7 +124,9 @@ Pass criteria:
 7. Use `./devnet/run-multihost-smoke.sh` as the repo-local proof path for
    network bootstrap plus publish, lookup, service open, and relay fallback on
    the host-style devnet layout.
-8. Cut the pilot tag only after the gate stays green on the exact commit being
+8. Run `./devnet/run-pilot-checklist.sh` and collect the resulting pilot
+   scenario evidence plus summary fields.
+9. Cut the pilot tag only after the gate stays green on the exact commit being
    tagged.
 
 ## Pilot tag workflow
@@ -149,6 +170,9 @@ Workflow:
   establishment, but publish, lookup, service open, and relay fallback remain
   harness-coordinated proof steps rather than a distributed control-plane
   implementation.
+- The Milestone 18 pilot checklist adds first-pilot rehearsal and reporting,
+  but it still uses the current smoke harness for the publish, lookup,
+  service-open, and relay-fallback proof path.
 - Relay fallback is still proven for the documented path only:
   `node-a -> node-relay -> node-b`.
 - Lookup is exact-by-`node_id` only, and service resolution is exact-by-`app_id`

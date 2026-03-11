@@ -1,7 +1,7 @@
 # Host-Style Devnet Layouts
 
 This directory contains the Milestone 16 host-style devnet assets carried into
-the current Milestone 17 operator-runtime stage.
+the current Milestone 18 real-pilot stage.
 
 ## Layouts
 
@@ -30,3 +30,6 @@ The host-style configs intentionally keep bootstrap minimal:
 - nodes fetch them over plain `http://`;
 - nodes may list more than one seed URL for conservative fallback;
 - the seed server is `overlay-cli bootstrap-serve`, not a public provider stack.
+
+For the current dedicated pilot pack, use
+`devnet/pilot/` and [docs/PILOT_RUNBOOK.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RUNBOOK.md).

@@ -5,9 +5,10 @@ This file is the execution plan for Codex.
 ## Current repository stage
 
 The repository has a closed Milestone 1-12 baseline, a landed Milestone 14
-pilot launch gate, a landed Milestone 16 network-bootstrap stage, and the
-current Milestone 17 operator-runtime stage.
-The current repository stage marker is `milestone-17-operator-runtime`.
+pilot launch gate, a landed Milestone 16 network-bootstrap stage, a landed
+Milestone 17 operator-runtime stage, and the current Milestone 18 real-pilot
+stage.
+The current repository stage marker is `milestone-18-real-pilot`.
 
 - Milestone 0 bootstrap is complete.
 - Milestone 1 foundations are implemented, vectorized, and validated in
@@ -124,7 +125,16 @@ The current repository stage marker is `milestone-17-operator-runtime`.
   shutdown, restart-safe operator lock/status state under `.overlay-runtime/`,
   `overlay-cli status`, stricter startup/config validation, an upgraded
   restart smoke, and the bounded soak added to the current launch gate. The
-  repository stage marker now advances to `milestone-17-operator-runtime`.
+  repository stage marker advanced to `milestone-17-operator-runtime`.
+- Milestone 18 real pilot support is now implemented in
+  `crates/overlay-cli/src/devnet.rs`, `crates/overlay-cli/src/main.rs`,
+  `devnet/pilot/`, `devnet/run-pilot-checklist.sh`,
+  `docs/PILOT_RUNBOOK.md`, and `docs/PILOT_REPORT_TEMPLATE.md`, with a
+  dedicated pilot topology/config pack, smoke fault rehearsals for `node-c`
+  down and relay unavailable, lookup-latency plus relay-usage reporting in the
+  smoke output, a bootstrap-seed-unavailable checklist path, and synchronized
+  current-stage docs. The repository stage marker now advances to
+  `milestone-18-real-pilot`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -132,19 +142,20 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Use `prompts/codex-milestone-17.md` as the recommended next-task prompt for the
-current `milestone-17-operator-runtime` stage and keep work conservative from
-the current pilot boundary:
+Use `prompts/codex-milestone-18.md` as the recommended next-task prompt for the
+current `milestone-18-real-pilot` stage and keep work conservative from the
+current pilot boundary:
 
 1. preserve the current launch surface documented in
-   `docs/LAUNCH_CHECKLIST.md`, `docs/RUNBOOK.md`, `docs/DEVNET.md`, and
-   `devnet/hosts/README.md`;
+   `docs/LAUNCH_CHECKLIST.md`, `docs/RUNBOOK.md`, `docs/DEVNET.md`,
+   `docs/PILOT_RUNBOOK.md`, and `devnet/pilot/README.md`;
 2. keep Milestones 1-12 limited to regression fixes, launch-maintenance
    updates, vector maintenance, or conservative spec-conformance fixes;
-3. prefer operator-runtime hardening, validation maintenance, and documentation
+3. prefer pilot execution support, validation maintenance, and documentation
    sync over feature expansion;
-4. rerun the documented launch gate whenever `REPOSITORY_STAGE`, launch docs,
-   or launch scripts change;
+4. rerun the documented launch gate and pilot checklist whenever
+   `REPOSITORY_STAGE`, launch docs, pilot docs, or current-stage scripts
+   change;
 5. keep public bootstrap infrastructure, protocol redesign, and scope expansion
    out of work unless explicitly requested.
 
@@ -473,7 +484,7 @@ readiness.
 
 ## Milestone 16 — network bootstrap and multi-host devnet
 
-Status: current repository stage.
+Status: landed and considered closed for the current baseline.
 
 ### Goal
 Move the devnet from local-file-only bootstrap to a minimal network-reachable
@@ -507,7 +518,7 @@ bootstrap flow and add a reproducible host-style devnet validation path.
 
 ## Milestone 17 — operator-grade runtime hardening
 
-Status: current repository stage.
+Status: landed and considered closed for the current baseline.
 
 ### Goal
 Make the current pilot runtime predictable under service-style operation
@@ -534,3 +545,39 @@ without changing the protocol surface.
   of the same config;
 - the launch gate includes the bounded soak and status docs report the same
   Milestone 17 stage marker.
+
+---
+
+## Milestone 18 — real pilot network on separate hosts
+
+Status: current repository stage.
+
+### Goal
+Prepare and rehearse the first real pilot network stage on separate hosts
+without widening the protocol surface.
+
+### Tasks
+1. Add a dedicated pilot topology/config pack for localhost rehearsal and
+   separate-host copy-and-edit use.
+2. Add a pilot runbook for 3-5 host execution.
+3. Add a pilot checklist script that captures baseline, restart, and fault
+   rehearsal evidence.
+4. Add pilot report structure for success/failure, lookup latency, relay usage,
+   restart outcomes, and remaining blockers.
+5. Keep the launch-gate docs and status markers synchronized to the new stage.
+
+### Important constraints
+- Do not claim hostile-environment or public-production readiness.
+- Do not add public bootstrap infrastructure or rollout automation.
+- Do not redesign protocol layers or invent a distributed operator control
+  plane for publish, lookup, service open, or relay intro.
+- Keep full-flow pilot proof honest about any remaining smoke-harness
+  coordination.
+
+### Done when
+- the repo includes a pilot topology pack and runbook for a 3-5 host pilot;
+- the pilot checklist captures baseline, restart, and documented fault
+  scenarios;
+- the current smoke output reports lookup latency and relay usage for pilot
+  reporting;
+- validation and status docs report the same Milestone 18 stage marker.

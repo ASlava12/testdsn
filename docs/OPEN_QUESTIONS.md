@@ -263,12 +263,16 @@ For current work, treat the repository stage as:
   `crates/overlay-cli/src/devnet.rs`;
 - Milestone 12 launch hardening is implemented with bounded cleanup, degraded
   bootstrap retry, runtime health snapshots, and the logical soak path;
-- the current repository stage marker is `milestone-17-operator-runtime`;
-- Milestone 17 operator-grade runtime hardening is now the current stage, with
-  `docs/LAUNCH_CHECKLIST.md`, `docs/PILOT_RELEASE_TEMPLATE.md`, the documented
-  green-path validation and launch sequence, signal-aware `overlay-cli run`,
-  config-local `.overlay-runtime/` operator state, `overlay-cli status`, the
-  bounded soak in the launch gate, and explicit pilot-only limitations;
+- the current repository stage marker is `milestone-18-real-pilot`;
+- Milestone 17 operator-grade runtime hardening is part of the landed baseline,
+  with `docs/LAUNCH_CHECKLIST.md`, the documented green-path validation and
+  launch sequence, signal-aware `overlay-cli run`, config-local
+  `.overlay-runtime/` operator state, `overlay-cli status`, and the bounded
+  soak in the launch gate;
+- Milestone 18 real pilot is now the current stage, with
+  `docs/PILOT_RUNBOOK.md`, `docs/PILOT_REPORT_TEMPLATE.md`, `devnet/pilot/`,
+  `devnet/run-pilot-checklist.sh`, and explicit pilot fault-scenario plus
+  reporting support;
 
 That means:
 
@@ -286,10 +290,10 @@ That means:
   vectors, or spec mismatches;
 - Milestone 8 is closed and should be touched only for regressions,
   vectors, or spec mismatches;
-- Milestone 17 is the current stage and should stay limited to operator-runtime
-  hardening, network-bootstrap maintenance, regression fixes, validation
-  maintenance, and documentation synchronization unless a task explicitly
-  reopens scope;
+- Milestone 18 is the current stage and should stay limited to pilot execution
+  support, network-bootstrap and operator-runtime maintenance, regression
+  fixes, validation maintenance, and documentation synchronization unless a
+  task explicitly reopens scope;
 - public bootstrap infrastructure, discovery expansion, and simulation-focused
   expansion remain out of scope for current work.
 
@@ -340,7 +344,7 @@ Rules:
 
 ### 12. Conservative operator-state persistence for the current pilot runtime
 
-For Milestone 17 operator-runtime hardening, persist only bounded operator
+For the current Milestone 18 pilot runtime, persist only bounded operator
 metadata, not protocol-layer state.
 
 Rules:

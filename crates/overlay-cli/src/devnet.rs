@@ -1,6 +1,7 @@
 use std::{
     io::{self, Write},
     path::Path,
+    time::Instant,
 };
 
 use overlay_core::{
@@ -30,9 +31,43 @@ const SERVICE_NAMESPACE: &str = "devnet";
 const SERVICE_NAME: &str = "terminal";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SmokeFault {
+    #[default]
+    None,
+    NodeCDown,
+    RelayUnavailable,
+}
+
+impl SmokeFault {
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "none" => Ok(Self::None),
+            "node-c-down" => Ok(Self::NodeCDown),
+            "relay-unavailable" => Ok(Self::RelayUnavailable),
+            other => Err(format!(
+                "unknown smoke fault '{other}' (expected one of: none, node-c-down, relay-unavailable)"
+            )),
+        }
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::NodeCDown => "node-c-down",
+            Self::RelayUnavailable => "relay-unavailable",
+        }
+    }
+
+    const fn is_active(self) -> bool {
+        !matches!(self, Self::None)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct SmokeOptions {
     pub soak_seconds: u64,
     pub status_interval_seconds: Option<u64>,
+    pub fault: SmokeFault,
 }
 
 pub fn run_smoke(devnet_dir: &Path) -> Result<(), String> {
@@ -53,7 +88,7 @@ struct SmokeReport {
     relay_node_id: NodeId,
     service_app_id: AppId,
     service_session_id: u64,
-    relay_tunnel_id: u64,
+    relay_tunnel_id: Option<u64>,
 }
 
 struct DevnetNode {
@@ -102,6 +137,13 @@ fn run_smoke_with_writer_and_mode(
     options: SmokeOptions,
     session_mode: SessionMode,
 ) -> Result<SmokeReport, String> {
+    if options.soak_seconds != 0 && options.fault.is_active() {
+        return Err(format!(
+            "soak mode is not supported with smoke fault scenario '{}'",
+            options.fault.as_str()
+        ));
+    }
+
     let mut node_a = load_node(devnet_dir, "node-a")?;
     let mut node_b = load_node(devnet_dir, "node-b")?;
     let mut node_c = load_node(devnet_dir, "node-c")?;
@@ -115,8 +157,36 @@ fn run_smoke_with_writer_and_mode(
 
     startup_node(&mut node_a, START_UNIX_MS, writer)?;
     startup_node(&mut node_b, START_UNIX_MS + 100, writer)?;
-    startup_node(&mut node_c, START_UNIX_MS + 200, writer)?;
-    startup_node(&mut relay, START_UNIX_MS + 300, writer)?;
+    let node_c_started = match options.fault {
+        SmokeFault::NodeCDown => {
+            write_fault_injected_step(
+                writer,
+                options.fault,
+                node_c.name,
+                "skip startup for the non-critical peer and keep the main flow running",
+            )?;
+            false
+        }
+        _ => {
+            startup_node(&mut node_c, START_UNIX_MS + 200, writer)?;
+            true
+        }
+    };
+    let relay_started = match options.fault {
+        SmokeFault::RelayUnavailable => {
+            write_fault_injected_step(
+                writer,
+                options.fault,
+                relay.name,
+                "skip relay startup and expect the fallback step to stop after planning",
+            )?;
+            false
+        }
+        _ => {
+            startup_node(&mut relay, START_UNIX_MS + 300, writer)?;
+            true
+        }
+    };
 
     match session_mode {
         SessionMode::RealTcp => {
@@ -186,6 +256,7 @@ fn run_smoke_with_writer_and_mode(
         .rendezvous()
         .lookup_state(4)
         .map_err(|error| format!("failed to create lookup state for node-a: {error}"))?;
+    let lookup_started = Instant::now();
     let lookup_response = node_a.runtime.context_mut().rendezvous_mut().lookup(
         LookupNode {
             node_id: node_b.runtime.context().node_id(),
@@ -193,6 +264,10 @@ fn run_smoke_with_writer_and_mode(
         lookup_timestamp_unix_s,
         &mut lookup_state,
     );
+    let lookup_latency_ms = lookup_started
+        .elapsed()
+        .as_millis()
+        .min(u128::from(u64::MAX)) as u64;
     let looked_up_presence = match lookup_response {
         LookupResponse::Result(result) => {
             write_step(
@@ -203,6 +278,7 @@ fn run_smoke_with_writer_and_mode(
                     "target_node": node_b.name,
                     "target_node_id": result.node_id.to_string(),
                     "remaining_budget": result.remaining_budget,
+                    "lookup_latency_ms": lookup_latency_ms,
                 }),
             )?;
             result.record
@@ -320,80 +396,104 @@ fn run_smoke_with_writer_and_mode(
         }),
     )?;
 
-    let resolve_intro = ResolveIntro {
-        relay_node_id: fallback.relay_node_id,
-        intro_ticket: intro_ticket.into_inner(),
-    }
-    .verify_with_public_key(&node_b.runtime.context().signing_key().public_key())
-    .map_err(|error| format!("resolve-intro verification failed: {error}"))?;
-    let intro_response = relay
-        .runtime
-        .context_mut()
-        .relay_manager_mut()
-        .process_resolve_intro(
-            relay_node_id,
-            resolve_intro,
-            REQUESTER_BINDING,
-            unix_ms_to_s(START_UNIX_MS + 5_100),
-        );
-    if intro_response.status != IntroResponseStatus::Forwarded {
-        return Err(format!(
-            "relay intro expected forwarded status, got {:?}",
-            intro_response.status
-        ));
-    }
-    let tunnel = relay
-        .runtime
-        .context_mut()
-        .relay_manager_mut()
-        .bind_tunnel(
-            RELAY_TUNNEL_ID,
-            relay_node_id,
-            node_b_id,
-            unix_ms_to_s(START_UNIX_MS + 5_200),
-        )
-        .map_err(|error| format!("relay tunnel bind failed: {error}"))?;
-    relay
-        .runtime
-        .context_mut()
-        .relay_manager_mut()
-        .note_relayed_bytes(relay_node_id, 1_024, unix_ms_to_s(START_UNIX_MS + 5_201))
-        .map_err(|error| format!("relay byte accounting failed: {error}"))?;
-    write_step(
-        writer,
-        json!({
-            "step": "relay_fallback_bound",
-            "client_node": node_a.name,
-            "target_node": node_b.name,
-            "relay_node": relay.name,
-            "relay_node_id": relay.runtime.context().node_id().to_string(),
-            "tunnel_id": tunnel.tunnel_id,
-        }),
-    )?;
+    let (relay_tunnel_id, relay_usage_bytes) = if relay_started {
+        let resolve_intro = ResolveIntro {
+            relay_node_id: fallback.relay_node_id,
+            intro_ticket: intro_ticket.into_inner(),
+        }
+        .verify_with_public_key(&node_b.runtime.context().signing_key().public_key())
+        .map_err(|error| format!("resolve-intro verification failed: {error}"))?;
+        let intro_response = relay
+            .runtime
+            .context_mut()
+            .relay_manager_mut()
+            .process_resolve_intro(
+                relay_node_id,
+                resolve_intro,
+                REQUESTER_BINDING,
+                unix_ms_to_s(START_UNIX_MS + 5_100),
+            );
+        if intro_response.status != IntroResponseStatus::Forwarded {
+            return Err(format!(
+                "relay intro expected forwarded status, got {:?}",
+                intro_response.status
+            ));
+        }
+        let tunnel = relay
+            .runtime
+            .context_mut()
+            .relay_manager_mut()
+            .bind_tunnel(
+                RELAY_TUNNEL_ID,
+                relay_node_id,
+                node_b_id,
+                unix_ms_to_s(START_UNIX_MS + 5_200),
+            )
+            .map_err(|error| format!("relay tunnel bind failed: {error}"))?;
+        relay
+            .runtime
+            .context_mut()
+            .relay_manager_mut()
+            .note_relayed_bytes(relay_node_id, 1_024, unix_ms_to_s(START_UNIX_MS + 5_201))
+            .map_err(|error| format!("relay byte accounting failed: {error}"))?;
+        write_step(
+            writer,
+            json!({
+                "step": "relay_fallback_bound",
+                "client_node": node_a.name,
+                "target_node": node_b.name,
+                "relay_node": relay.name,
+                "relay_node_id": relay.runtime.context().node_id().to_string(),
+                "tunnel_id": tunnel.tunnel_id,
+                "relay_usage_bytes": 1_024_u64,
+            }),
+        )?;
+        (Some(tunnel.tunnel_id), Some(1_024_u64))
+    } else {
+        write_step(
+            writer,
+            json!({
+                "step": "relay_fallback_unavailable",
+                "client_node": node_a.name,
+                "target_node": node_b.name,
+                "relay_node": relay.name,
+                "relay_node_id": relay.runtime.context().node_id().to_string(),
+                "reason": "relay runtime not started for fault rehearsal",
+            }),
+        )?;
+        (None, None)
+    };
 
     write_step(
         writer,
         json!({
             "step": "smoke_complete",
+            "result": if relay_started { "ok" } else { "degraded" },
+            "fault": options.fault.as_str(),
             "node_a_id": node_a.runtime.context().node_id().to_string(),
             "node_b_id": node_b.runtime.context().node_id().to_string(),
             "node_c_id": node_c.runtime.context().node_id().to_string(),
+            "node_c_started": node_c_started,
             "relay_node_id": relay.runtime.context().node_id().to_string(),
             "service_app_id": service_record.app_id.to_string(),
             "service_session_id": service_session_id,
-            "relay_tunnel_id": tunnel.tunnel_id,
+            "relay_tunnel_id": relay_tunnel_id,
+            "relay_usage_bytes": relay_usage_bytes,
+            "lookup_latency_ms": lookup_latency_ms,
         }),
     )?;
 
-    run_long_soak(
-        &mut node_a,
-        &mut node_b,
-        &mut node_c,
-        &mut relay,
-        START_UNIX_MS + 6_000,
-        options,
-        writer,
-    )?;
+    if !options.fault.is_active() {
+        run_long_soak(
+            &mut node_a,
+            &mut node_b,
+            &mut node_c,
+            &mut relay,
+            START_UNIX_MS + 6_000,
+            options,
+            writer,
+        )?;
+    }
 
     Ok(SmokeReport {
         node_a_id: node_a.runtime.context().node_id(),
@@ -402,7 +502,7 @@ fn run_smoke_with_writer_and_mode(
         relay_node_id: relay.runtime.context().node_id(),
         service_app_id: service_record.app_id,
         service_session_id,
-        relay_tunnel_id: tunnel.tunnel_id,
+        relay_tunnel_id,
     })
 }
 
@@ -843,6 +943,23 @@ fn unix_ms_to_s(timestamp_unix_ms: u64) -> u64 {
     timestamp_unix_ms / 1_000
 }
 
+fn write_fault_injected_step(
+    writer: &mut dyn Write,
+    fault: SmokeFault,
+    node: &str,
+    effect: &str,
+) -> Result<(), String> {
+    write_step(
+        writer,
+        json!({
+            "step": "fault_injected",
+            "fault": fault.as_str(),
+            "node": node,
+            "effect": effect,
+        }),
+    )
+}
+
 fn write_step(writer: &mut dyn Write, value: serde_json::Value) -> Result<(), String> {
     writeln!(writer, "{}", value).map_err(|error| format!("failed to write smoke output: {error}"))
 }
@@ -852,7 +969,8 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{
-        run_smoke_with_writer, run_smoke_with_writer_and_options, SmokeOptions, SERVICE_NAME,
+        run_smoke_with_writer, run_smoke_with_writer_and_options, SmokeFault, SmokeOptions,
+        SERVICE_NAME,
     };
 
     #[test]
@@ -863,7 +981,7 @@ mod tests {
         assert_ne!(report.node_a_id, report.node_b_id);
         assert_ne!(report.node_b_id, report.relay_node_id);
         assert_ne!(report.service_session_id, 0);
-        assert_eq!(report.relay_tunnel_id, 7_001);
+        assert_eq!(report.relay_tunnel_id, Some(7_001));
 
         let rendered = String::from_utf8(output).expect("smoke output should be utf-8");
         assert!(rendered.contains("\"step\":\"startup\""));
@@ -872,6 +990,7 @@ mod tests {
         assert!(rendered.contains("\"step\":\"lookup_node\""));
         assert!(rendered.contains("\"step\":\"open_service\""));
         assert!(rendered.contains("\"step\":\"relay_fallback_bound\""));
+        assert!(rendered.contains("\"lookup_latency_ms\":"));
         assert!(rendered.contains(SERVICE_NAME));
     }
 
@@ -884,6 +1003,7 @@ mod tests {
             SmokeOptions {
                 soak_seconds: 660,
                 status_interval_seconds: Some(220),
+                ..SmokeOptions::default()
             },
         )
         .expect("sample devnet soak flow should succeed");
@@ -895,6 +1015,48 @@ mod tests {
         assert!(rendered.contains("\"step\":\"soak_complete\""));
         assert!(rendered.contains("\"stale_path_probes_pruned\":"));
         assert!(rendered.contains("\"open_service_sessions\":0"));
+    }
+
+    #[test]
+    fn repo_devnet_smoke_flow_survives_node_c_down_fault() {
+        let mut output = Vec::new();
+        let report = run_smoke_with_writer_and_options(
+            &repo_devnet_dir(),
+            &mut output,
+            SmokeOptions {
+                fault: SmokeFault::NodeCDown,
+                ..SmokeOptions::default()
+            },
+        )
+        .expect("node-c-down fault rehearsal should still complete");
+        assert_eq!(report.relay_tunnel_id, Some(7_001));
+
+        let rendered = String::from_utf8(output).expect("smoke output should be utf-8");
+        assert!(rendered.contains("\"step\":\"fault_injected\""));
+        assert!(rendered.contains("\"fault\":\"node-c-down\""));
+        assert!(rendered.contains("\"node_c_started\":false"));
+        assert!(rendered.contains("\"step\":\"smoke_complete\""));
+    }
+
+    #[test]
+    fn repo_devnet_smoke_flow_reports_relay_unavailable_fault() {
+        let mut output = Vec::new();
+        let report = run_smoke_with_writer_and_options(
+            &repo_devnet_dir(),
+            &mut output,
+            SmokeOptions {
+                fault: SmokeFault::RelayUnavailable,
+                ..SmokeOptions::default()
+            },
+        )
+        .expect("relay-unavailable fault rehearsal should still complete");
+        assert_eq!(report.relay_tunnel_id, None);
+
+        let rendered = String::from_utf8(output).expect("smoke output should be utf-8");
+        assert!(rendered.contains("\"step\":\"relay_fallback_planned\""));
+        assert!(rendered.contains("\"step\":\"relay_fallback_unavailable\""));
+        assert!(!rendered.contains("\"step\":\"relay_fallback_bound\""));
+        assert!(rendered.contains("\"result\":\"degraded\""));
     }
 
     fn repo_devnet_dir() -> PathBuf {

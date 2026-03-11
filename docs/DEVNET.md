@@ -5,7 +5,9 @@ The repository ships a reproducible four-node local devnet under
 
 It is the operator-facing proof path for the current runtime surface, including
 the Milestone 16 host-style network-bootstrap layout under
-[devnet/hosts](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/hosts).
+[devnet/hosts](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/hosts)
+and the Milestone 18 pilot pack under
+[devnet/pilot](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot).
 
 ## Node roles
 
@@ -25,7 +27,9 @@ the Milestone 16 host-style network-bootstrap layout under
 - [devnet/run-distributed-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-smoke.sh): wrapper for the real-process localhost network-bootstrap smoke.
 - [devnet/run-multihost-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-multihost-smoke.sh): wrapper for the host-style network-bootstrap smoke.
 - [devnet/run-launch-gate.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-launch-gate.sh): wrapper for the full Milestone 17 launch gate.
+- [devnet/run-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-pilot-checklist.sh): wrapper for the Milestone 18 pilot rehearsal, fault scenarios, and restart/status evidence.
 - [devnet/run-soak.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-soak.sh): wrapper for the logical soak.
+- [devnet/pilot](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot): dedicated Milestone 18 pilot topology/config pack.
 
 ## Smoke flow
 
@@ -136,6 +140,24 @@ This executes the Milestone 17 pilot gate in documented order:
 - bounded logical soak
 - restart smoke
 
+## Pilot checklist
+
+Run:
+
+```bash
+./devnet/run-pilot-checklist.sh
+```
+
+This uses the dedicated `devnet/pilot/localhost` topology pack and validates:
+
+- the baseline publish, lookup, service-open, and relay-fallback rehearsal;
+- the `node-c-down` fault path;
+- the `relay-unavailable` fault path;
+- the one-bootstrap-seed-unavailable path;
+- the pilot-config restart/status outcome;
+- the final `pilot_checklist_complete` summary with lookup latency and relay
+  usage fields.
+
 ## Single-node inspection
 
 Use `overlay-cli run` when you want one node's raw logs and status snapshots
@@ -163,3 +185,6 @@ TMPDIR=/tmp cargo run -p overlay-cli -- status --config devnet/configs/node-a.js
   messages over that socket path.
 - Relay fallback is still demonstrated for one documented path only:
   `node-a -> node-relay -> node-b`.
+- The Milestone 18 pilot pack adds a real-host runbook, fault scenarios, and
+  reporting, but the full publish/lookup/service-open/relay proof remains
+  smoke-harness coordinated on the current runtime surface.

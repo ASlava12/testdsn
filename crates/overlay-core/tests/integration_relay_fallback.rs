@@ -45,7 +45,7 @@ fn relay_fallback_plan_tracks_current_stage_boundary() {
     )
     .expect("relay fallback plan should be created");
 
-    assert_eq!(REPOSITORY_STAGE, "milestone-17-operator-runtime");
+    assert_eq!(REPOSITORY_STAGE, "milestone-18-real-pilot");
     assert_eq!(
         plan.direct_attempts,
         vec![

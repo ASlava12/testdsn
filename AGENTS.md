@@ -85,23 +85,29 @@ Do not add by default:
 - Milestone 12 launch hardening is implemented with bounded cleanup,
   conservative bootstrap retry, runtime health snapshots, status dumps, and the
   logical soak path.
-- The current repository stage marker is `milestone-17-operator-runtime`.
+- The current repository stage marker is `milestone-18-real-pilot`.
 - Milestone 14 launch gate and pilot tag remains part of the landed pilot
   baseline.
 - Milestone 16 network bootstrap and multi-host devnet is implemented with
   minimal static `http://` bootstrap fetch, `overlay-cli bootstrap-serve`,
   host-style devnet configs and smoke paths, the documented green-path
   validation and launch sequence, and explicit pilot-only limitations.
-- Milestone 17 operator-grade runtime hardening is the current stage with
+- Milestone 17 operator-grade runtime hardening is implemented with
   signal-aware graceful shutdown, restart-safe operator lock/status files under
   `.overlay-runtime/`, `overlay-cli status`, stricter startup/config
   validation, the bounded soak in the launch gate, and explicit pilot-only
-  limitations. This stage still does not claim public-production readiness.
+  limitations.
+- Milestone 18 real pilot is the current stage with `docs/PILOT_RUNBOOK.md`,
+  `docs/PILOT_REPORT_TEMPLATE.md`, the dedicated `devnet/pilot/` topology pack,
+  `devnet/run-pilot-checklist.sh`, pilot fault-scenario rehearsals, and
+  explicit first-pilot reporting. This stage still does not claim
+  public-production readiness and still carries smoke-harness-coordinated proof
+  for publish, lookup, service open, and relay fallback.
 
 For normal work, touch Milestones 1-12 only for regression fixes, spec
 mismatches, vector maintenance, validation maintenance, or launch-maintenance
 updates unless the task explicitly reopens that stage. Treat current-stage work as narrow
-`milestone-17-operator-runtime` work, not as a restart from earlier milestones.
+`milestone-18-real-pilot` work, not as a restart from earlier milestones.
 
 ## 3. Change policy
 
