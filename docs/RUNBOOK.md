@@ -11,19 +11,22 @@ as the release gate and this runbook as the operator flow behind that gate.
 What exists today:
 
 - `overlay-cli run` loads one JSON node config, reads one Ed25519 seed file,
-  ingests local bootstrap seed files, ticks the in-memory runtime, and prints
-  structured JSON logs to stdout.
+  ingests bootstrap seed files from local paths or plain `http://` URLs, ticks
+  the in-memory runtime, and prints structured JSON logs to stdout.
 - `overlay-cli run --status-every <ticks>` also prints periodic
   `runtime_status` JSON snapshots with runtime state, metrics, relay usage,
   cleanup totals, bootstrap status, and resource limits.
 - `overlay-cli smoke --devnet-dir <path>` starts the local four-node devnet
   in-process and exercises the bootstrap, session, presence, lookup, service,
   and relay-fallback path that the repository currently validates.
+- `overlay-cli bootstrap-serve --bind <addr> --bootstrap-file <path>` serves
+  one static bootstrap response over minimal `http://` for devnet or lab use.
 
 What does not exist today:
 
-- no public bootstrap fetch over the network;
-- no real transport listeners or distributed multi-process data plane;
+- no public bootstrap-provider infrastructure or HTTPS bootstrap fetch;
+- no full distributed control plane beyond the checked-in bootstrap and session
+  smoke paths;
 - no daemon management, PID files, or signal-driven graceful shutdown path;
 - no persistent on-disk runtime state for peers, presence, services, or relay
   tunnels.
@@ -43,8 +46,8 @@ What does not exist today:
 1. Pick a role example from [docs/CONFIG_EXAMPLES.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/CONFIG_EXAMPLES.md).
 2. Verify the config only uses supported top-level fields.
 3. Verify `node_key_path` points to an existing 32-byte or 64-hex seed file.
-4. Verify every `bootstrap_sources[]` entry points to a local `.json` file or
-   uses `file:<path>`.
+4. Verify every `bootstrap_sources[]` entry points to a local `.json` file,
+   uses `file:<path>`, or uses a devnet/lab `http://host:port/path` seed URL.
 5. Start the node with a bounded run first.
 6. Confirm the first stdout records include `bootstrap_fetch`,
    `bootstrap_ingest`, and a runtime `state_transition`.
@@ -79,18 +82,63 @@ Repository devnet logical soak:
 TMPDIR=/tmp cargo run -p overlay-cli -- smoke --devnet-dir devnet --soak-seconds 1800 --status-interval-seconds 300
 ```
 
+Host-style network-bootstrap smoke:
+
+```bash
+./devnet/run-multihost-smoke.sh
+```
+
 Wrapper scripts:
 
 ```bash
 ./devnet/run-smoke.sh
+./devnet/run-distributed-smoke.sh
+./devnet/run-multihost-smoke.sh
 ./devnet/run-restart-smoke.sh
 ./devnet/run-launch-gate.sh
 ./devnet/run-soak.sh
 ```
 
-`./devnet/run-launch-gate.sh` is the CI-friendly Milestone 14 pilot gate. It
+`./devnet/run-launch-gate.sh` is the CI-friendly Milestone 16 pilot gate. It
 runs formatting, lint, build, workspace tests, the stage-boundary integration
-tests, the devnet smoke, and the restart smoke in the documented order.
+tests, the local devnet smoke, the distributed network-bootstrap smoke, the
+multi-host network-bootstrap smoke, and the restart smoke in the documented
+order.
+
+## Multi-host bootstrap runbook
+
+Use [devnet/hosts/README.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/hosts/README.md)
+as the file layout reference.
+
+Suggested four-host pilot topology:
+
+- host-a: `node-a`, bootstrap seed server for `node-foundation.json`
+- host-b: `node-b`, bootstrap seed server for `node-a-seed.json`
+- host-c: `node-c`
+- host-relay: `node-relay`, bootstrap seed server for `node-ab-seed.json`
+
+Bring the lab up in this order:
+
+1. Copy the example configs and bootstrap JSON from `devnet/hosts/examples/`.
+2. Start one static seed server on each designated bootstrap host, for example:
+
+   ```bash
+   TMPDIR=/tmp cargo run -p overlay-cli -- bootstrap-serve --bind 0.0.0.0:4201 --bootstrap-file devnet/hosts/examples/bootstrap/node-foundation.json
+   ```
+
+3. Start each node with its host-local config:
+
+   ```bash
+   TMPDIR=/tmp cargo run -p overlay-cli -- run --config /path/to/node-a.json --status-every 30
+   ```
+
+4. Confirm each node logs `bootstrap_fetch`, `bootstrap_ingest`, and
+   `state_transition`.
+5. Use `./devnet/run-distributed-smoke.sh` for the repo-local real-process
+   proof of network bootstrap plus session establishment.
+6. Use `./devnet/run-multihost-smoke.sh` for the repo-local host-style proof of
+   bootstrap, publish, lookup, service open, and relay fallback against the
+   same config layout.
 
 ## What healthy output looks like
 
@@ -148,8 +196,9 @@ manually, do not assume a final structured shutdown record will be emitted.
 
 ## Operator limits to remember
 
-- A "bootstrap node" in this repository means a node identity that other local
-  seed files point at. It is not a live bootstrap server process.
+- A "bootstrap node" in this repository may be represented either by a static
+  seed file or by `overlay-cli bootstrap-serve` exposing that file over
+  `http://`. It is still not a public bootstrap-provider framework.
 - `relay_mode` is the only relay-related JSON switch. Relay quotas are compiled
   profile defaults and are surfaced through `runtime_status`, not configured in
   the JSON file.

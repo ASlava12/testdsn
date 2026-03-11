@@ -3,9 +3,10 @@
 use std::{
     collections::BTreeMap,
     fs, io,
-    net::SocketAddr,
+    io::{Read, Write},
+    net::{SocketAddr, TcpStream, ToSocketAddrs},
     path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use getrandom::getrandom;
@@ -49,6 +50,7 @@ use crate::{
 
 const PRESENCE_REFRESH_DIVISOR: u64 = 2;
 const MIN_BOOTSTRAP_RETRY_INTERVAL_MS: u64 = 5_000;
+const DEFAULT_BOOTSTRAP_HTTP_TIMEOUT_MS: u64 = 1_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -349,7 +351,16 @@ struct ManagedSession {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum BootstrapSource {
     File { path: PathBuf },
+    Http { source: BootstrapHttpSource },
     Unsupported { source: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BootstrapHttpSource {
+    url: String,
+    endpoint: String,
+    host_header: String,
+    request_target: String,
 }
 
 pub struct NodeRuntime {
@@ -429,6 +440,12 @@ impl NodeRuntime {
 
     pub fn managed_session_count(&self) -> usize {
         self.managed_sessions.len()
+    }
+
+    pub fn managed_sessions(&self) -> impl Iterator<Item = &SessionManager> {
+        self.managed_sessions
+            .values()
+            .map(|managed| &managed.session)
     }
 
     pub fn tcp_listener_local_addr(&self) -> Option<SocketAddr> {
@@ -1689,6 +1706,14 @@ impl BootstrapSource {
         match self {
             Self::File { path } => BootstrapFileProvider { path: path.clone() }
                 .fetch_validated_response_with_observability(now_unix_s, observability, context),
+            Self::Http { source } => BootstrapHttpProvider {
+                source: source.clone(),
+            }
+            .fetch_validated_response_with_observability(
+                now_unix_s,
+                observability,
+                context,
+            ),
             Self::Unsupported { source } => UnsupportedBootstrapProvider {
                 source: source.clone(),
             }
@@ -1724,6 +1749,91 @@ impl BootstrapProvider for BootstrapFileProvider {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct BootstrapHttpProvider {
+    source: BootstrapHttpSource,
+}
+
+impl BootstrapProvider for BootstrapHttpProvider {
+    fn provider_name(&self) -> &'static str {
+        "http"
+    }
+
+    fn fetch_response(&self) -> Result<BootstrapResponse, BootstrapProviderError> {
+        let socket_addr = self
+            .source
+            .endpoint
+            .to_socket_addrs()
+            .map_err(|error| {
+                BootstrapProviderError::Unavailable(format!(
+                    "could not resolve bootstrap source {}: {error}",
+                    self.source.url
+                ))
+            })?
+            .next()
+            .ok_or_else(|| {
+                BootstrapProviderError::Unavailable(format!(
+                    "bootstrap source {} did not resolve to any socket address",
+                    self.source.url
+                ))
+            })?;
+        let timeout = Duration::from_millis(DEFAULT_BOOTSTRAP_HTTP_TIMEOUT_MS);
+        let mut stream = TcpStream::connect_timeout(&socket_addr, timeout).map_err(|error| {
+            BootstrapProviderError::Unavailable(format!(
+                "could not connect to bootstrap source {}: {error}",
+                self.source.url
+            ))
+        })?;
+        stream.set_read_timeout(Some(timeout)).map_err(|error| {
+            BootstrapProviderError::Unavailable(format!(
+                "could not configure bootstrap source {} read timeout: {error}",
+                self.source.url
+            ))
+        })?;
+        stream.set_write_timeout(Some(timeout)).map_err(|error| {
+            BootstrapProviderError::Unavailable(format!(
+                "could not configure bootstrap source {} write timeout: {error}",
+                self.source.url
+            ))
+        })?;
+
+        let request = format!(
+            "GET {} HTTP/1.1\r\nHost: {}\r\nAccept: application/json\r\nConnection: close\r\n\r\n",
+            self.source.request_target, self.source.host_header
+        );
+        stream.write_all(request.as_bytes()).map_err(|error| {
+            BootstrapProviderError::Unavailable(format!(
+                "could not send bootstrap request to {}: {error}",
+                self.source.url
+            ))
+        })?;
+
+        let mut bytes = Vec::new();
+        stream.read_to_end(&mut bytes).map_err(|error| {
+            BootstrapProviderError::Unavailable(format!(
+                "could not read bootstrap response from {}: {error}",
+                self.source.url
+            ))
+        })?;
+
+        let (status_code, body) =
+            parse_http_response(&bytes).map_err(BootstrapProviderError::Unavailable)?;
+        if status_code != 200 {
+            return Err(BootstrapProviderError::Unavailable(format!(
+                "bootstrap source {} returned HTTP status {}",
+                self.source.url, status_code
+            )));
+        }
+
+        serde_json::from_slice(body).map_err(|error| {
+            BootstrapProviderError::Unavailable(format!(
+                "could not parse bootstrap source {}: {error}",
+                self.source.url
+            ))
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct UnsupportedBootstrapProvider {
     source: String,
 }
@@ -1735,7 +1845,7 @@ impl BootstrapProvider for UnsupportedBootstrapProvider {
 
     fn fetch_response(&self) -> Result<BootstrapResponse, BootstrapProviderError> {
         Err(BootstrapProviderError::Unavailable(format!(
-            "bootstrap source '{}' is not supported by the Milestone 10 runtime",
+            "bootstrap source '{}' is not supported by the current runtime",
             self.source
         )))
     }
@@ -1806,6 +1916,9 @@ fn resolve_bootstrap_source(base_dir: &Path, source: &str) -> BootstrapSource {
             path: resolve_path(base_dir, Path::new(path.trim())),
         };
     }
+    if let Some(source) = parse_http_bootstrap_source(trimmed) {
+        return BootstrapSource::Http { source };
+    }
 
     let path = Path::new(trimmed);
     if path.extension().and_then(|ext| ext.to_str()) == Some("json") && !trimmed.contains("://") {
@@ -1817,6 +1930,79 @@ fn resolve_bootstrap_source(base_dir: &Path, source: &str) -> BootstrapSource {
             source: trimmed.to_string(),
         }
     }
+}
+
+fn parse_http_bootstrap_source(source: &str) -> Option<BootstrapHttpSource> {
+    let remainder = source.strip_prefix("http://")?;
+    if remainder.is_empty() {
+        return None;
+    }
+    let (authority, request_target) = match remainder.split_once('/') {
+        Some((authority, path)) => {
+            if authority.is_empty() {
+                return None;
+            }
+            (authority, format!("/{}", path))
+        }
+        None => (remainder, "/".to_string()),
+    };
+    let authority = authority.trim();
+    if authority.is_empty() {
+        return None;
+    }
+
+    let endpoint = http_authority_to_endpoint(authority)?;
+    Some(BootstrapHttpSource {
+        url: source.to_string(),
+        endpoint,
+        host_header: authority.to_string(),
+        request_target,
+    })
+}
+
+fn http_authority_to_endpoint(authority: &str) -> Option<String> {
+    if authority.starts_with('[') {
+        let close = authority.find(']')?;
+        let suffix = authority.get(close + 1..)?;
+        if suffix.is_empty() {
+            return Some(format!("{authority}:80"));
+        }
+        if suffix.starts_with(':') {
+            return Some(authority.to_string());
+        }
+        return None;
+    }
+
+    if authority.contains(':') {
+        Some(authority.to_string())
+    } else {
+        Some(format!("{authority}:80"))
+    }
+}
+
+fn parse_http_response(bytes: &[u8]) -> Result<(u16, &[u8]), String> {
+    let Some(header_end) = bytes.windows(4).position(|window| window == b"\r\n\r\n") else {
+        return Err("bootstrap HTTP response was missing header terminator".to_string());
+    };
+    let header_bytes = &bytes[..header_end];
+    let body = &bytes[header_end + 4..];
+    let header = std::str::from_utf8(header_bytes).map_err(|error| {
+        format!("bootstrap HTTP response headers were not valid UTF-8: {error}")
+    })?;
+    let mut lines = header.lines();
+    let status_line = lines
+        .next()
+        .ok_or_else(|| "bootstrap HTTP response was missing a status line".to_string())?;
+    let mut fields = status_line.split_whitespace();
+    let _http_version = fields
+        .next()
+        .ok_or_else(|| "bootstrap HTTP response status line was truncated".to_string())?;
+    let status_code = fields
+        .next()
+        .ok_or_else(|| "bootstrap HTTP response status line was missing a status code".to_string())?
+        .parse::<u16>()
+        .map_err(|error| format!("bootstrap HTTP response status code was invalid: {error}"))?;
+    Ok((status_code, body))
 }
 
 fn resolve_path(base_dir: &Path, path: &Path) -> PathBuf {
@@ -1897,13 +2083,19 @@ mod tests {
     use std::{
         collections::VecDeque,
         env, fs, io,
+        io::{Read, Write},
+        net::TcpListener,
         path::{Path, PathBuf},
+        thread,
         time::{Duration, SystemTime, UNIX_EPOCH},
     };
 
     use serde::Serialize;
 
-    use super::{unix_ms_to_s, NodeContext, NodeRuntime, NodeRuntimeState, RuntimeTickSummary};
+    use super::{
+        unix_ms_to_s, NodeContext, NodeRuntime, NodeRuntimeError, NodeRuntimeState,
+        RuntimeTickSummary,
+    };
     use crate::{
         bootstrap::{
             BootstrapNetworkParams, BootstrapPeer, BootstrapPeerRole, BootstrapResponse,
@@ -1947,7 +2139,7 @@ mod tests {
             .startup(START_UNIX_MS)
             .expect("startup should succeed");
 
-        assert_eq!(REPOSITORY_STAGE, "milestone-14-launch-gate");
+        assert_eq!(REPOSITORY_STAGE, "milestone-16-network-bootstrap");
         assert_eq!(runtime.state(), NodeRuntimeState::Running);
         assert_eq!(
             runtime.context().node_id(),
@@ -1964,6 +2156,96 @@ mod tests {
                     && entry.event == "state_transition"
                     && entry.result == "running"
             ));
+    }
+
+    #[test]
+    fn startup_fetches_bootstrap_over_http() {
+        let dir = unique_test_dir("runtime-startup-http");
+        let key_path = dir.join("node.key");
+        let config_path = dir.join("overlay-config.json");
+        let signing_key = Ed25519SigningKey::from_seed([32_u8; 32]);
+        let bootstrap_body =
+            serde_json::to_vec(&sample_bootstrap_response()).expect("bootstrap should serialize");
+        let (bootstrap_url, server_handle) =
+            match start_test_http_server(http_ok_response(&bootstrap_body), 1) {
+                Ok(server) => server,
+                Err(error) if error.kind() == io::ErrorKind::PermissionDenied => return,
+                Err(error) => panic!("http server should bind: {error}"),
+            };
+
+        fs::write(&key_path, signing_key.as_bytes()).expect("key file should be written");
+        write_json(
+            &config_path,
+            &sample_config("node.key", vec![bootstrap_url.clone()]),
+        )
+        .expect("config file should be written");
+
+        let mut runtime =
+            NodeRuntime::from_config_path(&config_path).expect("runtime should load from config");
+        runtime
+            .startup(START_UNIX_MS)
+            .expect("startup should fetch bootstrap over http");
+        server_handle
+            .join()
+            .expect("http server should exit cleanly");
+
+        assert_eq!(runtime.state(), NodeRuntimeState::Running);
+        assert_eq!(runtime.snapshot().active_peers, 3);
+        assert_eq!(runtime.health_snapshot().bootstrap.last_accepted_sources, 1);
+        assert!(runtime
+            .context()
+            .observability()
+            .logs()
+            .iter()
+            .any(|entry| {
+                entry.component == crate::metrics::LogComponent::Bootstrap
+                    && entry.event == "bootstrap_fetch"
+                    && entry.result == "accepted"
+            }));
+    }
+
+    #[test]
+    fn startup_falls_back_to_later_http_bootstrap_source() {
+        let dir = unique_test_dir("runtime-startup-http-fallback");
+        let key_path = dir.join("node.key");
+        let config_path = dir.join("overlay-config.json");
+        let signing_key = Ed25519SigningKey::from_seed([33_u8; 32]);
+        let bootstrap_body =
+            serde_json::to_vec(&sample_bootstrap_response()).expect("bootstrap should serialize");
+        let (bootstrap_url, server_handle) =
+            match start_test_http_server(http_ok_response(&bootstrap_body), 1) {
+                Ok(server) => server,
+                Err(error) if error.kind() == io::ErrorKind::PermissionDenied => return,
+                Err(error) => panic!("http server should bind: {error}"),
+            };
+
+        fs::write(&key_path, signing_key.as_bytes()).expect("key file should be written");
+        write_json(
+            &config_path,
+            &sample_config(
+                "node.key",
+                vec![
+                    "http://127.0.0.1:9/bootstrap.json".to_string(),
+                    bootstrap_url,
+                ],
+            ),
+        )
+        .expect("config file should be written");
+
+        let mut runtime =
+            NodeRuntime::from_config_path(&config_path).expect("runtime should load from config");
+        runtime
+            .startup(START_UNIX_MS)
+            .expect("startup should recover using later bootstrap source");
+        server_handle
+            .join()
+            .expect("http server should exit cleanly");
+
+        let bootstrap_status = runtime.health_snapshot().bootstrap;
+        assert_eq!(runtime.state(), NodeRuntimeState::Running);
+        assert_eq!(bootstrap_status.configured_sources, 2);
+        assert_eq!(bootstrap_status.last_accepted_sources, 1);
+        assert_eq!(bootstrap_status.total_successes, 1);
     }
 
     #[test]
@@ -2346,9 +2628,14 @@ mod tests {
                 .expect("client context should initialize"),
         );
 
-        server
-            .startup(START_UNIX_MS)
-            .expect("server startup should degrade, not fail");
+        match server.startup(START_UNIX_MS) {
+            Ok(()) => {}
+            Err(NodeRuntimeError::TcpTransport(crate::transport::TcpTransportIoError::Bind {
+                source,
+                ..
+            })) if source.kind() == io::ErrorKind::PermissionDenied => return,
+            Err(error) => panic!("server startup should degrade, not fail: {error}"),
+        }
         client
             .startup(START_UNIX_MS + 1)
             .expect("client startup should degrade, not fail");
@@ -2535,6 +2822,61 @@ mod tests {
             ],
             bridge_hints: Vec::new(),
         }
+    }
+
+    fn start_test_http_server(
+        response: Vec<u8>,
+        expected_requests: usize,
+    ) -> io::Result<(String, thread::JoinHandle<()>)> {
+        let listener = TcpListener::bind("127.0.0.1:0")?;
+        let addr = listener
+            .local_addr()
+            .expect("listener should expose local addr");
+        let handle = thread::spawn(move || {
+            for _ in 0..expected_requests {
+                let (mut stream, _) = listener.accept().expect("http client should connect");
+                stream
+                    .set_read_timeout(Some(Duration::from_millis(250)))
+                    .expect("read timeout should configure");
+                let mut request = Vec::new();
+                let mut buffer = [0_u8; 512];
+                loop {
+                    match stream.read(&mut buffer) {
+                        Ok(0) => break,
+                        Ok(read) => {
+                            request.extend_from_slice(&buffer[..read]);
+                            if request.windows(4).any(|window| window == b"\r\n\r\n") {
+                                break;
+                            }
+                        }
+                        Err(error)
+                            if matches!(
+                                error.kind(),
+                                io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                            ) =>
+                        {
+                            break;
+                        }
+                        Err(error) => panic!("http server read failed: {error}"),
+                    }
+                }
+                stream
+                    .write_all(&response)
+                    .expect("http response should write");
+            }
+        });
+
+        Ok((format!("http://{addr}/bootstrap.json"), handle))
+    }
+
+    fn http_ok_response(body: &[u8]) -> Vec<u8> {
+        let mut response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            body.len()
+        )
+        .into_bytes();
+        response.extend_from_slice(body);
+        response
     }
 
     fn bootstrap_peer(

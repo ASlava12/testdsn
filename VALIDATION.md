@@ -67,7 +67,7 @@ cargo test -p overlay-core --test integration_routing
 cargo test -p overlay-core --test integration_service_open
 ```
 
-## Milestone 14 pilot launch gate
+## Milestone 16 network-bootstrap gate
 
 ```bash
 ./devnet/run-launch-gate.sh
@@ -86,6 +86,8 @@ TMPDIR=/tmp cargo test -p overlay-core --test integration_relay_fallback
 TMPDIR=/tmp cargo test -p overlay-core --test integration_routing
 TMPDIR=/tmp cargo test -p overlay-core --test integration_service_open
 ./devnet/run-smoke.sh
+./devnet/run-distributed-smoke.sh
+./devnet/run-multihost-smoke.sh
 ./devnet/run-restart-smoke.sh
 ```
 
@@ -117,6 +119,12 @@ or
 
 ```bash
 ./devnet/run-distributed-smoke.sh
+```
+
+## Milestone 16 network-bootstrap multi-host smoke
+
+```bash
+./devnet/run-multihost-smoke.sh
 ```
 
 ## Milestone 5 regression runs
@@ -172,11 +180,11 @@ cargo test -p overlay-core --test integration_service_open
 ## Notes
 
 - Milestones 1-12 are considered implemented baseline work, and the current
-  repository stage marker is `milestone-14-launch-gate` (Milestone 14 launch
-  gate and pilot tag).
-- Use the Milestone 1-12 regression runs, stage-boundary smoke tests, and the
-  Milestone 14 pilot launch gate as the primary checks for the frozen pilot
-  baseline.
+  repository stage marker is `milestone-16-network-bootstrap` (Milestone 16
+  network bootstrap and multi-host devnet).
+- Use the Milestone 1-12 regression runs, stage-boundary smoke tests, the
+  distributed localhost smoke, and the Milestone 16 network-bootstrap gate as
+  the primary checks for the current pilot baseline.
 - If `REPOSITORY_STAGE`, `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, milestone
   prompts, or other status markers change, rerun the stage-boundary smoke
   tests so code and docs stay aligned.
@@ -212,14 +220,18 @@ cargo test -p overlay-core --test integration_service_open
 - `peer::tests` now also covers rejected bootstrap ingest observability without clobbering the active-peer gauge.
 - `session::manager::tests` now also covers bounded handshake transcript replay-cache validation, rejection, pruning, oldest-entry eviction, and explicit established-session gauge synchronization.
 - routing probe message vectors live in `tests/vectors/path_probe_messages.json`.
-- The local devnet smoke flow is intentionally in-process and local-file based:
-  it validates the sample configs, runtime startup, handshake-backed placeholder
-  session establishment, verified presence publish handoff, exact lookup,
-  service open, and one relay-fallback path without introducing real network
-  listeners.
-- The Milestone 14 launch gate adds a bounded restart smoke and freezes the
-  required command order for pilot tags, but it does not replace the Milestone
-  12 logical soak as an optional supporting hardening check.
+- The local devnet smoke flow stays repo-local, but it now keeps configured TCP
+  listeners enabled and uses a real TCP session path for the session-establish
+  step instead of the earlier placeholder-only path.
+- `./devnet/run-multihost-smoke.sh` is the current network-bootstrap and
+  host-style devnet proof path. It starts static bootstrap seed servers over
+  `http://`, then runs `overlay-cli smoke --devnet-dir devnet/hosts/localhost`
+  to validate bootstrap, session establishment, publish, lookup, service open,
+  and relay fallback against the multi-host config layout.
+- The Milestone 16 gate keeps the bounded restart smoke and adds the
+  distributed and multi-host network-bootstrap smoke commands, but it does not
+  replace the Milestone 12 logical soak as an optional supporting hardening
+  check.
 - The Milestone 12 soak path also stays in-process and advances logical time
   through repeated runtime ticks so stale-session/service/relay/probe cleanup,
   bootstrap retry, and health snapshots can be exercised without a separate
@@ -227,9 +239,9 @@ cargo test -p overlay-core --test integration_service_open
 - `overlay-cli run --status-every <ticks>` now emits JSON health snapshots with
   runtime counts, observability counters, relay usage, cleanup totals, and
   resource-limit surfaces for a single node.
-- `./devnet/run-distributed-smoke.sh` is the minimal real-socket regression
-  path for listener bind, outbound dial, accept, and handshake-backed session
-  establishment across separate localhost processes.
+- `./devnet/run-distributed-smoke.sh` now also validates network bootstrap over
+  `http://` before listener bind, outbound dial, accept, and handshake-backed
+  session establishment across separate localhost processes.
 - If the default temp directory is not writable in your environment, prefix the build, lint, and test commands with `TMPDIR=/tmp`.
 
 If a command fails, report exactly which command failed and whether it failed because:

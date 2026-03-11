@@ -1,7 +1,7 @@
 # Launch Checklist
 
-This checklist defines the Milestone 14 launch gate for the current
-pilot-ready network surface.
+This checklist defines the Milestone 16 network-bootstrap and multi-host
+devnet gate for the current pilot-ready network surface.
 
 It is a pilot gate, not a public-production or hostile-Internet readiness
 claim.
@@ -12,25 +12,27 @@ The current launchable MVP surface is frozen to:
 
 - node identity and key handling;
 - canonical wire framing and the current message catalog;
-- session handshake and placeholder session establishment;
-- local bootstrap-file startup and peer ingest;
+- session handshake and minimal real TCP session establishment;
+- local bootstrap-file startup plus minimal `http://` bootstrap fetch;
 - exact presence publish and exact lookup by `node_id`;
 - direct-first reachability planning with relay fallback;
 - bounded path metrics, deterministic scoring, and hysteresis;
 - exact service resolution by `app_id` and `OpenAppSession`;
 - structured logs, runtime health snapshots, and bounded counters;
 - `overlay-cli run` for single-node inspection;
-- `overlay-cli smoke` plus the checked-in four-node devnet for the green path.
+- `overlay-cli bootstrap-serve` for static devnet seed serving;
+- `overlay-cli smoke` plus the checked-in devnet layouts for local and
+  multi-host-style proof paths.
 
-Anything outside that list is out of the Milestone 14 launch gate unless a
-later task explicitly reopens scope.
+Anything outside that list is out of the Milestone 16 gate unless a later task
+explicitly reopens scope.
 
 ## Not in this gate
 
-The current launch gate does not claim:
+The current gate does not claim:
 
-- public bootstrap-provider fetch over the network;
-- real sockets, listeners, or distributed multi-process transport;
+- broad public bootstrap-provider infrastructure;
+- HTTPS, DNS-derived bootstrap, or bootstrap trust roots;
 - persistent on-disk peers, presence, services, sessions, or relay state;
 - global node or service discovery;
 - onion routing or stronger anonymity;
@@ -53,6 +55,8 @@ TMPDIR=/tmp cargo test -p overlay-core --test integration_relay_fallback
 TMPDIR=/tmp cargo test -p overlay-core --test integration_routing
 TMPDIR=/tmp cargo test -p overlay-core --test integration_service_open
 ./devnet/run-smoke.sh
+./devnet/run-distributed-smoke.sh
+./devnet/run-multihost-smoke.sh
 ./devnet/run-restart-smoke.sh
 ```
 
@@ -65,9 +69,11 @@ CI-friendly wrapper:
 Pass criteria:
 
 - every command exits `0`;
-- the devnet smoke reaches `smoke_complete`;
-- the devnet smoke includes `relay_fallback_planned` and
-  `relay_fallback_bound`;
+- the local smoke reaches `smoke_complete`;
+- the distributed smoke reaches `distributed_smoke_complete`;
+- the multi-host smoke reaches `smoke_complete`;
+- the multi-host smoke includes `publish_presence`, `lookup_node`,
+  `open_service`, `relay_fallback_planned`, and `relay_fallback_bound`;
 - the restart smoke completes two consecutive bounded `overlay-cli run`
   startups against the same config.
 
@@ -85,9 +91,13 @@ Pass criteria:
 4. Confirm the first logs include `bootstrap_fetch`, `bootstrap_ingest`, and
    `state_transition`, and that `runtime_status.health.runtime.state` becomes
    `running` or `degraded`.
-5. Use the devnet smoke as the end-to-end proof path for bootstrap, session,
-   publish, lookup, service open, and relay fallback.
-6. Cut the pilot tag only after the gate stays green on the exact commit being
+5. Use `./devnet/run-distributed-smoke.sh` as the real-process proof path for
+   network bootstrap, listener bind, outbound dial, accept, and handshake-backed
+   session establishment.
+6. Use `./devnet/run-multihost-smoke.sh` as the repo-local proof path for
+   network bootstrap plus publish, lookup, service open, and relay fallback on
+   the host-style devnet layout.
+7. Cut the pilot tag only after the gate stays green on the exact commit being
    tagged.
 
 ## Pilot tag workflow
@@ -119,12 +129,17 @@ Workflow:
 
 - The current runtime is in-memory only and loses peers, sessions, presence,
   service-open state, relay tunnels, and path probes on restart.
-- The checked-in green path is local-file and in-process; it does not prove a
-  distributed network data plane.
-- Bootstrap sources are local `.json` files or `file:` URIs only.
-- The current CLI does not expose standalone publish, lookup, relay-intro, or
-  service-open operator commands outside the smoke harness.
-- Relay fallback is proven for the documented local path only:
+- The new network bootstrap path is intentionally minimal: it fetches static
+  bootstrap JSON over plain `http://` only.
+- `overlay-cli bootstrap-serve` is a devnet seed server, not a public bootstrap
+  service or trust framework.
+- The current CLI still does not expose standalone publish, lookup,
+  relay-intro, or service-open operator commands outside the smoke harness.
+- The checked-in multi-host smoke uses host-style configs and real TCP session
+  establishment, but publish, lookup, service open, and relay fallback remain
+  harness-coordinated proof steps rather than a distributed control-plane
+  implementation.
+- Relay fallback is still proven for the documented path only:
   `node-a -> node-relay -> node-b`.
 - Lookup is exact-by-`node_id` only, and service resolution is exact-by-`app_id`
   only.

@@ -12,24 +12,24 @@ A Codex-oriented handoff bundle containing:
 
 ## Current repository stage
 
-- `REPOSITORY_STAGE` is `milestone-14-launch-gate`.
+- `REPOSITORY_STAGE` is `milestone-16-network-bootstrap`.
 - Milestones 0-12 are a closed baseline in this repository.
-- Milestone 14 launch gate and pilot tag is the current stage with a frozen
-  pilot launch surface, `docs/LAUNCH_CHECKLIST.md`,
-  `docs/PILOT_RELEASE_TEMPLATE.md`, the documented green-path validation and
-  launch flow, and explicit pilot-only limitations.
+- Milestone 16 network bootstrap and multi-host devnet is the current stage
+  with minimal `http://` bootstrap fetch, `overlay-cli bootstrap-serve`,
+  `devnet/hosts/`, `docs/LAUNCH_CHECKLIST.md`, the documented green-path
+  validation and launch flow, and explicit pilot-only limitations.
 
 ## Recommended first Codex task
 
-Use `prompts/codex-milestone-14.md` as the first task prompt for the current
-`milestone-14-launch-gate` stage. It assumes the repository already has a
+Use `prompts/codex-milestone-16.md` as the first task prompt for the current
+`milestone-16-network-bootstrap` stage. It assumes the repository already has a
 closed Milestone 1-12 baseline and does not need to restart from Milestone
 0/1/2.
 
 ## Recommended workflow
 
 1. Confirm from `README.md`, `AGENTS.md`, and `IMPLEMENT.md` that the current
-   stage is `milestone-14-launch-gate`.
+   stage is `milestone-16-network-bootstrap`.
 2. Do not restart from Milestone 0/1/2; treat Milestones 1-12 as
    regression-fix, vector-maintenance, validation-maintenance, and
    launch-maintenance territory only unless the task explicitly reopens them.

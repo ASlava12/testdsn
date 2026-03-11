@@ -3,7 +3,9 @@
 The repository ships a reproducible four-node local devnet under
 [devnet](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet).
 
-It is the operator-facing proof path for the current runtime surface.
+It is the operator-facing proof path for the current runtime surface, including
+the Milestone 16 host-style network-bootstrap layout under
+[devnet/hosts](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/hosts).
 
 ## Node roles
 
@@ -17,9 +19,12 @@ It is the operator-facing proof path for the current runtime surface.
 - [devnet/configs](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/configs): four runnable `OverlayConfig` files.
 - [devnet/keys](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/keys): deterministic seed files in hex form.
 - [devnet/bootstrap](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/bootstrap): local bootstrap seed JSON files.
+- [devnet/hosts](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/hosts): host-style localhost and example multi-host layouts.
 - [devnet/run-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-smoke.sh): wrapper for the smoke flow.
 - [devnet/run-restart-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-restart-smoke.sh): wrapper for the bounded restart smoke.
-- [devnet/run-launch-gate.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-launch-gate.sh): wrapper for the full Milestone 14 launch gate.
+- [devnet/run-distributed-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-smoke.sh): wrapper for the real-process localhost network-bootstrap smoke.
+- [devnet/run-multihost-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-multihost-smoke.sh): wrapper for the host-style network-bootstrap smoke.
+- [devnet/run-launch-gate.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-launch-gate.sh): wrapper for the full Milestone 16 launch gate.
 - [devnet/run-soak.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-soak.sh): wrapper for the logical soak.
 
 ## Smoke flow
@@ -49,10 +54,30 @@ What this proves:
 
 - the sample configs load;
 - bootstrap files validate and populate local peers;
-- the placeholder session runner can carry a real handshake outcome;
+- the runtime can carry a real handshake-backed TCP session;
 - a verified presence record can be published and looked up locally;
 - a verified service record can be registered and opened locally;
 - one direct-first, relay-second fallback path works.
+
+## Network-Bootstrap Smoke
+
+Run:
+
+```bash
+./devnet/run-multihost-smoke.sh
+```
+
+This starts three static bootstrap seed servers with `overlay-cli
+bootstrap-serve`, then runs `overlay-cli smoke --devnet-dir
+devnet/hosts/localhost`.
+
+Expected additions beyond the local smoke:
+
+1. startup succeeds from `http://` bootstrap sources rather than local files;
+2. the session step uses the configured TCP listeners instead of the earlier
+   placeholder-only path;
+3. the same publish, lookup, service-open, and relay-fallback steps complete
+   against the host-style config layout.
 
 ## Soak flow
 
@@ -98,7 +123,7 @@ Run:
 ./devnet/run-launch-gate.sh
 ```
 
-This executes the Milestone 14 pilot gate in documented order:
+This executes the Milestone 16 pilot gate in documented order:
 
 - `fmt`
 - `clippy`
@@ -106,6 +131,8 @@ This executes the Milestone 14 pilot gate in documented order:
 - `test`
 - stage-boundary smoke tests
 - devnet smoke
+- distributed network-bootstrap smoke
+- multi-host network-bootstrap smoke
 - restart smoke
 
 ## Single-node inspection
@@ -119,11 +146,12 @@ TMPDIR=/tmp cargo run -p overlay-cli -- run --config devnet/configs/node-a.json 
 
 ## Devnet limits
 
-- The devnet does not create real sockets or listeners.
-- Bootstrap remains local-file based.
-- Presence propagation, exact lookup visibility, and service open are performed
-  inside the harness rather than over a distributed control plane.
-- Dial hints are configuration artifacts for coherence only; the runtime does
-  not bind them to live endpoints.
-- Relay fallback is demonstrated for one local path only:
+- The network bootstrap path is plain `http://` serving static JSON only.
+- Presence propagation, exact lookup visibility, and service open are still
+  performed inside the smoke harness rather than over a distributed control
+  plane.
+- The distributed smoke proves bootstrap plus real TCP session establishment
+  only; it does not yet carry publish, lookup, service-open, or relay control
+  messages over that socket path.
+- Relay fallback is still demonstrated for one documented path only:
   `node-a -> node-relay -> node-b`.

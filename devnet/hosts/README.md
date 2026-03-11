@@ -1,0 +1,31 @@
+# Host-Style Devnet Layouts
+
+This directory contains the Milestone 16 host-style devnet assets.
+
+## Layouts
+
+- `localhost/`: runnable configs for the repo-local multi-host smoke.
+  These use real `http://127.0.0.1:*` bootstrap sources and real
+  `tcp://127.0.0.1:*` listener addresses.
+- `examples/`: copy-and-edit examples for separate hosts or VMs.
+  These use RFC 5737 documentation addresses and assume three static bootstrap
+  seed servers:
+  - `198.51.100.10:4201` serving `node-foundation.json`
+  - `198.51.100.11:4202` serving `node-a-seed.json`
+  - `198.51.100.13:4203` serving `node-ab-seed.json`
+
+## Roles
+
+- `node-a`: bootstrap anchor and smoke-flow client
+- `node-b`: presence publisher and service host
+- `node-c`: extra standard peer
+- `node-relay`: relay-enabled node for fallback
+
+## Bootstrap model
+
+The host-style configs intentionally keep bootstrap minimal:
+
+- bootstrap responses stay static JSON with the existing schema;
+- nodes fetch them over plain `http://`;
+- nodes may list more than one seed URL for conservative fallback;
+- the seed server is `overlay-cli bootstrap-serve`, not a public provider stack.

@@ -263,11 +263,12 @@ For current work, treat the repository stage as:
   `crates/overlay-cli/src/devnet.rs`;
 - Milestone 12 launch hardening is implemented with bounded cleanup, degraded
   bootstrap retry, runtime health snapshots, and the logical soak path;
-- the current repository stage marker is `milestone-14-launch-gate`;
-- Milestone 14 launch gate and pilot tag is now the current stage, with
-  `docs/LAUNCH_CHECKLIST.md`, `docs/PILOT_RELEASE_TEMPLATE.md`, the documented
-  green-path validation and launch sequence, a frozen current MVP launch
-  surface, and explicit pilot-only limitations;
+- the current repository stage marker is `milestone-16-network-bootstrap`;
+- Milestone 16 network bootstrap and multi-host devnet is now the current
+  stage, with `docs/LAUNCH_CHECKLIST.md`, `docs/PILOT_RELEASE_TEMPLATE.md`,
+  the documented green-path validation and launch sequence, the checked-in
+  `overlay-cli bootstrap-serve` surface, host-style devnet layouts, and
+  explicit pilot-only limitations;
 
 That means:
 
@@ -285,10 +286,12 @@ That means:
   vectors, or spec mismatches;
 - Milestone 8 is closed and should be touched only for regressions,
   vectors, or spec mismatches;
-- Milestone 14 is the current stage and should stay limited to pilot launch
-  maintenance, regression fixes, validation maintenance, and documentation
-  synchronization unless a task explicitly reopens scope;
-- simulation-focused expansion remains out of scope for current work.
+- Milestone 16 is the current stage and should stay limited to network
+  bootstrap, multi-host devnet maintenance, regression fixes, validation
+  maintenance, and documentation synchronization unless a task explicitly
+  reopens scope;
+- public bootstrap infrastructure, discovery expansion, and simulation-focused
+  expansion remain out of scope for current work.
 
 ### 9. Final encoding of `supported_kex` and `supported_signatures`
 

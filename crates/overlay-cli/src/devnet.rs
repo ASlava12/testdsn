@@ -23,8 +23,6 @@ use overlay_core::{
 use serde_json::json;
 
 const START_UNIX_MS: u64 = 1_700_100_000_000;
-const CLIENT_SESSION_ID: u64 = 101;
-const SERVER_SESSION_ID: u64 = 201;
 const RELAY_TUNNEL_ID: u64 = 7_001;
 const PRESENCE_TTL_S: u64 = 600;
 const REQUESTER_BINDING: &[u8] = b"devnet-node-a";
@@ -63,37 +61,79 @@ struct DevnetNode {
     runtime: NodeRuntime,
 }
 
-#[cfg(test)]
-fn run_smoke_with_writer(devnet_dir: &Path, writer: &mut dyn Write) -> Result<SmokeReport, String> {
-    run_smoke_with_writer_and_options(devnet_dir, writer, SmokeOptions::default())
+#[cfg_attr(test, allow(dead_code))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SessionMode {
+    RealTcp,
+    Placeholder,
 }
 
+#[cfg(test)]
+fn run_smoke_with_writer(devnet_dir: &Path, writer: &mut dyn Write) -> Result<SmokeReport, String> {
+    run_smoke_with_writer_and_mode(
+        devnet_dir,
+        writer,
+        SmokeOptions::default(),
+        SessionMode::Placeholder,
+    )
+}
+
+#[cfg(not(test))]
 fn run_smoke_with_writer_and_options(
     devnet_dir: &Path,
     writer: &mut dyn Write,
     options: SmokeOptions,
+) -> Result<SmokeReport, String> {
+    run_smoke_with_writer_and_mode(devnet_dir, writer, options, SessionMode::RealTcp)
+}
+
+#[cfg(test)]
+fn run_smoke_with_writer_and_options(
+    devnet_dir: &Path,
+    writer: &mut dyn Write,
+    options: SmokeOptions,
+) -> Result<SmokeReport, String> {
+    run_smoke_with_writer_and_mode(devnet_dir, writer, options, SessionMode::Placeholder)
+}
+
+fn run_smoke_with_writer_and_mode(
+    devnet_dir: &Path,
+    writer: &mut dyn Write,
+    options: SmokeOptions,
+    session_mode: SessionMode,
 ) -> Result<SmokeReport, String> {
     let mut node_a = load_node(devnet_dir, "node-a")?;
     let mut node_b = load_node(devnet_dir, "node-b")?;
     let mut node_c = load_node(devnet_dir, "node-c")?;
     let mut relay = load_node(devnet_dir, "node-relay")?;
 
+    if session_mode == SessionMode::Placeholder {
+        for node in [&mut node_a, &mut node_b, &mut node_c, &mut relay] {
+            node.runtime.context_mut().config_mut().tcp_listener_addr = None;
+        }
+    }
+
     startup_node(&mut node_a, START_UNIX_MS, writer)?;
     startup_node(&mut node_b, START_UNIX_MS + 100, writer)?;
     startup_node(&mut node_c, START_UNIX_MS + 200, writer)?;
     startup_node(&mut relay, START_UNIX_MS + 300, writer)?;
 
-    establish_placeholder_session(
-        &mut node_a,
-        &mut node_b,
-        CLIENT_SESSION_ID,
-        SERVER_SESSION_ID,
-        START_UNIX_MS + 1_000,
-        writer,
-    )?;
+    match session_mode {
+        SessionMode::RealTcp => {
+            establish_real_tcp_session(&mut node_a, &mut node_b, START_UNIX_MS + 1_000, writer)?
+        }
+        SessionMode::Placeholder => {
+            establish_placeholder_session(&mut node_a, &mut node_b, START_UNIX_MS + 1_000, writer)?
+        }
+    }
 
     let presence_record = build_signed_presence_record(
         node_b.runtime.context().signing_key(),
+        match session_mode {
+            SessionMode::RealTcp => tcp_dial_hint(&node_b)?,
+            SessionMode::Placeholder => "tcp://127.0.0.1:4102".to_string(),
+        }
+        .as_str(),
         unix_ms_to_s(START_UNIX_MS) + PRESENCE_TTL_S,
         relay.runtime.context().node_id(),
     )?;
@@ -368,13 +408,12 @@ fn run_smoke_with_writer_and_options(
 
 fn load_node(devnet_dir: &Path, name: &'static str) -> Result<DevnetNode, String> {
     let config_path = devnet_dir.join("configs").join(format!("{name}.json"));
-    let mut runtime = NodeRuntime::from_config_path(&config_path).map_err(|error| {
+    let runtime = NodeRuntime::from_config_path(&config_path).map_err(|error| {
         format!(
             "failed to load {name} config {}: {error}",
             config_path.display()
         )
     })?;
-    runtime.context_mut().config_mut().tcp_listener_addr = None;
     Ok(DevnetNode { name, runtime })
 }
 
@@ -408,21 +447,82 @@ fn startup_node(
     )
 }
 
-fn establish_placeholder_session(
+fn establish_real_tcp_session(
     client: &mut DevnetNode,
     server: &mut DevnetNode,
-    client_session_id: u64,
-    server_session_id: u64,
     timestamp_unix_ms: u64,
     writer: &mut dyn Write,
 ) -> Result<(), String> {
+    let listener_addr = server
+        .runtime
+        .tcp_listener_local_addr()
+        .ok_or_else(|| format!("{} did not bind a tcp listener", server.name))?;
+    let client_session_id = client
+        .runtime
+        .open_tcp_session(&format!("tcp://{listener_addr}"), timestamp_unix_ms)
+        .map_err(|error| format!("{} tcp dial failed: {error}", client.name))?;
+
+    let mut established = false;
+    for tick in 0..200_u64 {
+        server
+            .runtime
+            .tick(timestamp_unix_ms + 20 + tick)
+            .map_err(|error| format!("{} tcp session tick failed: {error}", server.name))?;
+        client
+            .runtime
+            .tick(timestamp_unix_ms + 20 + tick)
+            .map_err(|error| format!("{} tcp session tick failed: {error}", client.name))?;
+
+        let client_established = client
+            .runtime
+            .managed_session(client_session_id)
+            .map(|session| session.state())
+            == Some(SessionState::Established);
+        let server_established = server
+            .runtime
+            .managed_sessions()
+            .any(|session| session.state() == SessionState::Established);
+        if client_established && server_established {
+            established = true;
+            break;
+        }
+    }
+    if !established {
+        return Err(format!(
+            "{} -> {} tcp session did not establish within tick budget",
+            client.name, server.name
+        ));
+    }
+
+    write_step(
+        writer,
+        json!({
+            "step": "session_established",
+            "client_node": client.name,
+            "server_node": server.name,
+            "client_node_id": client.runtime.context().node_id().to_string(),
+            "server_node_id": server.runtime.context().node_id().to_string(),
+            "transport": "tcp",
+        }),
+    )
+}
+
+fn establish_placeholder_session(
+    client: &mut DevnetNode,
+    server: &mut DevnetNode,
+    timestamp_unix_ms: u64,
+    writer: &mut dyn Write,
+) -> Result<(), String> {
+    const CLIENT_SESSION_ID: u64 = 101;
+    const SERVER_SESSION_ID: u64 = 201;
+
     client
         .runtime
-        .open_placeholder_session(client_session_id, Box::new(TcpTransport), timestamp_unix_ms)
+        .open_placeholder_session(CLIENT_SESSION_ID, Box::new(TcpTransport), timestamp_unix_ms)
         .map_err(|error| format!("{} open placeholder session failed: {error}", client.name))?;
     server
         .runtime
-        .open_placeholder_session(server_session_id, Box::new(TcpTransport), timestamp_unix_ms)
+        .open_placeholder_session(SERVER_SESSION_ID, Box::new(TcpTransport), timestamp_unix_ms)
         .map_err(|error| format!("{} open placeholder session failed: {error}", server.name))?;
 
     let handshake_config = HandshakeConfig::default();
@@ -455,7 +555,7 @@ fn establish_placeholder_session(
 
     client
         .runtime
-        .managed_session_mut(client_session_id)
+        .managed_session_mut(CLIENT_SESSION_ID)
         .ok_or_else(|| format!("{} missing client session after open", client.name))?
         .handle_runner_input(
             timestamp_unix_ms + 10,
@@ -466,7 +566,7 @@ fn establish_placeholder_session(
         .map_err(|error| format!("{} session establishment failed: {error}", client.name))?;
     server
         .runtime
-        .managed_session_mut(server_session_id)
+        .managed_session_mut(SERVER_SESSION_ID)
         .ok_or_else(|| format!("{} missing server session after open", server.name))?
         .handle_runner_input(
             timestamp_unix_ms + 20,
@@ -497,12 +597,12 @@ fn establish_placeholder_session(
 
     let client_state = client
         .runtime
-        .managed_session(client_session_id)
+        .managed_session(CLIENT_SESSION_ID)
         .ok_or_else(|| format!("{} missing client session after handshake", client.name))?
         .state();
     let server_state = server
         .runtime
-        .managed_session(server_session_id)
+        .managed_session(SERVER_SESSION_ID)
         .ok_or_else(|| format!("{} missing server session after handshake", server.name))?
         .state();
     if client_state != SessionState::Established || server_state != SessionState::Established {
@@ -522,6 +622,14 @@ fn establish_placeholder_session(
             "transport": "tcp",
         }),
     )
+}
+
+fn tcp_dial_hint(node: &DevnetNode) -> Result<String, String> {
+    let listener_addr = node
+        .runtime
+        .tcp_listener_local_addr()
+        .ok_or_else(|| format!("{} did not bind a tcp listener", node.name))?;
+    Ok(format!("tcp://{listener_addr}"))
 }
 
 fn run_long_soak(
@@ -649,6 +757,7 @@ fn sample_soak_path_state() -> PathState {
 
 fn build_signed_presence_record(
     signing_key: &Ed25519SigningKey,
+    direct_dial_hint: &str,
     expires_at_unix_s: u64,
     relay_node_id: NodeId,
 ) -> Result<PresenceRecord, String> {
@@ -661,7 +770,7 @@ fn build_signed_presence_record(
         transport_classes: vec!["quic".to_string(), "relay".to_string(), "tcp".to_string()],
         reachability_mode: "hybrid".to_string(),
         locator_commitment: b"devnet/node-b".to_vec(),
-        encrypted_contact_blobs: vec![b"tcp://127.0.0.1:4102".to_vec()],
+        encrypted_contact_blobs: vec![direct_dial_hint.as_bytes().to_vec()],
         relay_hint_refs: vec![relay_node_id.as_bytes().to_vec()],
         intro_policy: "allow".to_string(),
         capability_requirements: vec!["service-host".to_string()],

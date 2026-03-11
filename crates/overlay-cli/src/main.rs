@@ -1,3 +1,4 @@
+mod bootstrap_server;
 mod devnet;
 
 use std::{
@@ -61,6 +62,11 @@ fn try_main() -> Result<(), String> {
                 )
             }
         }
+        Command::BootstrapServe {
+            bind_addr,
+            bootstrap_file,
+            max_requests,
+        } => bootstrap_server::run(&bind_addr, &bootstrap_file, max_requests),
     }
 }
 
@@ -80,6 +86,11 @@ enum Command {
         soak_seconds: u64,
         status_interval_seconds: Option<u64>,
     },
+    BootstrapServe {
+        bind_addr: String,
+        bootstrap_file: PathBuf,
+        max_requests: Option<usize>,
+    },
 }
 
 fn parse_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, String> {
@@ -93,6 +104,7 @@ fn parse_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, St
         "-h" | "--help" => Ok(Command::Help),
         "run" => parse_run_command(args),
         "smoke" => parse_smoke_command(args),
+        "bootstrap-serve" => parse_bootstrap_serve_command(args),
         other => Err(format!("unknown command '{other}'")),
     }
 }
@@ -196,6 +208,53 @@ fn parse_smoke_command(args: impl IntoIterator<Item = OsString>) -> Result<Comma
     })
 }
 
+fn parse_bootstrap_serve_command(
+    args: impl IntoIterator<Item = OsString>,
+) -> Result<Command, String> {
+    let mut bind_addr = None;
+    let mut bootstrap_file = None;
+    let mut max_requests = None;
+    let mut args = args.into_iter();
+
+    while let Some(arg) = args.next() {
+        match arg.to_string_lossy().as_ref() {
+            "--bind" => {
+                let Some(value) = args.next() else {
+                    return Err("--bind requires an address".to_string());
+                };
+                bind_addr = Some(value.to_string_lossy().into_owned());
+            }
+            "--bootstrap-file" => {
+                let Some(value) = args.next() else {
+                    return Err("--bootstrap-file requires a path".to_string());
+                };
+                bootstrap_file = Some(PathBuf::from(value));
+            }
+            "--max-requests" => {
+                let Some(value) = args.next() else {
+                    return Err("--max-requests requires an integer value".to_string());
+                };
+                max_requests = Some(parse_usize_flag("--max-requests", &value)?);
+            }
+            "-h" | "--help" => return Ok(Command::Help),
+            other => return Err(format!("unknown bootstrap-serve flag '{other}'")),
+        }
+    }
+
+    let Some(bind_addr) = bind_addr else {
+        return Err("bootstrap-serve requires --bind <addr>".to_string());
+    };
+    let Some(bootstrap_file) = bootstrap_file else {
+        return Err("bootstrap-serve requires --bootstrap-file <path>".to_string());
+    };
+
+    Ok(Command::BootstrapServe {
+        bind_addr,
+        bootstrap_file,
+        max_requests,
+    })
+}
+
 fn parse_u64_flag(flag: &str, value: &OsString) -> Result<u64, String> {
     value
         .to_string_lossy()
@@ -209,6 +268,13 @@ fn parse_non_zero_u64_flag(flag: &str, value: &OsString) -> Result<u64, String> 
         return Err(format!("{flag} must be greater than zero"));
     }
     Ok(parsed)
+}
+
+fn parse_usize_flag(flag: &str, value: &OsString) -> Result<usize, String> {
+    value
+        .to_string_lossy()
+        .parse::<usize>()
+        .map_err(|error| format!("{flag} must be an unsigned integer: {error}"))
 }
 
 fn run_command(
@@ -296,6 +362,9 @@ fn print_usage() {
     println!(
         "  overlay-cli smoke [--devnet-dir <path>] [--soak-seconds <seconds>] [--status-interval-seconds <seconds>]"
     );
+    println!(
+        "  overlay-cli bootstrap-serve --bind <addr> --bootstrap-file <path> [--max-requests <count>]"
+    );
 }
 
 #[cfg(test)]
@@ -378,6 +447,28 @@ mod tests {
                 max_ticks: None,
                 status_every_ticks: Some(5),
                 dial_hints: vec!["tcp://127.0.0.1:4102".to_string()],
+            }
+        );
+    }
+
+    #[test]
+    fn parse_command_parses_bootstrap_serve_flags() {
+        assert_eq!(
+            parse_command([
+                OsString::from("overlay-cli"),
+                OsString::from("bootstrap-serve"),
+                OsString::from("--bind"),
+                OsString::from("127.0.0.1:4201"),
+                OsString::from("--bootstrap-file"),
+                OsString::from("devnet/bootstrap/node-foundation.json"),
+                OsString::from("--max-requests"),
+                OsString::from("2"),
+            ])
+            .unwrap(),
+            Command::BootstrapServe {
+                bind_addr: "127.0.0.1:4201".to_string(),
+                bootstrap_file: PathBuf::from("devnet/bootstrap/node-foundation.json"),
+                max_requests: Some(2),
             }
         );
     }

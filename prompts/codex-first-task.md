@@ -3,11 +3,12 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `VALIDATION.md`, `docs/OPEN_QUESTIONS.md`,
 `spec/threat-model.md`, and `spec/config.md`.
 
 Goal:
-Synchronize on the current repository stage, `milestone-14-launch-gate`, and
-use the dedicated Milestone 14 prompt for the next concrete current-stage task.
+Synchronize on the current repository stage,
+`milestone-16-network-bootstrap`, and use the dedicated Milestone 16 prompt
+for the next concrete current-stage task.
 
 Current repository baseline:
-- The current repository stage is `milestone-14-launch-gate`.
+- The current repository stage is `milestone-16-network-bootstrap`.
 - Milestone 0 is already complete.
 - Milestone 1 foundations are already implemented, vectorized, and validated in
   `overlay-core` (`identity`, `records`, `wire`).
@@ -36,10 +37,12 @@ Current repository baseline:
 - Milestone 9 hardening, Milestone 10 minimal runtime, Milestone 11 local
   devnet, and Milestone 12 launch hardening are implemented as part of the
   frozen baseline.
-- Milestone 14 launch gate and pilot tag is now active with a frozen current
-  MVP launch surface, `docs/LAUNCH_CHECKLIST.md`,
-  `docs/PILOT_RELEASE_TEMPLATE.md`, a documented green-path launch sequence,
-  and explicit pilot-only limitations.
+- Milestone 14 launch gate and pilot tag remains part of the landed pilot
+  baseline.
+- Milestone 16 network bootstrap and multi-host devnet is now active with
+  `overlay-cli bootstrap-serve`, host-style devnet configs under
+  `devnet/hosts/`, the updated `docs/LAUNCH_CHECKLIST.md`, a documented
+  green-path validation sequence, and explicit pilot-only limitations.
 
 Constraints:
 - do not restart the repository from Milestone 0;
@@ -49,8 +52,8 @@ Constraints:
 
 Tasks:
 - confirm the repository already sits at the closed Milestone 1-8 baseline;
-- use `prompts/codex-milestone-14.md` for the next concrete
-  `milestone-14-launch-gate` task;
+- use `prompts/codex-milestone-16.md` for the next concrete
+  `milestone-16-network-bootstrap` task;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the repository baseline changes;
 - treat Milestones 1-12 as closed baseline work, touching them only for

@@ -4,9 +4,9 @@ This file is the execution plan for Codex.
 
 ## Current repository stage
 
-The repository has a closed Milestone 1-12 baseline plus a frozen Milestone 14
-pilot launch gate.
-The current repository stage marker is `milestone-14-launch-gate`.
+The repository has a closed Milestone 1-12 baseline, a landed Milestone 14
+pilot launch gate, and the current Milestone 16 network-bootstrap stage.
+The current repository stage marker is `milestone-16-network-bootstrap`.
 
 - Milestone 0 bootstrap is complete.
 - Milestone 1 foundations are implemented, vectorized, and validated in
@@ -108,6 +108,14 @@ The current repository stage marker is `milestone-14-launch-gate`.
   `docs/DEVNET.md`, a frozen current MVP launch surface, and explicit pilot-only
   limitations. The repository stage marker now advances to
   `milestone-14-launch-gate`.
+- Milestone 16 network bootstrap and multi-host devnet work is now implemented
+  in `crates/overlay-core/src/runtime.rs`, `crates/overlay-cli/src/main.rs`,
+  `crates/overlay-cli/src/bootstrap_server.rs`, and `crates/overlay-cli/src/devnet.rs`,
+  with minimal static `http://` bootstrap fetch, a bounded static bootstrap
+  seed server command, host-style devnet configs under `devnet/hosts/`,
+  distributed and multi-host smoke scripts, and the current validation/docs
+  updates for that surface. The repository stage marker now advances to
+  `milestone-16-network-bootstrap`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -115,20 +123,21 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Use `prompts/codex-milestone-14.md` as the recommended next-task prompt for the
-current `milestone-14-launch-gate` stage and keep work conservative from the
-pilot launch-gate boundary:
+Use `prompts/codex-milestone-16.md` as the recommended next-task prompt for the
+current `milestone-16-network-bootstrap` stage and keep work conservative from
+the current pilot boundary:
 
-1. preserve the frozen launch surface documented in
-   `docs/LAUNCH_CHECKLIST.md`, `docs/RUNBOOK.md`, and `docs/DEVNET.md`;
+1. preserve the current launch surface documented in
+   `docs/LAUNCH_CHECKLIST.md`, `docs/RUNBOOK.md`, `docs/DEVNET.md`, and
+   `devnet/hosts/README.md`;
 2. keep Milestones 1-12 limited to regression fixes, launch-maintenance
    updates, vector maintenance, or conservative spec-conformance fixes;
-3. prefer pilot-readiness fixes, validation maintenance, and documentation sync
-   over feature expansion;
+3. prefer network-bootstrap hardening, validation maintenance, and
+   documentation sync over feature expansion;
 4. rerun the documented launch gate whenever `REPOSITORY_STAGE`, launch docs,
    or launch scripts change;
-5. keep public-production claims, protocol redesign, and scope expansion out of
-   work unless explicitly requested.
+5. keep public bootstrap infrastructure, protocol redesign, and scope expansion
+   out of work unless explicitly requested.
 
 ## Milestone 0 — repository bootstrap
 
@@ -425,7 +434,7 @@ Close the highest-risk gaps before larger-scale simulation.
 
 ## Milestone 14 — launch gate and pilot tag
 
-Status: current repository stage and considered closed for the current baseline.
+Status: landed and considered closed for the current baseline.
 
 ### Goal
 Freeze a reproducible pilot launch gate without claiming public-production
@@ -450,3 +459,37 @@ readiness.
 - the current network can be raised and checked through the documented green
   path
 - status docs and prompts report the same Milestone 14 stage marker
+
+---
+
+## Milestone 16 — network bootstrap and multi-host devnet
+
+Status: current repository stage.
+
+### Goal
+Move the devnet from local-file-only bootstrap to a minimal network-reachable
+bootstrap flow and add a reproducible host-style devnet validation path.
+
+### Tasks
+1. Add minimal network bootstrap fetch support without redesigning bootstrap
+   message semantics.
+2. Add a bounded static bootstrap seed server command for devnet or lab use.
+3. Add host-style multi-host config examples with real dial hints.
+4. Add distributed and multi-host smoke scripts.
+5. Document the host-to-host bootstrap runbook and current limits.
+
+### Important constraints
+- Keep bootstrap transport minimal and static.
+- Do not add broad public bootstrap-provider infrastructure.
+- Do not add global discovery or anonymity features.
+- Keep publish, lookup, service-open, and relay-fallback proof paths explicit
+  about any remaining smoke-harness coordination.
+
+### Done when
+- nodes can bootstrap from static `http://` seed URLs;
+- the repo includes host-style localhost and example multi-host configs;
+- the distributed smoke proves network bootstrap plus real TCP session
+  establishment;
+- the multi-host smoke proves bootstrap, publish, lookup, service open, and
+  relay fallback against the host-style devnet layout;
+- status docs and prompts report the same Milestone 16 stage marker.

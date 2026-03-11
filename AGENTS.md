@@ -85,17 +85,19 @@ Do not add by default:
 - Milestone 12 launch hardening is implemented with bounded cleanup,
   conservative bootstrap retry, runtime health snapshots, status dumps, and the
   logical soak path.
-- The current repository stage marker is `milestone-14-launch-gate`.
-- Milestone 14 launch gate and pilot tag is the current stage with
-  `docs/LAUNCH_CHECKLIST.md`, `docs/PILOT_RELEASE_TEMPLATE.md`, the documented
-  green-path validation and launch sequence, a frozen current MVP launch
-  surface, and explicit pilot-only limitations. This stage does not claim
-  public-production readiness.
+- The current repository stage marker is `milestone-16-network-bootstrap`.
+- Milestone 14 launch gate and pilot tag remains part of the landed pilot
+  baseline.
+- Milestone 16 network bootstrap and multi-host devnet is the current stage
+  with minimal static `http://` bootstrap fetch, `overlay-cli bootstrap-serve`,
+  host-style devnet configs and smoke paths, the documented green-path
+  validation and launch sequence, and explicit pilot-only limitations. This
+  stage does not claim public-production readiness.
 
 For normal work, touch Milestones 1-12 only for regression fixes, spec
 mismatches, vector maintenance, validation maintenance, or launch-maintenance
 updates unless the task explicitly reopens that stage. Treat current-stage work as narrow
-`milestone-14-launch-gate` work, not as a restart from earlier milestones.
+`milestone-16-network-bootstrap` work, not as a restart from earlier milestones.
 
 ## 3. Change policy
 
