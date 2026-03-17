@@ -8,7 +8,7 @@ public deployment.
 ## Release metadata
 
 - Tag: `pilot-v0.1.0-rcN`
-- Repository stage: `milestone-21-first-user-runtime`
+- Repository stage: `milestone-22-first-user-acceptance-pack`
 - Commit: `<git-sha>`
 - Release date: `<YYYY-MM-DD>`
 - Operator: `<name>`
@@ -20,9 +20,8 @@ Short statement of what this pilot candidate is intended to prove.
 ## Frozen launch surface
 
 - `overlay-cli run` for single-node bounded startup and status inspection
-- `./devnet/run-launch-gate.sh` followed by
-  `./devnet/run-distributed-pilot-checklist.sh` as the current localhost
-  sign-off path
+- `./devnet/run-first-user-acceptance.sh` as the current localhost sign-off
+  path, reusing the landed launch gate and distributed checklist
 - supporting repo-local proof paths in `./devnet/run-smoke.sh`,
   `./devnet/run-distributed-smoke.sh`, and `./devnet/run-multihost-smoke.sh`
 - exact `node_id` lookup, exact `app_id` service resolution, and the two
@@ -35,6 +34,7 @@ Short statement of what this pilot candidate is intended to prove.
 - `cargo clippy --workspace --all-targets --all-features -- -D warnings`: `<pass/fail>`
 - `cargo check --workspace`: `<pass/fail>`
 - `cargo test --workspace`: `<pass/fail>`
+- `./devnet/run-first-user-acceptance.sh`: `<pass/fail>`
 - `cargo test -p overlay-core --test integration_bootstrap`: `<pass/fail>`
 - `cargo test -p overlay-core --test integration_publish_lookup`: `<pass/fail>`
 - `cargo test -p overlay-core --test integration_relay_fallback`: `<pass/fail>`

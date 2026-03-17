@@ -2,9 +2,9 @@
 
 Run the following commands when applicable.
 
-## Current Milestone 21 sign-off path
+## Current Milestone 22 sign-off path
 
-Use the current first-user-runtime sign-off order on the commit you intend to
+Use the current first-user acceptance-pack sign-off order on the commit you intend to
 validate:
 
 ```bash
@@ -12,12 +12,14 @@ cargo fmt --all --check
 TMPDIR=/tmp cargo clippy --workspace --all-targets --all-features -- -D warnings
 TMPDIR=/tmp cargo check --workspace
 TMPDIR=/tmp cargo test --workspace
-./devnet/run-launch-gate.sh
-./devnet/run-distributed-pilot-checklist.sh
+./devnet/run-first-user-acceptance.sh
 ```
 
 `./devnet/run-pilot-checklist.sh` is retained as the Milestone 18 localhost
 rehearsal pack only. It is not part of the current sign-off path.
+
+`./devnet/run-launch-gate.sh` and `./devnet/run-distributed-pilot-checklist.sh`
+remain required component scripts inside `./devnet/run-first-user-acceptance.sh`.
 
 ## Formatting
 
@@ -97,7 +99,26 @@ cargo test -p overlay-core --test integration_service_open
 ```
 
 Use this only when you need the older localhost rehearsal path for the landed
-Milestone 18 baseline. It is not part of current Milestone 21 sign-off.
+Milestone 18 baseline. It is not part of current Milestone 22 sign-off.
+
+## Milestone 22 first-user acceptance flow
+
+```bash
+./devnet/run-first-user-acceptance.sh
+```
+
+Optional evidence-preserving form:
+
+```bash
+./devnet/run-first-user-acceptance.sh --evidence-dir /tmp/overlay-first-user-acceptance
+```
+
+Equivalent component order:
+
+```bash
+./devnet/run-launch-gate.sh
+./devnet/run-distributed-pilot-checklist.sh --evidence-dir /tmp/overlay-first-user-acceptance/distributed-pilot-evidence
+```
 
 ## Current distributed pilot checklist
 
@@ -228,18 +249,20 @@ cargo test -p overlay-core --test integration_service_open
 
 - Milestones 1-12 are considered implemented baseline work, and the current
   repository stage marker is
-  `milestone-21-first-user-runtime` (Milestone 21 first-user runtime support
-  on top of the landed Milestone 20 regular distributed use closure baseline).
-- The current sign-off path is the top-level Milestone 21 section above:
-  workspace format/lint/build/test, then `./devnet/run-launch-gate.sh`, then
-  `./devnet/run-distributed-pilot-checklist.sh`.
+  `milestone-22-first-user-acceptance-pack` (Milestone 22 first-user
+  acceptance-pack support on top of the landed Milestone 21 first-user
+  runtime baseline).
+- The current sign-off path is the top-level Milestone 22 section above:
+  workspace format/lint/build/test, then
+  `./devnet/run-first-user-acceptance.sh`.
 - Use the Milestone 1-12 regression runs, stage-boundary smoke tests, the
   distributed localhost smoke, the bounded soak, and the retained Milestone 18
   checklist only when the touched code or docs justify the narrower reruns.
 - If `REPOSITORY_STAGE`, `README.md`, `HANDOFF.md`, `IMPLEMENT.md`,
-  `VALIDATION.md`, `docs/LAUNCH_CHECKLIST.md`, milestone prompts, or other
-  status markers change, rerun the stage-boundary smoke tests, launch gate,
-  and distributed pilot checklist so code and docs stay aligned.
+  `VALIDATION.md`, `docs/FIRST_USER_ACCEPTANCE.md`,
+  `docs/LAUNCH_CHECKLIST.md`, milestone prompts, or other status markers
+  change, rerun the stage-boundary smoke tests and the full
+  `./devnet/run-first-user-acceptance.sh` flow so code and docs stay aligned.
 - `integration_publish_lookup` remains the real Milestone 5 integration path; `integration_relay_fallback` is the real Milestone 6 integration path; `integration_routing` is the real Milestone 7 integration path; `integration_service_open` is now the real Milestone 8 integration path.
 - Milestone 9 hardening coverage remains part of the frozen baseline through
   `bootstrap::tests`, `config::tests`, `metrics::tests`, `peer::tests`,
@@ -286,13 +309,18 @@ cargo test -p overlay-core --test integration_service_open
   the required launch order.
 - `./devnet/run-pilot-checklist.sh` remains the Milestone 18 localhost
   rehearsal pack for the smoke-harness pilot boundary; it is retained for the
-  landed baseline but is not the current Milestone 21 sign-off path.
-- `./devnet/run-distributed-pilot-checklist.sh` remains the current distributed
-  proof path for the dedicated pilot topology pack, the expanded fault matrix,
-  the repeated relay-bind evidence, and the
+  landed baseline but is not the current Milestone 22 sign-off path.
+- `./devnet/run-distributed-pilot-checklist.sh` remains the current
+  distributed component proof path for the dedicated pilot topology pack, the
+  expanded fault matrix, the repeated relay-bind evidence, the fresh-node-join
+  proof, the relay-unavailable service-open proof, and the
   unavailable/integrity/stale/empty pinned-bootstrap diagnostics.
-- `./devnet/run-doctor-smoke.sh` is the current Milestone 21 operator-surface
-  proof for `overlay-cli doctor` against a live runtime.
+- `./devnet/run-doctor-smoke.sh` remains the landed operator-surface proof for
+  `overlay-cli doctor` against a live runtime and is exercised through
+  `./devnet/run-launch-gate.sh`.
+- `./devnet/run-first-user-acceptance.sh` is the current Milestone 22 wrapper
+  that combines the landed launch gate and the distributed acceptance
+  scenarios into one bounded first-user-ready proof.
 - The Milestone 12 soak path also stays in-process and advances logical time
   through repeated runtime ticks so stale-session/service/relay/probe cleanup,
   bootstrap retry, and health snapshots can be exercised without a separate

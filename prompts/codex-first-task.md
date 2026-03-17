@@ -4,12 +4,12 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `VALIDATION.md`, `docs/OPEN_QUESTIONS.md`,
 
 Goal:
 Synchronize on the current repository stage,
-`milestone-21-first-user-runtime`, and use the dedicated
-Milestone 21 prompt
+`milestone-22-first-user-acceptance-pack`, and use the dedicated
+Milestone 22 prompt
 for the next concrete current-stage task.
 
 Current repository baseline:
-- The current repository stage is `milestone-21-first-user-runtime`.
+- The current repository stage is `milestone-22-first-user-acceptance-pack`.
 - Milestone 0 is already complete.
 - Milestone 1 foundations are already implemented, vectorized, and validated in
   `overlay-core` (`identity`, `records`, `wire`).
@@ -56,10 +56,12 @@ Current repository baseline:
   operator commands, pinned static bootstrap artifacts, the expanded pilot
   topology, and `./devnet/run-distributed-pilot-checklist.sh`.
 - Milestone 20 regular distributed use closure is landed baseline work.
-- Milestone 21 first-user runtime is now active with bounded restart recovery
-  from last-known active bootstrap peers, continued bootstrap retry after
-  peer-cache recovery, `overlay-cli status --summary`, `overlay-cli doctor`,
-  stable first-user example profiles, and more actionable config validation.
+- Milestone 21 first-user runtime is landed baseline work.
+- Milestone 22 first-user acceptance pack is now active with the bounded
+  `./devnet/run-first-user-acceptance.sh` wrapper, explicit
+  first-user-ready scenarios, fresh-node-join and
+  relay-unavailable-service-open coverage in the distributed checklist, and
+  synchronized acceptance-boundary docs.
 
 Constraints:
 - do not restart the repository from Milestone 0;
@@ -69,8 +71,8 @@ Constraints:
 
 Tasks:
 - confirm the repository already sits at the closed Milestone 1-8 baseline;
-- use `prompts/codex-milestone-21.md` for the next concrete
-  `milestone-21-first-user-runtime` task;
+- use `prompts/codex-milestone-22.md` for the next concrete
+  `milestone-22-first-user-acceptance-pack` task;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the repository baseline changes;
 - treat Milestones 1-12 as closed baseline work, touching them only for

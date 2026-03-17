@@ -5,13 +5,14 @@ not for hostile-Internet or public-production deployment.
 
 Use [docs/LAUNCH_CHECKLIST.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/LAUNCH_CHECKLIST.md)
 as the release gate, this runbook as the operator flow behind that gate, and
+[docs/FIRST_USER_ACCEPTANCE.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/FIRST_USER_ACCEPTANCE.md)
+for the current first-user-ready boundary, and
 [docs/PILOT_RUNBOOK.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RUNBOOK.md)
 for the dedicated current-stage off-box distributed exercise.
 
-The current localhost sign-off path is `./devnet/run-launch-gate.sh` followed
-by `./devnet/run-distributed-pilot-checklist.sh`. The older
-`./devnet/run-pilot-checklist.sh` remains a retained Milestone 18 rehearsal
-only.
+The current localhost sign-off path is
+`./devnet/run-first-user-acceptance.sh`. The older
+`./devnet/run-pilot-checklist.sh` remains a retained Milestone 18 rehearsal only.
 
 ## Current boundary
 
@@ -37,6 +38,8 @@ What exists today:
   devnet in-process for the checked-in repo-local proof path
 - `overlay-cli bootstrap-serve --bind <addr> --bootstrap-file <path>` serves
   one static bootstrap response over minimal `http://` for devnet or lab use
+- `./devnet/run-first-user-acceptance.sh` wraps the landed launch gate and the
+  distributed checklist into the current bounded first-user-ready proof
 
 What does not exist today:
 

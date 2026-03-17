@@ -1,18 +1,24 @@
 # Launch Checklist
 
-This checklist defines the Milestone 17 operator-runtime gate that remains the
-prerequisite launch gate for the current Milestone 21
-first-user-runtime stage.
+This checklist defines the landed Milestone 17 operator-runtime gate that
+remains the first component of the current Milestone 22
+first-user-acceptance-pack stage.
 
 It is a pilot gate, not a public-production or hostile-Internet readiness
 claim.
 
-For current Milestone 21 sign-off, the validation green path is
-`./devnet/run-launch-gate.sh` followed by
-`./devnet/run-distributed-pilot-checklist.sh` on the same commit.
+For current Milestone 22 sign-off, the bounded acceptance flow is
+`./devnet/run-first-user-acceptance.sh` on the same commit after the
+applicable workspace validation commands.
+
+This checklist still matters because `./devnet/run-first-user-acceptance.sh`
+reuses `./devnet/run-launch-gate.sh` as a landed prerequisite component.
 
 `./devnet/run-pilot-checklist.sh` remains a retained Milestone 18 localhost
 rehearsal. Do not treat it as the current sign-off path.
+
+Use [docs/FIRST_USER_ACCEPTANCE.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/FIRST_USER_ACCEPTANCE.md)
+for the current first-user-ready acceptance scenarios and boundary.
 
 ## Launchable surface freeze
 
@@ -100,8 +106,8 @@ Pass criteria:
 
 ## Current distributed follow-on
 
-After the launch gate stays green on the target commit, run the current
-regular-distributed-use checklist:
+After the launch gate stays green on the target commit, the current acceptance
+flow continues with the distributed checklist:
 
 ```bash
 ./devnet/run-distributed-pilot-checklist.sh
@@ -236,7 +242,7 @@ Workflow:
 - Relay quotas and most service-open policy are still code-level defaults rather
   than a rich operator-configurable surface.
 
-## Remaining blockers after Milestone 21
+## Remaining limitations after Milestone 22
 
 - Run and attach the off-box pilot report for the exact commit being signed
   off; the localhost checklist is necessary but not sufficient evidence for a

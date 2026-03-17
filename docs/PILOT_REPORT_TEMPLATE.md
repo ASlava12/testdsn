@@ -8,7 +8,7 @@ public deployment.
 ## Metadata
 
 - Date: `<YYYY-MM-DD>`
-- Repository stage: `milestone-21-first-user-runtime`
+- Repository stage: `milestone-22-first-user-acceptance-pack`
 - Commit: `<git-sha>`
 - Operator: `<name>`
 - Topology: `pilot-5-host-two-relay`
@@ -25,6 +25,7 @@ public deployment.
 ## Validation Summary
 
 - Launch gate (`./devnet/run-launch-gate.sh`): `<pass/fail>`
+- First-user acceptance flow (`./devnet/run-first-user-acceptance.sh`): `<pass/fail>`
 - Host-style smoke (`./devnet/run-multihost-smoke.sh`): `<pass/fail>`
 - Distributed pilot checklist (`./devnet/run-distributed-pilot-checklist.sh`): `<pass/fail>`
 - Off-box baseline flow: `<pass/fail>`
@@ -79,7 +80,9 @@ public deployment.
 ## Fault Scenarios
 
 - `node-c-down`: `<pass/fail>`; observed outcome: `<notes>`
+- `fresh-node-join`: `<pass/fail>`; observed outcome: `<notes>`
 - `relay-unavailable`: `<pass/fail>`; observed outcome: `<notes>`
+- `relay-unavailable-service-open`: `<pass/fail>`; observed outcome: `<notes>`
 - `bootstrap-seed-unavailable`: `<pass/fail>`; observed outcome: `<notes>`
 - `integrity-mismatch-fallback`: `<pass/fail>`; observed outcome: `<notes>`
 - `stale-bootstrap-fallback`: `<pass/fail>`; observed outcome: `<notes>`

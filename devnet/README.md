@@ -1,7 +1,7 @@
 # Devnet
 
 This directory contains the checked-in devnet and pilot assets for the current
-Milestone 21 stage:
+Milestone 22 stage:
 
 - the original four-node local-file devnet under `configs/` and `bootstrap/`
 - the host-style multi-host devnet layouts under `hosts/`
@@ -28,10 +28,12 @@ Nodes:
 - `run-distributed-smoke.sh`: wrapper around the minimal multi-process localhost TCP smoke
 - `run-multihost-smoke.sh`: wrapper around the host-style network-bootstrap smoke
 - `run-distributed-pilot-checklist.sh`: wrapper around the current distributed pilot checklist
+- `run-first-user-acceptance.sh`: wrapper around the current Milestone 22
+  first-user acceptance flow
 - `run-pilot-checklist.sh`: retained Milestone 18 localhost rehearsal pack,
   not the current sign-off path
 - `run-launch-gate.sh`: wrapper around the Milestone 17 launch gate
-- `run-doctor-smoke.sh`: wrapper around the Milestone 21 doctor/self-check
+- `run-doctor-smoke.sh`: wrapper around the landed doctor/self-check
   smoke
 - `run-restart-smoke.sh`: wrapper around the bounded restart smoke
 - `run-soak.sh`: wrapper around the logical long-run runtime soak

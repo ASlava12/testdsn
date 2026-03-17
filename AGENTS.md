@@ -86,7 +86,7 @@ Do not add by default:
   conservative bootstrap retry, runtime health snapshots, status dumps, and the
   logical soak path.
 - The current repository stage marker is
-  `milestone-21-first-user-runtime`.
+  `milestone-22-first-user-acceptance-pack`.
 - Milestone 14 launch gate and pilot tag remains part of the landed pilot
   baseline.
 - Milestone 16 network bootstrap and multi-host devnet is implemented with
@@ -115,17 +115,23 @@ Do not add by default:
   topology, and reproducible `--evidence-dir` wrappers for the distributed
   smoke and pilot checklist. This stage still does not claim
   hostile-environment or public-production readiness.
-- Milestone 21 first-user runtime is the current stage with bounded restart
+- Milestone 21 first-user runtime is part of the landed baseline with bounded restart
   recovery from the last-known active bootstrap peers, continued bootstrap
   retry after peer-cache recovery, `overlay-cli status --summary`,
   `overlay-cli doctor`, stable first-user example profiles, and more
   actionable config validation. This stage still does not claim
   hostile-environment or public-production readiness.
+- Milestone 22 first-user acceptance pack is the current stage with the
+  bounded `./devnet/run-first-user-acceptance.sh` wrapper, explicit
+  first-user-ready acceptance scenarios, fresh-node-join and
+  relay-unavailable-service-open proof inside the distributed checklist, and
+  synchronized first-user-ready boundary docs. This stage still does not claim
+  hostile-environment or public-production readiness.
 
 For normal work, touch Milestones 1-12 only for regression fixes, spec
 mismatches, vector maintenance, validation maintenance, or launch-maintenance
 updates unless the task explicitly reopens that stage. Treat current-stage work as narrow
-`milestone-21-first-user-runtime` work, not as a restart from
+`milestone-22-first-user-acceptance-pack` work, not as a restart from
 earlier milestones.
 
 ## 3. Change policy

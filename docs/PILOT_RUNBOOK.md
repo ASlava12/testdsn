@@ -1,6 +1,7 @@
 # Pilot Runbook
 
-This runbook defines the Milestone 21 first-user-runtime distributed exercise.
+This runbook defines the Milestone 22 first-user-acceptance-pack distributed
+exercise.
 
 It extends the landed Milestone 18 pilot pack with minimal distributed
 operator surfaces, two relay-capable fallback paths, conservative bootstrap
@@ -20,12 +21,14 @@ Use this runbook to prove:
 - real TCP session establishment across hosts;
 - networked `publish`, `lookup`, `open-service`, and `relay-intro` flows over
   established runtime sessions;
+- a fresh-node-join proof where `node-c` joins after the rest of the topology
+  is already running;
 - two documented relay fallback paths:
   `node-a -> node-relay -> node-b` and
   `node-a -> node-relay-b -> node-b`;
-- the node-down, primary-relay-down, bootstrap-seed-down, integrity-mismatch,
-  stale-bootstrap, empty-peer-set, service-restart, and tampered-bootstrap
-  scenarios;
+- the node-down, primary-relay-down, relay-unavailable-service-open,
+  bootstrap-seed-down, integrity-mismatch, stale-bootstrap, empty-peer-set,
+  service-restart, and tampered-bootstrap scenarios;
 - per-source bootstrap diagnostics through
   `runtime_status.health.bootstrap.last_attempt_summary` and `last_sources`;
 - persisted status summaries through `overlay-cli status --summary`;
@@ -91,10 +94,10 @@ Files:
 
 ## Prerequisites
 
-- Run the current launch gate first:
+- Run the current acceptance flow first:
 
   ```bash
-  ./devnet/run-launch-gate.sh
+  ./devnet/run-first-user-acceptance.sh
   ```
 
 - Keep the same validated commit on all pilot hosts.
@@ -126,7 +129,7 @@ Files:
    TMPDIR=/tmp cargo run -p overlay-cli -- bootstrap-serve --bind 0.0.0.0:4303 --bootstrap-file devnet/pilot/examples/bootstrap/node-ab-seed.json
    ```
 
-2. Start the five runtimes on their matching hosts:
+2. Start the four always-on runtimes on their matching hosts:
 
    ```bash
    TMPDIR=/tmp cargo run -p overlay-cli -- run --config /path/to/node-a.json --status-every 30
@@ -136,13 +139,13 @@ Files:
    TMPDIR=/tmp cargo run -p overlay-cli -- run --config /path/to/node-b.json --service devnet:terminal --status-every 30
    ```
 
-3. Confirm each node emits:
+3. Confirm each always-on node emits:
 
    - `bootstrap_fetch`
    - `bootstrap_ingest`
    - `state_transition`
 
-4. Confirm each node reports status:
+4. Confirm each always-on node reports status:
 
    ```bash
    TMPDIR=/tmp cargo run -p overlay-cli -- status --config /path/to/node-a.json
@@ -154,11 +157,17 @@ Files:
    TMPDIR=/tmp cargo run -p overlay-cli -- doctor --config /path/to/node-a.json
    ```
 
-6. Use [devnet/run-multihost-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-multihost-smoke.sh)
+6. Start `node-c` only when you are ready to record the fresh-node-join proof:
+
+   ```bash
+   TMPDIR=/tmp cargo run -p overlay-cli -- run --config /path/to/node-c.json --status-every 30
+   ```
+
+7. Use [devnet/run-multihost-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-multihost-smoke.sh)
    as the repo-local proof for bootstrap plus real networked operator flows on
    the host-style config pack.
 
-7. Use [devnet/run-distributed-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-pilot-checklist.sh)
+8. Use [devnet/run-distributed-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-pilot-checklist.sh)
    as the localhost proof for the current distributed checklist. Use `--evidence-dir <dir>` when you want
    the wrapper to preserve the raw logs and status files automatically.
 
@@ -214,10 +223,12 @@ Run from the repository root for the localhost closure proof:
 This script:
 
 - starts the pilot bootstrap servers on `127.0.0.1:4301-4303`
-- starts `node-a`, `node-b`, `node-c`, `node-relay`, and `node-relay-b`
+- starts `node-a`, `node-b`, `node-relay`, and `node-relay-b`, then starts
+  `node-c` later for the fresh-node-join proof
 - drives networked `publish`, `lookup`, `open-service`, and both relay-intro
   paths over real runtime sessions
-- exercises the node-down, primary-relay-down, bootstrap-seed-down,
+- exercises the fresh-node-join, node-down, primary-relay-down,
+  relay-unavailable-service-open, bootstrap-seed-down,
   service-host-restart, and tampered-bootstrap-artifact scenarios
 - emits JSON lines for each scenario plus a final `pilot_checklist_complete`
   summary
@@ -231,55 +242,67 @@ Operational note:
 
 ## Fault scenarios
 
-Record all eight scenarios in the pilot report:
+Record all ten scenarios in the pilot report:
 
-1. `node-c-down`
+1. `fresh-node-join`
+
+   - `node-c` starts after the rest of the topology is already healthy
+   - expected outcome: `node-c` publishes presence to `node-a`, and `node-a`
+     can look up `node-c`
+
+2. `node-c-down`
 
    - `node-c` is unavailable
    - expected outcome: `publish`, `lookup`, `open-service`, and both relay
      paths still succeed
 
-2. `relay-unavailable`
+3. `relay-unavailable`
 
    - `node-relay` is unavailable
    - expected outcome: the primary relay path fails, and the alternate path via
      `node-relay-b` still succeeds
 
-3. `bootstrap-seed-unavailable`
+4. `relay-unavailable-service-open`
+
+   - `node-relay` is unavailable
+   - expected outcome: the primary relay-intro attempt degrades once, the
+     alternate relay path still binds, and `open-service` still succeeds
+
+5. `bootstrap-seed-unavailable`
 
    - the `node-a-seed.json` server is intentionally unavailable
    - expected outcome: bootstrap still succeeds with the remaining pinned seed
      URLs
 
-4. `service-host-restart`
+6. `service-host-restart`
 
    - `node-b` is restarted after the baseline publish/lookup flow
    - expected outcome: the service host comes back cleanly, `startup_count`
      increases, `open-service` succeeds again after restart, and the alternate
      relay path binds again
 
-5. `integrity-mismatch-fallback`
+7. `integrity-mismatch-fallback`
 
    - one configured bootstrap source uses a deliberately bad SHA-256 pin
    - expected outcome: startup still reaches `running` through the later
      configured source, and `health.bootstrap.last_attempt_summary` reports one
      `integrity_mismatch_sources`
 
-6. `stale-bootstrap-fallback`
+8. `stale-bootstrap-fallback`
 
    - one configured bootstrap source is present but expired
    - expected outcome: startup still reaches `running` through the later
      configured source, and `health.bootstrap.last_attempt_summary` reports one
      `stale_sources`
 
-7. `empty-bootstrap-fallback`
+9. `empty-bootstrap-fallback`
 
    - one configured bootstrap source validates but contains an empty peer set
    - expected outcome: startup still reaches `running` through the later
      configured source, and `health.bootstrap.last_attempt_summary` reports one
      `empty_peer_set_sources`
 
-8. `tampered-bootstrap-artifact`
+10. `tampered-bootstrap-artifact`
 
    - a config is pointed at a deliberately pin-mismatched bootstrap artifact
    - expected outcome: `bootstrap_fetch` reports `rejected` and startup
@@ -306,9 +329,9 @@ Record all eight scenarios in the pilot report:
 - service restart evidence from the persisted status JSON
 - tampered-bootstrap rejection logs
 
-## Remaining closure items for first-user runtime
+## Remaining limitations after Milestone 22
 
-- The localhost checklist is the current Milestone 21 green path, but it still
+- The localhost acceptance pack is the current Milestone 22 green path, but it still
   does not replace the required off-box pilot evidence on separate hosts for a
   release note.
 - Bootstrap remains static pinned `http://` artifact delivery; operators must

@@ -4,27 +4,28 @@ Specification-first Rust workspace for a censorship-resistant overlay network.
 
 ## Current Stage
 
-The current repository stage is `milestone-21-first-user-runtime`.
+The current repository stage is `milestone-22-first-user-acceptance-pack`.
 
-Milestones 0-18 are landed baseline work. Current tasks should stay narrow:
-stabilize first-user runtime behavior, keep the launch/runbook docs honest,
-and fix validation, recovery, or operator-surface regressions without widening
-protocol scope.
+Milestones 0-21 are landed baseline work. Current tasks should stay narrow:
+maintain the first-user acceptance pack, keep the acceptance/runbook docs
+honest, and fix validation or runtime regressions without widening protocol
+scope.
 
 ## Current Green Path
 
 Use this repository in the current stage with one sign-off flow:
 
 1. run the applicable commands in `VALIDATION.md`;
-2. run `./devnet/run-launch-gate.sh`;
-3. run `./devnet/run-distributed-pilot-checklist.sh` on the same commit;
-4. use `docs/PILOT_RUNBOOK.md` to collect separate-host evidence before
-   claiming first-user runtime readiness on that commit.
+2. run `./devnet/run-first-user-acceptance.sh` on the same commit;
+3. use `docs/PILOT_RUNBOOK.md` to collect separate-host evidence before
+   claiming first-user-ready status on that commit.
 
-`./devnet/run-pilot-checklist.sh` is retained only as the older Milestone 18
-localhost rehearsal pack. It is not the current sign-off path.
+`./devnet/run-launch-gate.sh` and
+`./devnet/run-distributed-pilot-checklist.sh` remain the landed component
+scripts inside that acceptance flow. `./devnet/run-pilot-checklist.sh` is
+retained only as the older Milestone 18 localhost rehearsal pack.
 
-## Current First-User Runtime Surface
+## Current Acceptance Surface
 
 The current validated surface includes:
 
@@ -35,26 +36,46 @@ The current validated surface includes:
   `bootstrap-serve`, `publish`, `lookup`, `open-service`, and `relay-intro`;
 - repo-local proof paths in `devnet/run-smoke.sh`,
   `devnet/run-distributed-smoke.sh`, `devnet/run-multihost-smoke.sh`,
-  `devnet/run-launch-gate.sh`, and
+  `devnet/run-launch-gate.sh`,
+  `devnet/run-first-user-acceptance.sh`, and
   `devnet/run-distributed-pilot-checklist.sh`;
 - bounded per-source bootstrap diagnostics in `runtime_status.health.bootstrap`
   with `last_attempt_summary` and `last_sources`;
 - bounded restart recovery from the last-known active bootstrap peers embedded
   in persisted `runtime_status`, plus continued bootstrap retry until a live
   source succeeds again;
+- an explicit acceptance pack covering fresh join, service publish/open,
+  relay-fallback proof, one-bootstrap-down startup, one-relay-down service
+  open, ordinary restart recovery, and stale-state cleanup;
 - the dedicated distributed pilot pack under `devnet/pilot/`.
+
+## First-User Ready Boundary
+
+The current repo may be described as sufficiently working for first users only
+within this bounded claim:
+
+- the exact acceptance scenarios in `docs/FIRST_USER_ACCEPTANCE.md` passed on
+  the same commit;
+- operators use static pinned bootstrap artifacts, explicit point-to-point
+  operator commands, and the checked-in two-relay pilot topology;
+- expected degraded cases remain explicit, including one failed primary
+  relay-intro during relay-unavailable rehearsal and rejected tampered
+  bootstrap artifacts;
+- separate-host evidence is still attached before the claim is used for a
+  release note.
 
 ## Primary Docs
 
 - `HANDOFF.md`: current stage summary and first-task guidance
 - `IMPLEMENT.md`: repository stage history and current execution boundaries
 - `VALIDATION.md`: required validation commands and current sign-off order
+- `docs/FIRST_USER_ACCEPTANCE.md`: exact acceptance scenarios and boundary
 - `docs/LAUNCH_CHECKLIST.md`: current launch gate and localhost sign-off flow
 - `docs/PILOT_RUNBOOK.md`: separate-host pilot execution and evidence
 - `docs/DEVNET.md`: checked-in devnet layouts and proof wrappers
 - `docs/OPEN_QUESTIONS.md`: conservative defaults for underspecified areas
 
-## Remaining Usability Blockers For First Users
+## Remaining Limitations After Milestone 22
 
 - bootstrap is still static pinned `http://` artifact delivery, not HTTPS or a
   public trust framework
@@ -66,7 +87,7 @@ The current validated surface includes:
 - relay fallback is proven for the checked-in two-relay pilot topology, not
   arbitrary relay graphs or public-network conditions
 - off-box evidence still must be collected on the validated commit before a
-  release note can claim first-user runtime readiness
+  release note can claim first-user-ready status
 
 ## Stage Marker Discipline
 

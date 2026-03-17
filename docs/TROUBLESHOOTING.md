@@ -32,6 +32,10 @@ TMPDIR=/tmp cargo run -p overlay-cli -- status --config <config-path> --summary
 TMPDIR=/tmp cargo run -p overlay-cli -- doctor --config <config-path>
 ```
 
+After fixing a current-stage issue, rerun
+`./devnet/run-first-user-acceptance.sh` before treating the repository as
+first-user-ready again.
+
 ## Matrix
 
 | Symptom | Real signals to inspect | Likely cause in the current repo | Action |

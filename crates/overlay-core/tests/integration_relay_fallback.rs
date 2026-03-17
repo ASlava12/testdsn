@@ -45,7 +45,7 @@ fn relay_fallback_plan_tracks_current_stage_boundary() {
     )
     .expect("relay fallback plan should be created");
 
-    assert_eq!(REPOSITORY_STAGE, "milestone-21-first-user-runtime");
+    assert_eq!(REPOSITORY_STAGE, "milestone-22-first-user-acceptance-pack");
     assert_eq!(
         plan.direct_attempts,
         vec![

@@ -15,7 +15,7 @@ pub mod session;
 pub mod transport;
 pub mod wire;
 
-pub const REPOSITORY_STAGE: &str = "milestone-21-first-user-runtime";
+pub const REPOSITORY_STAGE: &str = "milestone-22-first-user-acceptance-pack";
 
 #[cfg(test)]
 mod tests {
@@ -25,7 +25,7 @@ mod tests {
 
     #[test]
     fn reports_repository_stage() {
-        assert_eq!(REPOSITORY_STAGE, "milestone-21-first-user-runtime");
+        assert_eq!(REPOSITORY_STAGE, "milestone-22-first-user-acceptance-pack");
     }
 
     #[test]

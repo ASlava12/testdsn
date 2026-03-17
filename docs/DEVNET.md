@@ -37,8 +37,10 @@ and the carried-forward distributed pilot pack under
   wrapper for the host-style network-bootstrap and operator-flow smoke
 - [devnet/run-distributed-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-pilot-checklist.sh):
   wrapper for the current distributed pilot checklist
+- [devnet/run-first-user-acceptance.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-first-user-acceptance.sh):
+  wrapper for the current Milestone 22 first-user acceptance flow
 - [devnet/run-doctor-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-doctor-smoke.sh):
-  wrapper for the Milestone 21 doctor/self-check surface
+  wrapper for the landed Milestone 21 doctor/self-check surface
 - [devnet/run-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-pilot-checklist.sh):
   retained Milestone 18 localhost rehearsal pack, not the current sign-off
   path
@@ -114,20 +116,43 @@ Optional evidence-preserving form:
 ./devnet/run-distributed-pilot-checklist.sh --evidence-dir /tmp/overlay-pilot-evidence
 ```
 
-This is the current localhost regular-distributed-use sign-off path after
-`./devnet/run-launch-gate.sh`.
+This is the current distributed component proof path inside
+`./devnet/run-first-user-acceptance.sh`.
 
 This uses the dedicated `devnet/pilot/localhost` topology pack and validates:
 
 - the baseline distributed operator flow
+- the fresh-node-join proof with late `node-c` startup
 - the `node-c-down` fault path
 - the primary-relay-down path with alternate relay fallback
+- the one-relay-down service-open proof
 - the one-bootstrap-seed-unavailable path
 - the integrity-mismatch, stale-bootstrap, and empty-peer-set fallback paths
 - the service-host restart/status outcome
 - the tampered-bootstrap rejection path
 - the final `pilot_checklist_complete` summary with lookup latency and relay
   path fields
+
+## First-user acceptance wrapper
+
+Run:
+
+```bash
+./devnet/run-first-user-acceptance.sh
+```
+
+Optional evidence-preserving form:
+
+```bash
+./devnet/run-first-user-acceptance.sh --evidence-dir /tmp/overlay-first-user-acceptance
+```
+
+This is the current top-level localhost sign-off path. It wraps:
+
+- `./devnet/run-launch-gate.sh` for format, lint, build, test, soak, doctor,
+  and restart recovery proof
+- `./devnet/run-distributed-pilot-checklist.sh` for distributed acceptance
+  scenarios on the checked-in pilot topology
 
 ## Single-node inspection
 

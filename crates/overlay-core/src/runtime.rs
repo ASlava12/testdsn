@@ -2855,7 +2855,7 @@ mod tests {
             .startup(START_UNIX_MS)
             .expect("startup should succeed");
 
-        assert_eq!(REPOSITORY_STAGE, "milestone-21-first-user-runtime");
+        assert_eq!(REPOSITORY_STAGE, "milestone-22-first-user-acceptance-pack");
         assert_eq!(runtime.state(), NodeRuntimeState::Running);
         assert_eq!(
             runtime.context().node_id(),

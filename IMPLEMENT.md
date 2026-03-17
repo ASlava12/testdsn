@@ -8,21 +8,22 @@ The repository has a closed Milestone 1-12 baseline, a landed Milestone 14
 pilot launch gate, a landed Milestone 16 network-bootstrap stage, a landed
 Milestone 17 operator-runtime stage, a landed Milestone 18 real-pilot stage,
 the landed Milestone 20 regular-distributed-use-closure stage, and the current
-Milestone 21 first-user-runtime stage.
+Milestone 22 first-user-acceptance-pack stage.
 The current repository stage marker is
-`milestone-21-first-user-runtime`.
+`milestone-22-first-user-acceptance-pack`.
 
-## Current first-user-runtime green path
+## Current first-user-acceptance-pack green path
 
 Treat the current stage as having one localhost sign-off flow:
 
 1. run the applicable commands in `VALIDATION.md`;
-2. run `./devnet/run-launch-gate.sh`;
-3. run `./devnet/run-distributed-pilot-checklist.sh` on the same commit;
+2. run `./devnet/run-first-user-acceptance.sh` on the same commit;
 4. use `docs/PILOT_RUNBOOK.md` for the separate-host evidence run.
 
-`./devnet/run-pilot-checklist.sh` remains a retained Milestone 18 localhost
-rehearsal only. It is not the current sign-off path.
+`./devnet/run-launch-gate.sh` and
+`./devnet/run-distributed-pilot-checklist.sh` remain the landed component
+scripts inside the current acceptance flow. `./devnet/run-pilot-checklist.sh`
+remains a retained Milestone 18 localhost rehearsal only.
 
 - Milestone 0 bootstrap is complete.
 - Milestone 1 foundations are implemented, vectorized, and validated in
@@ -184,6 +185,14 @@ rehearsal only. It is not the current sign-off path.
   first-user example profiles, and more actionable config validation. The
   repository stage marker now advances to
   `milestone-21-first-user-runtime`.
+- Milestone 22 first-user-acceptance-pack support is now implemented in
+  `devnet/run-first-user-acceptance.sh`,
+  `devnet/run-distributed-pilot-checklist.sh`,
+  `docs/FIRST_USER_ACCEPTANCE.md`, and the synchronized current-stage docs,
+  with the bounded acceptance wrapper, explicit first-user-ready scenarios,
+  fresh-node-join and relay-unavailable-service-open proof in the distributed
+  checklist, and the explicit first-user-ready boundary. The repository stage
+  marker now advances to `milestone-22-first-user-acceptance-pack`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -191,9 +200,9 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Use `prompts/codex-milestone-21.md` as the recommended next-task prompt for the
-current `milestone-21-first-user-runtime` stage and keep work conservative from
-the current first-user-runtime boundary:
+Use `prompts/codex-milestone-22.md` as the recommended next-task prompt for the
+current `milestone-22-first-user-acceptance-pack` stage and keep work
+conservative from the current first-user-ready boundary:
 
 1. preserve the current launch surface documented in
    `docs/LAUNCH_CHECKLIST.md`, `docs/RUNBOOK.md`, `docs/DEVNET.md`,
@@ -202,9 +211,10 @@ the current first-user-runtime boundary:
    updates, vector maintenance, or conservative spec-conformance fixes;
 3. prefer pilot execution support, validation maintenance, documentation sync,
    and operator-surface hardening over feature expansion;
-4. rerun the documented launch gate and distributed pilot checklist whenever
-   `REPOSITORY_STAGE`, `README.md`, `HANDOFF.md`, `IMPLEMENT.md`,
-   `VALIDATION.md`, launch docs, pilot docs, or current-stage scripts change;
+4. rerun the documented first-user acceptance flow whenever `REPOSITORY_STAGE`,
+   `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, `VALIDATION.md`,
+   `docs/FIRST_USER_ACCEPTANCE.md`, launch docs, pilot docs, or current-stage
+   scripts change;
 5. keep public bootstrap infrastructure, protocol redesign, and scope expansion
    out of work unless explicitly requested.
 
@@ -717,7 +727,7 @@ pilot-only operating model.
 
 ## Milestone 21 — first-user runtime
 
-Status: current repository stage.
+Status: landed baseline.
 
 ### Goal
 Make the current runtime usable for first users without widening protocol
@@ -756,3 +766,43 @@ visibility, and make configs runnable without repository spelunking.
   first-user roles without source-code reading;
 - validation and status docs report the same Milestone 21 stage marker and the
   narrower remaining first-user blockers.
+
+## Milestone 22 — first-user acceptance pack
+
+Status: current repository stage.
+
+### Goal
+Define, encode, and document the exact bounded acceptance pack behind the
+current first-user-ready claim without widening protocol or deployment scope.
+
+### Tasks
+1. Define the exact acceptance scenarios that must pass before handing the
+   network to first users.
+2. Encode those scenarios into reproducible scripts, checklists, and runbook
+   sections instead of leaving them implicit.
+3. Add a bounded top-level acceptance flow that reuses the landed launch gate
+   and distributed checklist.
+4. Make the first-user-ready boundary, expected degraded cases, and remaining
+   limitations explicit in the docs.
+5. Keep the stage marker, prompts, validation docs, and runbooks synchronized
+   to the Milestone 22 boundary.
+
+### Important constraints
+- Prefer acceptance coverage, runbook clarity, and conservative bug fixes over
+  broad refactoring.
+- Do not add major features, transports, or discovery redesign.
+- Do not claim guarantees that are not explicitly backed by the acceptance
+  pack.
+- Keep the current proof bounded to the checked-in topology, static bootstrap,
+  and explicit operator flows.
+
+### Done when
+- `./devnet/run-first-user-acceptance.sh` provides one bounded wrapper for the
+  current first-user acceptance flow;
+- the acceptance scenarios explicitly cover fresh join, service publish/open,
+  relay fallback, one-bootstrap-down startup, one-relay-down service open,
+  ordinary restart recovery, and stale-state cleanup;
+- the docs define the current first-user-ready boundary and expected degraded
+  or rejected cases without over-claiming;
+- validation and status docs report the same Milestone 22 stage marker and the
+  same acceptance flow.

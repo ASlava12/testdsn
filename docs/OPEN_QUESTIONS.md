@@ -2,7 +2,7 @@
 
 This file exists so Codex does not silently invent protocol details.
 All currently known MVP ambiguities affecting the current
-`milestone-21-first-user-runtime` baseline are resolved below and should be reused
+`milestone-22-first-user-acceptance-pack` baseline are resolved below and should be reused
 as the conservative defaults.
 
 ## Resolved conservative choices for MVP
@@ -265,7 +265,7 @@ For current work, treat the repository stage as:
 - Milestone 12 launch hardening is implemented with bounded cleanup, degraded
   bootstrap retry, runtime health snapshots, and the logical soak path;
 - the current repository stage marker is
-  `milestone-21-first-user-runtime`;
+  `milestone-22-first-user-acceptance-pack`;
 - Milestone 17 operator-grade runtime hardening is part of the landed baseline,
   with `docs/LAUNCH_CHECKLIST.md`, the documented green-path validation and
   launch sequence, signal-aware `overlay-cli run`, config-local
@@ -284,10 +284,14 @@ For current work, treat the repository stage as:
   localhost checklist proof for unavailable/integrity/stale/empty bootstrap
   cases, and stronger relay-bind evidence across the checked-in two-relay
   topology;
-- Milestone 21 first-user runtime is now the current stage, with bounded
+- Milestone 21 first-user runtime is part of the landed baseline, with bounded
   restart recovery from the last-known active bootstrap peers, continued
   bootstrap retry after peer-cache recovery, persisted status summaries,
   `overlay-cli doctor`, and stable first-user example profiles;
+- Milestone 22 first-user acceptance pack is now the current stage, with the
+  bounded `./devnet/run-first-user-acceptance.sh` wrapper, explicit
+  first-user-ready acceptance scenarios, and the synchronized acceptance
+  boundary docs;
 
 That means:
 
@@ -305,13 +309,12 @@ That means:
   vectors, or spec mismatches;
 - Milestone 8 is closed and should be touched only for regressions,
   vectors, or spec mismatches;
-- Milestone 21 is the current stage and should stay limited to first-user
-  runtime support, network-bootstrap and operator-runtime maintenance,
+- Milestone 22 is the current stage and should stay limited to first-user
+  acceptance coverage, network-bootstrap and operator-runtime maintenance,
   regression fixes, validation maintenance, and documentation synchronization
   unless a task explicitly reopens scope;
-- the current localhost sign-off flow is `./devnet/run-launch-gate.sh`
-  followed by `./devnet/run-distributed-pilot-checklist.sh` on the same
-  commit;
+- the current localhost sign-off flow is `./devnet/run-first-user-acceptance.sh`
+  on the same commit after the applicable workspace validation commands;
 - `./devnet/run-pilot-checklist.sh` is retained only as the older Milestone 18
   localhost rehearsal and should not be treated as the current sign-off path;
 - public bootstrap infrastructure, discovery expansion, and simulation-focused
@@ -362,9 +365,9 @@ Rules:
   higher sequence, and equal epoch plus sequence must be byte-identical to be
   treated as the same record.
 
-### 12. Conservative operator-state persistence for the current first-user runtime
+### 12. Conservative operator-state persistence for the landed first-user runtime baseline
 
-For the current Milestone 21 runtime, persist bounded operator metadata plus
+For the landed Milestone 21 runtime baseline, persist bounded operator metadata plus
 the smallest practical bootstrap-recovery state, not broad protocol-layer
 state.
 
@@ -965,7 +968,7 @@ For the current regular-distributed-use closure stage:
 
 ### 38. Conservative status-summary and doctor defaults for Milestone 21
 
-For the current first-user-runtime stage:
+For the landed first-user-runtime baseline:
 
 - persisted `runtime_status` may include a bounded summary surface for peers,
   bootstrap health, presence state, service-registration state, relay usage,
@@ -978,6 +981,26 @@ For the current first-user-runtime stage:
   `0` healthy, `2` warn/degraded-but-readable, and `3` failed or unusable;
 - these are local operator surfaces only, not protocol messages or distributed
   orchestration features.
+
+### 39. Conservative first-user acceptance defaults for Milestone 22
+
+For the current first-user-acceptance-pack stage:
+
+- the bounded local acceptance wrapper may be
+  `./devnet/run-first-user-acceptance.sh`;
+- the smallest conservative local acceptance scenarios are:
+  `fresh-node-join`, `service-publish`, `service-discover-and-open`,
+  `direct-path-loss-relay-fallback`, `bootstrap-source-unavailable`,
+  `relay-unavailable-service-open`, `ordinary-restart-recovery`, and
+  `stale-presence-and-expired-state-recovery`;
+- expected degraded local acceptance outcomes may include one failed primary
+  relay-intro during the relay-unavailable rehearsal and rejected tampered
+  bootstrap artifacts;
+- the first-user-ready claim remains bounded to the checked-in topology,
+  static pinned bootstrap artifacts, explicit operator commands, and the
+  separately collected off-box evidence on the same validated commit;
+- these are acceptance-boundary defaults only, not new protocol messages,
+  transport classes, or production-readiness guarantees.
 
 ## Rule
 

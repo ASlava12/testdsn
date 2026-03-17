@@ -1071,6 +1071,19 @@ mod tests {
         assert!(!script.contains("devnet/bootstrap/node-ab-seed.json"));
     }
 
+    #[test]
+    fn first_user_acceptance_script_wraps_launch_gate_and_distributed_acceptance() {
+        let script = fs::read_to_string(repo_devnet_dir().join("run-first-user-acceptance.sh"))
+            .expect("first-user acceptance script should be readable");
+        assert!(script.contains("run-launch-gate.sh"));
+        assert!(script.contains("run-distributed-pilot-checklist.sh"));
+        assert!(script.contains("\"kind\":\"runtime_doctor\""));
+        assert!(script.contains("\"restored_from_peer_cache\":true"));
+        assert!(script.contains("\"state\":\"recovered_from_peer_cache\""));
+        assert!(script.contains("\"scenario\":\"fresh-node-join\""));
+        assert!(script.contains("\"scenario\":\"relay-unavailable-service-open\""));
+    }
+
     fn repo_devnet_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
