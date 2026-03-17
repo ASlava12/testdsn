@@ -19,6 +19,6 @@ Suggested host map:
 - `host-relay-b-ops`: `node-relay-b`, operator/report host running status
   collection and report assembly
 
-Use [docs/PILOT_RUNBOOK.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RUNBOOK.md)
+Use [docs/PILOT_RUNBOOK.md](../../docs/PILOT_RUNBOOK.md)
 for the full execution order, distributed operator commands, fault scenarios,
 and reporting steps.

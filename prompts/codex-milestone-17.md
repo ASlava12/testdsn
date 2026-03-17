@@ -5,12 +5,12 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `README.md`, `HANDOFF.md`, `VALIDATION.md`,
 `spec/state-machines.md`.
 
 Goal:
-Work within the current repository stage, `milestone-17-operator-runtime`,
-from the landed Milestone 1-16 baseline plus the current operator-runtime
-hardening surface.
+Audit or repair the closed Milestone 17 operator-runtime surface from the
+current `milestone-22-first-user-acceptance-pack` repository stage.
 
 Current repository baseline:
-- The current repository stage marker is `milestone-17-operator-runtime`.
+- The current repository stage marker is
+  `milestone-22-first-user-acceptance-pack`.
 - Milestones 0-12 are implemented, validated, and considered closed.
 - Milestone 14 launch gate and pilot tag are implemented and remain part of the
   pilot baseline.

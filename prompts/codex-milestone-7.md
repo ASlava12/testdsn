@@ -29,8 +29,8 @@ Current repository baseline:
   wire bodies, verified `ServiceRecord` registration, exact `app_id`
   resolution, `reachability_ref` binding checks, and `integration_service_open`
   coverage.
-- The current repository stage is `milestone-14-launch-gate` (Milestone 14
-  launch gate and pilot tag).
+- The current repository stage is
+  `milestone-22-first-user-acceptance-pack`.
 
 Requirements:
 - keep explicit layering between routing, relay, transport/session,

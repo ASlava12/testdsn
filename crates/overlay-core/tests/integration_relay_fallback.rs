@@ -8,6 +8,8 @@ use overlay_core::{
     REPOSITORY_STAGE,
 };
 
+const REPOSITORY_STAGE_FILE: &str = include_str!("../../../REPOSITORY_STAGE");
+
 #[test]
 fn relay_fallback_plan_tracks_current_stage_boundary() {
     let now_unix_s = 1_700_000_000;
@@ -45,7 +47,7 @@ fn relay_fallback_plan_tracks_current_stage_boundary() {
     )
     .expect("relay fallback plan should be created");
 
-    assert_eq!(REPOSITORY_STAGE, "milestone-22-first-user-acceptance-pack");
+    assert_eq!(REPOSITORY_STAGE, REPOSITORY_STAGE_FILE.trim());
     assert_eq!(
         plan.direct_attempts,
         vec![

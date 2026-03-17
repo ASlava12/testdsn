@@ -5,10 +5,12 @@ relevant modules under `crates/overlay-core/src/`.
 
 Goal:
 Audit or repair the Milestone 9 hardening baseline only if a task explicitly
-reopens it from the current `milestone-14-launch-gate` repository stage.
+reopens it from the current
+`milestone-22-first-user-acceptance-pack` repository stage.
 
 Current repository baseline:
-- The current repository stage marker is `milestone-14-launch-gate`.
+- The current repository stage marker is
+  `milestone-22-first-user-acceptance-pack`.
 - Milestone 0 is complete.
 - Milestone 1 identities, records, and wire foundations are implemented,
   vectorized, and validated.
@@ -31,7 +33,8 @@ Current repository baseline:
   subsystem observability integration, expanded malformed-input coverage, and
   the current regression suites, stage-boundary integration tests, and
   Milestone 9 unit coverage as its working boundary.
-- Milestone 14 launch gate and pilot tag is the active repository stage.
+- Milestones 14/16/17/18/19/20/21 are landed baseline work ahead of the
+  current Milestone 22 acceptance-pack stage.
 
 Requirements:
 - do not treat Milestone 9 as a broad umbrella task; take one concrete

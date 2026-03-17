@@ -2830,6 +2830,7 @@ mod tests {
         REPOSITORY_STAGE,
     };
 
+    const REPOSITORY_STAGE_FILE: &str = include_str!("../../../REPOSITORY_STAGE");
     const START_UNIX_MS: u64 = 1_700_000_000_000;
 
     #[test]
@@ -2855,7 +2856,7 @@ mod tests {
             .startup(START_UNIX_MS)
             .expect("startup should succeed");
 
-        assert_eq!(REPOSITORY_STAGE, "milestone-22-first-user-acceptance-pack");
+        assert_eq!(REPOSITORY_STAGE, REPOSITORY_STAGE_FILE.trim());
         assert_eq!(runtime.state(), NodeRuntimeState::Running);
         assert_eq!(
             runtime.context().node_id(),

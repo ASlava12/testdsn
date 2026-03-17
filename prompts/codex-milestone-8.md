@@ -29,8 +29,8 @@ Current repository baseline:
   resolution, `reachability_ref` binding checks, allow/deny local policy
   enforcement, deterministic message vectors, and
   `integration_service_open` coverage.
-- The current repository stage is `milestone-14-launch-gate` (Milestone 14
-  launch gate and pilot tag).
+- The current repository stage is
+  `milestone-22-first-user-acceptance-pack`.
 
 Requirements:
 - keep exact `app_id` service resolution aligned with `spec/service-layer.md`,

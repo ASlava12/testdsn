@@ -1,7 +1,7 @@
 # Config Examples
 
 Role-based runnable examples live in
-[docs/config-examples](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/config-examples).
+[docs/config-examples](config-examples).
 
 These examples intentionally reuse the checked-in `devnet/` keys and bootstrap
 seed files so they can be loaded and validated directly in this repository.
@@ -105,22 +105,22 @@ Unknown operator knobs are not available yet. In particular:
 ## Stable first-user profiles
 
 - User node:
-  [user-node.json](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/config-examples/user-node.json)
+  [user-node.json](config-examples/user-node.json)
 - Relay-capable node:
-  [relay-capable.json](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/config-examples/relay-capable.json)
+  [relay-capable.json](config-examples/relay-capable.json)
 - Bootstrap-seed node:
-  [bootstrap-seed.json](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/config-examples/bootstrap-seed.json)
+  [bootstrap-seed.json](config-examples/bootstrap-seed.json)
 
 Retained repository-role examples:
 
 - Bootstrap anchor:
-  [bootstrap-node.json](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/config-examples/bootstrap-node.json)
+  [bootstrap-node.json](config-examples/bootstrap-node.json)
 - Standard node:
-  [standard-node.json](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/config-examples/standard-node.json)
+  [standard-node.json](config-examples/standard-node.json)
 - Relay-enabled node:
-  [relay-enabled-node.json](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/config-examples/relay-enabled-node.json)
+  [relay-enabled-node.json](config-examples/relay-enabled-node.json)
 - Service-host node:
-  [service-host-node.json](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/config-examples/service-host-node.json)
+  [service-host-node.json](config-examples/service-host-node.json)
 
 All profile examples are loadable with:
 
@@ -144,7 +144,7 @@ TMPDIR=/tmp cargo run -p overlay-cli -- status --config <example-path> --summary
 
 Bootstrap seed JSON files are separate from node config JSON files. The checked
 in working examples live under
-[devnet/bootstrap](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/bootstrap).
+[devnet/bootstrap](../devnet/bootstrap).
 
 The current bootstrap seed schema contains:
 

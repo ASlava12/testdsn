@@ -1,13 +1,13 @@
 # Devnet
 
 The repository ships a reproducible local and host-style devnet under
-[devnet](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet).
+[devnet](../devnet).
 
 It is the operator-facing proof path for the current runtime surface, including
 the Milestone 16 host-style network-bootstrap layout under
-[devnet/hosts](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/hosts)
+[devnet/hosts](../devnet/hosts)
 and the carried-forward distributed pilot pack under
-[devnet/pilot](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot).
+[devnet/pilot](../devnet/pilot).
 
 ## Node roles
 
@@ -19,29 +19,29 @@ and the carried-forward distributed pilot pack under
 
 ## Files
 
-- [devnet/configs](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/configs):
+- [devnet/configs](../devnet/configs):
   four runnable local `OverlayConfig` files
-- [devnet/keys](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/keys):
+- [devnet/keys](../devnet/keys):
   deterministic seed files in hex form
-- [devnet/bootstrap](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/bootstrap):
+- [devnet/bootstrap](../devnet/bootstrap):
   local bootstrap seed JSON files
-- [devnet/hosts](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/hosts):
+- [devnet/hosts](../devnet/hosts):
   host-style localhost and example multi-host layouts
-- [devnet/pilot](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot):
+- [devnet/pilot](../devnet/pilot):
   dedicated distributed pilot topology/config pack
-- [devnet/run-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-smoke.sh):
+- [devnet/run-smoke.sh](../devnet/run-smoke.sh):
   wrapper for the repo-local smoke flow
-- [devnet/run-distributed-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-smoke.sh):
+- [devnet/run-distributed-smoke.sh](../devnet/run-distributed-smoke.sh):
   wrapper for the real-process localhost bootstrap/session smoke
-- [devnet/run-multihost-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-multihost-smoke.sh):
+- [devnet/run-multihost-smoke.sh](../devnet/run-multihost-smoke.sh):
   wrapper for the host-style network-bootstrap and operator-flow smoke
-- [devnet/run-distributed-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-pilot-checklist.sh):
+- [devnet/run-distributed-pilot-checklist.sh](../devnet/run-distributed-pilot-checklist.sh):
   wrapper for the current distributed pilot checklist
-- [devnet/run-first-user-acceptance.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-first-user-acceptance.sh):
+- [devnet/run-first-user-acceptance.sh](../devnet/run-first-user-acceptance.sh):
   wrapper for the current Milestone 22 first-user acceptance flow
-- [devnet/run-doctor-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-doctor-smoke.sh):
+- [devnet/run-doctor-smoke.sh](../devnet/run-doctor-smoke.sh):
   wrapper for the landed Milestone 21 doctor/self-check surface
-- [devnet/run-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-pilot-checklist.sh):
+- [devnet/run-pilot-checklist.sh](../devnet/run-pilot-checklist.sh):
   retained Milestone 18 localhost rehearsal pack, not the current sign-off
   path
 

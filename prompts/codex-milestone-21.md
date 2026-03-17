@@ -6,13 +6,14 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `README.md`, `HANDOFF.md`, `VALIDATION.md`,
 `spec/state-machines.md`.
 
 Goal:
-Work within the current repository stage, `milestone-21-first-user-runtime`,
-from the landed Milestone 1-20 baseline and keep Milestone 21 focused on
-bounded restart recovery, operator visibility, and first-user config/runtime
-usability without widening protocol scope.
+Audit or repair the closed Milestone 21 first-user-runtime surface from the
+current `milestone-22-first-user-acceptance-pack` repository stage and keep
+Milestone 21 work focused on bounded restart recovery, operator visibility,
+and first-user config/runtime usability without widening protocol scope.
 
 Current repository baseline:
-- The current repository stage marker is `milestone-21-first-user-runtime`.
+- The current repository stage marker is
+  `milestone-22-first-user-acceptance-pack`.
 - Milestones 0-12 are implemented, validated, and considered closed.
 - Milestone 14 launch gate, Milestone 16 network bootstrap, Milestone 17
   operator runtime hardening, Milestone 18 real pilot, Milestone 19 pilot

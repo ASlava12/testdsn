@@ -3,11 +3,11 @@
 This runbook is for the repository's current local and pilot launch surface,
 not for hostile-Internet or public-production deployment.
 
-Use [docs/LAUNCH_CHECKLIST.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/LAUNCH_CHECKLIST.md)
+Use [docs/LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md)
 as the release gate, this runbook as the operator flow behind that gate, and
-[docs/FIRST_USER_ACCEPTANCE.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/FIRST_USER_ACCEPTANCE.md)
+[docs/FIRST_USER_ACCEPTANCE.md](FIRST_USER_ACCEPTANCE.md)
 for the current first-user-ready boundary, and
-[docs/PILOT_RUNBOOK.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RUNBOOK.md)
+[docs/PILOT_RUNBOOK.md](PILOT_RUNBOOK.md)
 for the dedicated current-stage off-box distributed exercise.
 
 The current localhost sign-off path is
@@ -64,7 +64,7 @@ What does not exist today:
 1. Generate a starter config with
    `overlay-cli config-template --profile <user-node|relay-capable|bootstrap-seed> --output <path>`
    or pick a stable profile example from
-   [docs/CONFIG_EXAMPLES.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/CONFIG_EXAMPLES.md).
+   [docs/CONFIG_EXAMPLES.md](CONFIG_EXAMPLES.md).
 2. Verify the config only uses supported top-level fields.
 3. Verify `node_key_path` points to an existing seed file.
 4. Verify every `bootstrap_sources[]` entry points to a local `.json` file,
@@ -154,9 +154,9 @@ Wrapper scripts:
 
 ## Multi-host bootstrap runbook
 
-Use [devnet/hosts/README.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/hosts/README.md)
+Use [devnet/hosts/README.md](../devnet/hosts/README.md)
 as the host-style layout reference and
-[devnet/pilot/README.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot/README.md)
+[devnet/pilot/README.md](../devnet/pilot/README.md)
 for the current pilot pack.
 
 Suggested five-host pilot topology:
@@ -183,9 +183,9 @@ Bring the lab up in this order:
 7. Use `./devnet/run-multihost-smoke.sh` for the repo-local host-style proof
    of bootstrap, publish, lookup, service open, and relay fallback.
 8. Use `./devnet/run-distributed-pilot-checklist.sh` for the localhost
-   regular-distributed-use checklist. Add `--evidence-dir <dir>` when you want
+   distributed acceptance checklist. Add `--evidence-dir <dir>` when you want
    the wrapper to preserve raw logs and status files automatically.
-9. Use [docs/PILOT_RUNBOOK.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RUNBOOK.md)
+9. Use [docs/PILOT_RUNBOOK.md](PILOT_RUNBOOK.md)
    for the actual off-box operator-command run and evidence collection order.
 
 ## What healthy output looks like

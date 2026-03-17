@@ -8,6 +8,8 @@ use overlay_core::{
     REPOSITORY_STAGE,
 };
 
+const REPOSITORY_STAGE_FILE: &str = include_str!("../../../REPOSITORY_STAGE");
+
 #[test]
 fn publish_lookup_flow_tracks_current_stage_boundary() {
     let now_unix_s = 1_700_000_000;
@@ -32,7 +34,7 @@ fn publish_lookup_flow_tracks_current_stage_boundary() {
         .expect("lookup state should be created");
     let response = store.lookup(LookupNode { node_id }, now_unix_s + 1, &mut state);
 
-    assert_eq!(REPOSITORY_STAGE, "milestone-22-first-user-acceptance-pack");
+    assert_eq!(REPOSITORY_STAGE, REPOSITORY_STAGE_FILE.trim());
     match response {
         LookupResponse::Result(result) => {
             assert_eq!(result.node_id, node_id);

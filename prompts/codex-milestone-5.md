@@ -23,8 +23,8 @@ Current repository baseline:
 - Milestone 6 relay intro/fallback work is closed.
 - Milestone 7 routing work is closed.
 - Milestone 8 service-layer work is closed.
-- The current repository stage is `milestone-14-launch-gate` (Milestone 14
-  launch gate and pilot tag).
+- The current repository stage is
+  `milestone-22-first-user-acceptance-pack`.
 
 Requirements:
 - keep the current `publish_verified` contract intact: signature verification

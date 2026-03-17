@@ -17,7 +17,7 @@ reuses `./devnet/run-launch-gate.sh` as a landed prerequisite component.
 `./devnet/run-pilot-checklist.sh` remains a retained Milestone 18 localhost
 rehearsal. Do not treat it as the current sign-off path.
 
-Use [docs/FIRST_USER_ACCEPTANCE.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/FIRST_USER_ACCEPTANCE.md)
+Use [docs/FIRST_USER_ACCEPTANCE.md](FIRST_USER_ACCEPTANCE.md)
 for the current first-user-ready acceptance scenarios and boundary.
 
 ## Launchable surface freeze
@@ -205,7 +205,7 @@ Workflow:
 
 1. Pick the next unused `pilot-v<crate-version>-rcN` tag.
 2. Run the full launch gate on the exact commit you intend to tag.
-3. Copy [docs/PILOT_RELEASE_TEMPLATE.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RELEASE_TEMPLATE.md)
+3. Copy [docs/PILOT_RELEASE_TEMPLATE.md](PILOT_RELEASE_TEMPLATE.md)
    into a release note for that candidate and fill in the command results,
    commit SHA, and limitations.
 4. Create an annotated tag on the validated commit:

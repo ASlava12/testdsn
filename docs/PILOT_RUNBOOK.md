@@ -52,7 +52,7 @@ Current pilot limits remain in force:
 
 ## Topology
 
-Use the files under [devnet/pilot](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot).
+Use the files under [devnet/pilot](../devnet/pilot).
 
 Suggested 5-host pilot:
 
@@ -80,17 +80,17 @@ Example node IDs from the checked-in deterministic keys:
 Files:
 
 - localhost rehearsal configs:
-  [devnet/pilot/localhost/configs](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot/localhost/configs)
+  [devnet/pilot/localhost/configs](../devnet/pilot/localhost/configs)
 - localhost rehearsal bootstrap seeds:
-  [devnet/pilot/localhost/bootstrap](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot/localhost/bootstrap)
+  [devnet/pilot/localhost/bootstrap](../devnet/pilot/localhost/bootstrap)
 - separate-host example configs:
-  [devnet/pilot/examples/configs](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot/examples/configs)
+  [devnet/pilot/examples/configs](../devnet/pilot/examples/configs)
 - separate-host example bootstrap seeds:
-  [devnet/pilot/examples/bootstrap](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot/examples/bootstrap)
+  [devnet/pilot/examples/bootstrap](../devnet/pilot/examples/bootstrap)
 - localhost proof wrapper:
-  [devnet/run-distributed-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-pilot-checklist.sh)
+  [devnet/run-distributed-pilot-checklist.sh](../devnet/run-distributed-pilot-checklist.sh)
 - report template:
-  [docs/PILOT_REPORT_TEMPLATE.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_REPORT_TEMPLATE.md)
+  [docs/PILOT_REPORT_TEMPLATE.md](PILOT_REPORT_TEMPLATE.md)
 
 ## Prerequisites
 
@@ -163,13 +163,14 @@ Files:
    TMPDIR=/tmp cargo run -p overlay-cli -- run --config /path/to/node-c.json --status-every 30
    ```
 
-7. Use [devnet/run-multihost-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-multihost-smoke.sh)
+7. Use [devnet/run-multihost-smoke.sh](../devnet/run-multihost-smoke.sh)
    as the repo-local proof for bootstrap plus real networked operator flows on
    the host-style config pack.
 
-8. Use [devnet/run-distributed-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-pilot-checklist.sh)
-   as the localhost proof for the current distributed checklist. Use `--evidence-dir <dir>` when you want
-   the wrapper to preserve the raw logs and status files automatically.
+8. Use [devnet/run-distributed-pilot-checklist.sh](../devnet/run-distributed-pilot-checklist.sh)
+   as the localhost proof for the current distributed checklist. Use
+   `--evidence-dir <dir>` when you want the wrapper to preserve the raw logs
+   and status files automatically.
 
 ## Distributed operator flow
 
@@ -343,5 +344,5 @@ Record all ten scenarios in the pilot report:
 - Relay proof remains bounded to the checked-in two-relay topology rather than
   arbitrary relay graphs or public-network conditions.
 
-Use [docs/PILOT_REPORT_TEMPLATE.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_REPORT_TEMPLATE.md)
+Use [docs/PILOT_REPORT_TEMPLATE.md](PILOT_REPORT_TEMPLATE.md)
 to write the final report.

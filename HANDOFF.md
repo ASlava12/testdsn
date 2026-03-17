@@ -50,7 +50,7 @@ A Codex-oriented handoff bundle containing:
 
 1. Run the applicable commands in `VALIDATION.md`.
 2. Run `./devnet/run-first-user-acceptance.sh`.
-4. Use `docs/PILOT_RUNBOOK.md` for the off-box pilot run and evidence
+3. Use `docs/PILOT_RUNBOOK.md` for the off-box pilot run and evidence
    collection.
 
 `./devnet/run-launch-gate.sh` and
@@ -90,5 +90,8 @@ closed Milestone 1-12 baseline and does not need to restart from Milestone
    the stage as a feature umbrella.
 5. Keep broader protocol scope, public-production claims, and redesign work out
    of current-stage tasks unless explicitly requested.
-6. Keep status docs, milestone prompts, `docs/OPEN_QUESTIONS.md`, and the root
-   `REPOSITORY_STAGE` marker aligned as the repository stage evolves.
+6. Keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, `VALIDATION.md`,
+   `docs/FIRST_USER_ACCEPTANCE.md`, `docs/PILOT_RUNBOOK.md`,
+   `docs/DEVNET.md`, `docs/LAUNCH_CHECKLIST.md`, `docs/OPEN_QUESTIONS.md`,
+   milestone prompts, and the root `REPOSITORY_STAGE` marker aligned as the
+   repository stage evolves.

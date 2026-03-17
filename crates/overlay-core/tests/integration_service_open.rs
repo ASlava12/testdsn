@@ -9,6 +9,8 @@ use overlay_core::{
     REPOSITORY_STAGE,
 };
 
+const REPOSITORY_STAGE_FILE: &str = include_str!("../../../REPOSITORY_STAGE");
+
 #[test]
 fn service_open_flow_tracks_current_stage_boundary() {
     let now_unix_ms = 1_700_000_000_123;
@@ -37,7 +39,7 @@ fn service_open_flow_tracks_current_stage_boundary() {
         now_unix_ms,
     );
 
-    assert_eq!(REPOSITORY_STAGE, "milestone-22-first-user-acceptance-pack");
+    assert_eq!(REPOSITORY_STAGE, REPOSITORY_STAGE_FILE.trim());
     assert_eq!(response.status, ServiceRecordResponseStatus::Found);
     assert_eq!(response.record, Some(record.clone()));
     assert_eq!(opened.status, OpenAppSessionStatus::Opened);

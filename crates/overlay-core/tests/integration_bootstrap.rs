@@ -11,6 +11,8 @@ use overlay_core::{
     REPOSITORY_STAGE,
 };
 
+const REPOSITORY_STAGE_FILE: &str = include_str!("../../../REPOSITORY_STAGE");
+
 #[test]
 fn bootstrap_smoke_tracks_current_stage_boundary() {
     let provider = StaticBootstrapProvider::new(sample_response());
@@ -46,7 +48,7 @@ fn bootstrap_smoke_tracks_current_stage_boundary() {
         )
         .expect("validated bootstrap response should seed the peer store");
 
-    assert_eq!(REPOSITORY_STAGE, "milestone-22-first-user-acceptance-pack");
+    assert_eq!(REPOSITORY_STAGE, REPOSITORY_STAGE_FILE.trim());
     assert_eq!(active.len(), 3);
     assert_eq!(store.active_neighbors().count(), 3);
     assert_eq!(observability.metrics().active_peers, 3);

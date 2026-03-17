@@ -25,7 +25,7 @@ mod tests {
 
     #[test]
     fn reports_repository_stage() {
-        assert_eq!(REPOSITORY_STAGE, "milestone-22-first-user-acceptance-pack");
+        assert_eq!(REPOSITORY_STAGE, REPOSITORY_STAGE_FILE.trim());
     }
 
     #[test]

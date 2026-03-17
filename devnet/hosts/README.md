@@ -32,4 +32,4 @@ The host-style configs intentionally keep bootstrap minimal:
 - the seed server is `overlay-cli bootstrap-serve`, not a public provider stack.
 
 For the current dedicated pilot pack, use
-`devnet/pilot/` and [docs/PILOT_RUNBOOK.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RUNBOOK.md).
+`devnet/pilot/` and [docs/PILOT_RUNBOOK.md](../../docs/PILOT_RUNBOOK.md).

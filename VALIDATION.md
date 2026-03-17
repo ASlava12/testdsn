@@ -260,8 +260,9 @@ cargo test -p overlay-core --test integration_service_open
   checklist only when the touched code or docs justify the narrower reruns.
 - If `REPOSITORY_STAGE`, `README.md`, `HANDOFF.md`, `IMPLEMENT.md`,
   `VALIDATION.md`, `docs/FIRST_USER_ACCEPTANCE.md`,
-  `docs/LAUNCH_CHECKLIST.md`, milestone prompts, or other status markers
-  change, rerun the stage-boundary smoke tests and the full
+  `docs/PILOT_RUNBOOK.md`, `docs/DEVNET.md`, `docs/LAUNCH_CHECKLIST.md`,
+  `docs/OPEN_QUESTIONS.md`, milestone prompts, or other status markers change,
+  rerun the stage-boundary smoke tests and the full
   `./devnet/run-first-user-acceptance.sh` flow so code and docs stay aligned.
 - `integration_publish_lookup` remains the real Milestone 5 integration path; `integration_relay_fallback` is the real Milestone 6 integration path; `integration_routing` is the real Milestone 7 integration path; `integration_service_open` is now the real Milestone 8 integration path.
 - Milestone 9 hardening coverage remains part of the frozen baseline through

@@ -93,7 +93,8 @@ within this bounded claim:
 
 The repository stage marker lives in the root `REPOSITORY_STAGE` file and in
 `overlay_core::REPOSITORY_STAGE`. Keep `README.md`, `HANDOFF.md`,
-`IMPLEMENT.md`, `VALIDATION.md`, `docs/LAUNCH_CHECKLIST.md`, and
+`IMPLEMENT.md`, `VALIDATION.md`, `docs/FIRST_USER_ACCEPTANCE.md`,
+`docs/PILOT_RUNBOOK.md`, `docs/DEVNET.md`, `docs/LAUNCH_CHECKLIST.md`, and
 `docs/OPEN_QUESTIONS.md` synchronized with that marker whenever the stage
 changes.
 

@@ -17,7 +17,7 @@ Current repository baseline:
 - Milestone 4 is closed; Milestone 5 presence/lookup work is closed; Milestone 6
   relay intro/fallback work is closed; Milestone 7 routing work is closed;
   Milestone 8 service-layer work is closed; the current repository stage is
-  `milestone-14-launch-gate` (Milestone 14 launch gate and pilot tag).
+  `milestone-22-first-user-acceptance-pack`.
 
 Requirements:
 - touch Milestone 3 only for regression fixes, fixture maintenance, runner-boundary

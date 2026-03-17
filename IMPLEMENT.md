@@ -18,7 +18,7 @@ Treat the current stage as having one localhost sign-off flow:
 
 1. run the applicable commands in `VALIDATION.md`;
 2. run `./devnet/run-first-user-acceptance.sh` on the same commit;
-4. use `docs/PILOT_RUNBOOK.md` for the separate-host evidence run.
+3. use `docs/PILOT_RUNBOOK.md` for the separate-host evidence run.
 
 `./devnet/run-launch-gate.sh` and
 `./devnet/run-distributed-pilot-checklist.sh` remain the landed component

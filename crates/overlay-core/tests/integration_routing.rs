@@ -3,6 +3,8 @@ use overlay_core::{
     REPOSITORY_STAGE,
 };
 
+const REPOSITORY_STAGE_FILE: &str = include_str!("../../../REPOSITORY_STAGE");
+
 #[test]
 fn routing_selector_tracks_current_stage_boundary() {
     let mut selector =
@@ -10,7 +12,7 @@ fn routing_selector_tracks_current_stage_boundary() {
     let direct_path = sample_path(1, 50, 100, 10, 0);
     let better_path = sample_path(2, 30, 60, 8, 1);
 
-    assert_eq!(REPOSITORY_STAGE, "milestone-22-first-user-acceptance-pack");
+    assert_eq!(REPOSITORY_STAGE, REPOSITORY_STAGE_FILE.trim());
     assert!(matches!(
         selector.evaluate(1_700_000_000, &[direct_path]),
         RouteDecision::SelectedInitial { path_id: 1, .. }

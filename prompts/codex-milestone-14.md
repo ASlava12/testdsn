@@ -4,19 +4,21 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `README.md`, `HANDOFF.md`, `VALIDATION.md`,
 `spec/wire-protocol.md`, `spec/records.md`, and `spec/state-machines.md`.
 
 Goal:
-Work only within the current repository stage, `milestone-14-launch-gate`,
-from the frozen pilot-ready baseline.
+Audit or repair the closed Milestone 14 launch-gate surface from the current
+`milestone-22-first-user-acceptance-pack` repository stage.
 
 Current repository baseline:
-- The current repository stage marker is `milestone-14-launch-gate`.
+- The current repository stage marker is
+  `milestone-22-first-user-acceptance-pack`.
 - Milestones 0-8 are implemented, vectorized where applicable, validated, and
   considered closed.
 - Milestone 9 hardening is implemented and part of the frozen baseline.
 - Milestone 10 minimal runtime, Milestone 11 local devnet, and Milestone 12
   launch hardening are implemented and part of the frozen baseline.
-- Milestone 14 launch gate and pilot tag is the current stage with a frozen MVP
-  launch surface, a reproducible launch checklist, a pilot release template, a
-  documented green-path launch flow, and explicit known limitations.
+- Milestone 14 launch gate and pilot tag are implemented and remain part of the
+  landed baseline with a frozen MVP launch surface, a reproducible launch
+  checklist, a pilot release template, a documented green-path launch flow,
+  and explicit known limitations.
 
 Requirements:
 - preserve the frozen launch surface documented in `docs/LAUNCH_CHECKLIST.md`;

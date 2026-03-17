@@ -5,12 +5,12 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `README.md`, `HANDOFF.md`, `VALIDATION.md`,
 `spec/state-machines.md`, and `spec/config.md`.
 
 Goal:
-Work within the current repository stage, `milestone-16-network-bootstrap`,
-from the landed Milestone 1-14 baseline plus the current minimal network
-bootstrap and multi-host devnet surface.
+Audit or repair the closed Milestone 16 network-bootstrap surface from the
+current `milestone-22-first-user-acceptance-pack` repository stage.
 
 Current repository baseline:
-- The current repository stage marker is `milestone-16-network-bootstrap`.
+- The current repository stage marker is
+  `milestone-22-first-user-acceptance-pack`.
 - Milestones 0-12 are implemented, validated, and considered closed.
 - Milestone 14 launch gate and pilot tag are implemented and remain part of the
   pilot baseline.

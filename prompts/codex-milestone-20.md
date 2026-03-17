@@ -6,15 +6,15 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `README.md`, `HANDOFF.md`, `VALIDATION.md`,
 `spec/records.md`, and `spec/state-machines.md`.
 
 Goal:
-Work within the current repository stage,
-`milestone-20-regular-distributed-use-closure`, from the landed Milestone
-1-19 baseline and keep Milestone 20 focused on closing the remaining blockers
-for regular distributed use without widening scope into hostile-environment or
+Audit or repair the closed Milestone 20 regular-distributed-use surface from
+the current `milestone-22-first-user-acceptance-pack` repository stage and
+keep Milestone 20 work focused on closing the remaining blockers for regular
+distributed use without widening scope into hostile-environment or
 public-Internet rollout.
 
 Current repository baseline:
 - The current repository stage marker is
-  `milestone-20-regular-distributed-use-closure`.
+  `milestone-22-first-user-acceptance-pack`.
 - Milestones 0-12 are implemented, validated, and considered closed.
 - Milestone 14 launch gate, Milestone 16 network bootstrap, Milestone 17
   operator runtime hardening, Milestone 18 real pilot, and Milestone 19 pilot

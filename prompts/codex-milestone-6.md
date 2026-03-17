@@ -24,8 +24,8 @@ Current repository baseline:
   direct-first fallback planning.
 - Milestone 7 routing work is closed in `overlay-core` (`routing`).
 - Milestone 8 service-layer work is closed in `overlay-core` (`service`).
-- The current repository stage is `milestone-14-launch-gate` (Milestone 14
-  launch gate and pilot tag).
+- The current repository stage is
+  `milestone-22-first-user-acceptance-pack`.
 
 Requirements:
 - keep direct transport attempts first and use relay only as bounded fallback;
