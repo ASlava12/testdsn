@@ -8,7 +8,7 @@ public deployment.
 ## Metadata
 
 - Date: `<YYYY-MM-DD>`
-- Repository stage: `milestone-24-bootstrap-trust-delivery-hardening`
+- Repository stage: `milestone-25-runtime-persistence-recovery-hardening`
 - Commit: `<git-sha>`
 - Operator: `<name>`
 - Topology: `pilot-5-host-two-relay`

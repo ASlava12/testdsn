@@ -1079,6 +1079,7 @@ mod tests {
         assert!(script.contains("run-distributed-pilot-checklist.sh"));
         assert!(script.contains("\"kind\":\"runtime_doctor\""));
         assert!(script.contains("\"restored_from_peer_cache\":true"));
+        assert!(script.contains("\"restored_service_intents\":1"));
         assert!(script.contains("\"state\":\"recovered_from_peer_cache\""));
         assert!(script.contains("\"scenario\":\"fresh-node-join\""));
         assert!(script.contains("\"scenario\":\"relay-unavailable-service-open\""));

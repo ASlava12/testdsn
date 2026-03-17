@@ -5,12 +5,12 @@ Specification-first Rust workspace for a censorship-resistant overlay network.
 ## Current Stage
 
 The current repository stage is
-`milestone-24-bootstrap-trust-delivery-hardening`.
+`milestone-25-runtime-persistence-recovery-hardening`.
 
 Milestones 0-21 are landed baseline work. Current tasks should stay narrow:
-maintain the hardened bootstrap boundary, keep the acceptance/runbook docs
-honest, and fix validation or runtime regressions without widening protocol
-scope.
+maintain the hardened bootstrap and bounded recovery boundary, keep the
+acceptance/runbook docs honest, and fix validation or runtime regressions
+without widening protocol scope.
 
 ## Current Green Path
 
@@ -45,8 +45,9 @@ The current validated surface includes:
   with `last_attempt_summary` and `last_sources`, including explicit
   `unavailable`, `integrity_mismatch`, `trust_verification_failed`, `stale`,
   and `empty_peer_set` outcomes;
-- bounded restart recovery from the last-known active bootstrap peers embedded
-  in persisted `runtime_status`, plus continued bootstrap retry until a live
+- bounded restart recovery from persisted bootstrap-source preference,
+  last-known active bootstrap peers, and local service registration intent
+  embedded in `runtime_status`, plus continued bootstrap retry until a live
   source succeeds again;
 - an explicit acceptance pack covering fresh join, service publish/open,
   relay-fallback proof, one-bootstrap-down startup, one-relay-down service
@@ -80,15 +81,16 @@ within this bounded claim:
 - `docs/DEVNET.md`: checked-in devnet layouts and proof wrappers
 - `docs/OPEN_QUESTIONS.md`: conservative defaults for underspecified areas
 
-## Remaining Limitations After Milestone 24
+## Remaining Limitations After Milestone 25
 
 - bootstrap is still static signed artifact delivery over `http://`, not HTTPS
   or a public trust framework
 - the distributed operator commands are one-shot point-to-point proof
   surfaces, not a general distributed control plane or discovery layer
-- only the last-known active bootstrap peers are recovered across restart;
-  presence, registered services, sessions, relay tunnels, and path probes are
-  still rebuilt
+- restart recovery remains bounded to bootstrap-source state, last-known
+  active bootstrap peers, and local service registration intent; presence
+  records, service-open sessions, relay tunnels, and path probes are still
+  rebuilt
 - relay fallback is proven for the checked-in two-relay pilot topology, not
   arbitrary relay graphs or public-network conditions
 - off-box evidence still must be collected on the validated commit before a

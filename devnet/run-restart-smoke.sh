@@ -50,6 +50,7 @@ sed -i 's/"tcp_listener_addr": "127.0.0.1:4101"/"tcp_listener_addr": "127.0.0.1:
 "${overlay_cli}" run \
   --config "${config_path}" \
   --tick-ms 25 \
+  --service devnet:terminal \
   --status-every 1 \
   >"${first_run_log}" 2>&1 &
 node_pid="$!"
@@ -76,6 +77,7 @@ node_pid=""
 grep -q '"shutdown_reason":"signal_terminate"' "${status_output}"
 grep -q '"clean_shutdown":true' "${status_output}"
 grep -q '"startup_count":1' "${status_output}"
+grep -q '"registered_services":1' "${status_output}"
 
 rm -f "${bootstrap_dir}/node-foundation.json"
 
@@ -90,6 +92,8 @@ for _ in $(seq 1 200); do
   if "${overlay_cli}" status --config "${config_path}" >"${status_output}" 2>/dev/null; then
     if grep -q '"state":"running"' "${status_output}" \
       && grep -q '"restored_from_peer_cache":true' "${status_output}" \
+      && grep -q '"restored_service_intents":1' "${status_output}" \
+      && grep -q '"registered_services":1' "${status_output}" \
       && grep -q '"state":"recovered_from_peer_cache"' "${status_output}"; then
       break
     fi
@@ -111,6 +115,13 @@ grep -q '"startup_count":2' "${status_output}"
 grep -q '"previous_shutdown_clean":true' "${status_output}"
 grep -q '"clean_shutdown":true' "${status_output}"
 grep -q '"restored_from_peer_cache":true' "${status_output}"
+grep -q '"restored_preferred_bootstrap_source":true' "${status_output}"
+grep -q '"restored_service_intents":1' "${status_output}"
+grep -q '"recoverable_service_intents":1' "${status_output}"
+grep -q '"failed_service_intents":0' "${status_output}"
+grep -q '"registered_services":1' "${status_output}"
 grep -q '"state":"recovered_from_peer_cache"' "${status_output}"
+grep -q '"event":"bootstrap_source_recovery","result":"restored"' "${second_run_log}"
+grep -q '"event":"service_intent_recovery","result":"restored"' "${second_run_log}"
 
 cat "${status_output}"

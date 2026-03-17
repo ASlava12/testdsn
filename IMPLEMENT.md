@@ -8,11 +8,11 @@ The repository has a closed Milestone 1-12 baseline, a landed Milestone 14
 pilot launch gate, a landed Milestone 16 network-bootstrap stage, a landed
 Milestone 17 operator-runtime stage, a landed Milestone 18 real-pilot stage,
 the landed Milestone 20 regular-distributed-use-closure stage, and the current
-Milestone 24 bootstrap-trust-delivery-hardening stage.
+Milestone 25 runtime-persistence-recovery-hardening stage.
 The current repository stage marker is
-`milestone-24-bootstrap-trust-delivery-hardening`.
+`milestone-25-runtime-persistence-recovery-hardening`.
 
-## Current bootstrap-hardening green path
+## Current recovery-hardening green path
 
 Treat the current stage as having one localhost sign-off flow:
 
@@ -206,6 +206,17 @@ remains a retained Milestone 18 localhost rehearsal only.
   `overlay-cli bootstrap-sign`, signed `bootstrap-serve`, trust-verification
   diagnostics, and expanded distributed checklist proof. The repository stage
   marker now advances to `milestone-24-bootstrap-trust-delivery-hardening`.
+- Milestone 25 runtime-persistence-recovery-hardening support is now
+  implemented in `crates/overlay-core/src/runtime.rs`,
+  `crates/overlay-cli/src/main.rs`,
+  `crates/overlay-cli/src/operator_state.rs`,
+  `devnet/run-restart-smoke.sh`,
+  `devnet/run-distributed-pilot-checklist.sh`, and the synchronized
+  recovery/runbook docs, with persisted bootstrap-source preference, bounded
+  local service-registration intent recovery, explicit recovery fields on the
+  status/doctor surfaces, and updated restart-focused proof paths. The
+  repository stage marker now advances to
+  `milestone-25-runtime-persistence-recovery-hardening`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -213,9 +224,9 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Use `prompts/codex-milestone-24.md` as the recommended next-task prompt for the
-current `milestone-24-bootstrap-trust-delivery-hardening` stage and keep work
-conservative from the current first-user-ready boundary:
+Use `prompts/codex-milestone-25.md` as the recommended next-task prompt for the
+current `milestone-25-runtime-persistence-recovery-hardening` stage and keep
+work conservative from the current first-user-ready boundary:
 
 1. preserve the current launch surface documented in
    `docs/LAUNCH_CHECKLIST.md`, `docs/RUNBOOK.md`, `docs/DEVNET.md`,

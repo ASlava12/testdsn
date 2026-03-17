@@ -31,8 +31,8 @@ What exists today:
   summary for peers, bootstrap, presence, services, relay usage, and recent
   failures
 - `overlay-cli doctor --config <path>` checks config validity, persisted
-  runtime state, bootstrap health, and peer-cache recovery using local files
-  only
+  runtime state, bootstrap health, and bounded restart recovery using local
+  files only
 - `overlay-cli publish`, `lookup`, `open-service`, and `relay-intro` provide
   bounded one-shot operator flows over established runtime sessions
 - `overlay-cli smoke --devnet-dir <path>` still starts the local four-node
@@ -51,8 +51,8 @@ What does not exist today:
 - no public bootstrap-provider infrastructure or HTTPS bootstrap fetch
 - no general distributed control plane beyond the explicit operator commands
 - no broad persistent on-disk runtime state beyond bounded operator metadata,
-  last-known health, and the last-known active bootstrap peers used for restart
-  recovery
+  last-known health, and the persisted bootstrap-source, active-peer, and
+  local-service-intent state used for restart recovery
 - no rolling upgrade or orchestration framework
 
 ## Prerequisites
@@ -231,12 +231,15 @@ Important fields to watch first:
 
 ## Restart procedure
 
-The current runtime keeps a bounded peer-cache recovery path. A restart means:
+The current runtime keeps a bounded recovery path. A restart means:
 
-- the runtime first tries live bootstrap sources
+- the runtime first restores any persisted preferred bootstrap source index
+  before trying live bootstrap sources
 - if all configured bootstrap sources are temporarily unavailable, the runtime
   may recover from the last-known active bootstrap peers persisted in
   `runtime_status`
+- if bounded local service registration intent was persisted, the runtime
+  re-registers those local services on startup
 - sessions are reopened from scratch
 - published presence and service-open session state are lost unless the caller
   recreates them
@@ -246,7 +249,8 @@ What does persist across restarts:
 
 - `.overlay-runtime/<config-stem>/runtime.lock` while the process is active
 - `.overlay-runtime/<config-stem>/runtime-status.json` with the last known
-  `runtime_status` payload, including the bounded peer-cache recovery state
+  `runtime_status` payload, including bounded bootstrap-source, peer-cache,
+  and local-service-intent recovery state
 - startup counters plus clean/unclean shutdown markers for operator recovery
 
 For a bounded restart check:

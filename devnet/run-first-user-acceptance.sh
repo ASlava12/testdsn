@@ -68,6 +68,7 @@ trap cleanup EXIT
 grep -q '"step":"soak_complete"' "${launch_gate_log}"
 grep -q '"kind":"runtime_doctor"' "${launch_gate_log}"
 grep -q '"restored_from_peer_cache":true' "${launch_gate_log}"
+grep -q '"restored_service_intents":1' "${launch_gate_log}"
 grep -q '"state":"recovered_from_peer_cache"' "${launch_gate_log}"
 
 grep -q '"step":"pilot_scenario","scenario":"fresh-node-join","result":"ok"' "${distributed_acceptance_log}"

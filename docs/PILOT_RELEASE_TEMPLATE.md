@@ -8,7 +8,7 @@ public deployment.
 ## Release metadata
 
 - Tag: `pilot-v0.1.0-rcN`
-- Repository stage: `milestone-24-bootstrap-trust-delivery-hardening`
+- Repository stage: `milestone-25-runtime-persistence-recovery-hardening`
 - Commit: `<git-sha>`
 - Release date: `<YYYY-MM-DD>`
 - Operator: `<name>`

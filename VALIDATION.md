@@ -2,7 +2,7 @@
 
 Run the following commands when applicable.
 
-## Current Milestone 24 sign-off path
+## Current Milestone 25 sign-off path
 
 Use the current first-user acceptance-pack sign-off order on the commit you intend to
 validate:
@@ -99,7 +99,7 @@ cargo test -p overlay-core --test integration_service_open
 ```
 
 Use this only when you need the older localhost rehearsal path for the landed
-Milestone 18 baseline. It is not part of current Milestone 24 sign-off.
+Milestone 18 baseline. It is not part of current Milestone 25 sign-off.
 
 ## Current first-user acceptance flow
 
@@ -249,10 +249,10 @@ cargo test -p overlay-core --test integration_service_open
 
 - Milestones 1-12 are considered implemented baseline work, and the current
   repository stage marker is
-  `milestone-24-bootstrap-trust-delivery-hardening` (Milestone 24 bootstrap
-  trust/delivery hardening on top of the landed Milestone 22 first-user
-  acceptance baseline).
-- The current sign-off path is the top-level Milestone 24 section above:
+  `milestone-25-runtime-persistence-recovery-hardening` (Milestone 25 runtime
+  persistence/recovery hardening on top of the landed Milestone 24 bootstrap
+  trust baseline and the Milestone 22 first-user acceptance baseline).
+- The current sign-off path is the top-level Milestone 25 section above:
   workspace format/lint/build/test, then
   `./devnet/run-first-user-acceptance.sh`.
 - Use the Milestone 1-12 regression runs, stage-boundary smoke tests, the
@@ -311,7 +311,7 @@ cargo test -p overlay-core --test integration_service_open
   the required launch order.
 - `./devnet/run-pilot-checklist.sh` remains the Milestone 18 localhost
   rehearsal pack for the smoke-harness pilot boundary; it is retained for the
-  landed baseline but is not the current Milestone 24 sign-off path.
+  landed baseline but is not the current Milestone 25 sign-off path.
 - `./devnet/run-distributed-pilot-checklist.sh` remains the current
   distributed component proof path for the dedicated pilot topology pack, the
   expanded fault matrix, the repeated relay-bind evidence, the fresh-node-join
@@ -320,9 +320,13 @@ cargo test -p overlay-core --test integration_service_open
 - `./devnet/run-doctor-smoke.sh` remains the landed operator-surface proof for
   `overlay-cli doctor` against a live runtime and is exercised through
   `./devnet/run-launch-gate.sh`.
-- `./devnet/run-first-user-acceptance.sh` is the current Milestone 24 wrapper
+- `./devnet/run-first-user-acceptance.sh` is the current Milestone 25 wrapper
   that combines the landed launch gate and the distributed acceptance
   scenarios into one bounded first-user-ready proof.
+- Milestone 25 restart-focused work should rerun `./devnet/run-restart-smoke.sh`
+  and `./devnet/run-distributed-pilot-checklist.sh` in addition to the full
+  acceptance wrapper so persisted recovery and service-host restart behavior
+  stay aligned.
 - The Milestone 12 soak path also stays in-process and advances logical time
   through repeated runtime ticks so stale-session/service/relay/probe cleanup,
   bootstrap retry, and health snapshots can be exercised without a separate

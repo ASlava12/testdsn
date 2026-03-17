@@ -15,7 +15,7 @@ pub mod session;
 pub mod transport;
 pub mod wire;
 
-pub const REPOSITORY_STAGE: &str = "milestone-24-bootstrap-trust-delivery-hardening";
+pub const REPOSITORY_STAGE: &str = "milestone-25-runtime-persistence-recovery-hardening";
 
 #[cfg(test)]
 mod tests {

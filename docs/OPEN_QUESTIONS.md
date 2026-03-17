@@ -2,7 +2,7 @@
 
 This file exists so Codex does not silently invent protocol details.
 All currently known MVP ambiguities affecting the current
-`milestone-24-bootstrap-trust-delivery-hardening` baseline are resolved below and should be reused
+`milestone-25-runtime-persistence-recovery-hardening` baseline are resolved below and should be reused
 as the conservative defaults.
 
 ## Resolved conservative choices for MVP
@@ -265,7 +265,7 @@ For current work, treat the repository stage as:
 - Milestone 12 launch hardening is implemented with bounded cleanup, degraded
   bootstrap retry, runtime health snapshots, and the logical soak path;
 - the current repository stage marker is
-  `milestone-24-bootstrap-trust-delivery-hardening`;
+  `milestone-25-runtime-persistence-recovery-hardening`;
 - Milestone 17 operator-grade runtime hardening is part of the landed baseline,
   with `docs/LAUNCH_CHECKLIST.md`, the documented green-path validation and
   launch sequence, signal-aware `overlay-cli run`, config-local
@@ -292,10 +292,14 @@ For current work, treat the repository stage as:
   with the bounded `./devnet/run-first-user-acceptance.sh` wrapper, explicit
   first-user-ready acceptance scenarios, and the synchronized acceptance
   boundary docs;
-- Milestone 24 bootstrap trust and delivery hardening is now the current
-  stage, with signed bootstrap artifacts, pinned signer-key verification with
-  optional SHA-256 integrity pins, trust-failure diagnostics, and the
-  synchronized operator/bootstrap runbooks;
+- Milestone 24 bootstrap trust and delivery hardening is now part of the
+  landed baseline, with signed bootstrap artifacts, pinned signer-key
+  verification with optional SHA-256 integrity pins, trust-failure
+  diagnostics, and the synchronized operator/bootstrap runbooks;
+- Milestone 25 runtime persistence and recovery hardening is now the current
+  stage, with persisted bootstrap-source preference, bounded local
+  service-registration intent recovery, explicit recovery fields on the
+  status/doctor surfaces, and the synchronized restart/runbook docs;
 
 That means:
 
@@ -313,8 +317,8 @@ That means:
   vectors, or spec mismatches;
 - Milestone 8 is closed and should be touched only for regressions,
   vectors, or spec mismatches;
-- Milestone 24 is the current stage and should stay limited to bootstrap trust
-  hardening, network-bootstrap and operator-runtime maintenance, regression
+- Milestone 25 is the current stage and should stay limited to bounded runtime
+  persistence/recovery hardening, operator-runtime maintenance, regression
   fixes, validation maintenance, and documentation synchronization unless a
   task explicitly reopens scope;
 - the current localhost sign-off flow is `./devnet/run-first-user-acceptance.sh`
@@ -988,7 +992,7 @@ For the landed first-user-runtime baseline:
 
 ### 39. Conservative first-user acceptance defaults for the current stage
 
-For the current bootstrap-trust-delivery-hardening stage:
+For the current runtime-persistence-recovery-hardening stage:
 
 - the bounded local acceptance wrapper may be
   `./devnet/run-first-user-acceptance.sh`;
@@ -1010,7 +1014,7 @@ For the current bootstrap-trust-delivery-hardening stage:
 
 ### 40. Conservative bootstrap trust defaults for Milestone 24
 
-For the current bootstrap-trust-delivery-hardening stage:
+For the landed bootstrap-trust-delivery-hardening baseline:
 
 - the smallest conservative network-bootstrap trust model is a signed
   bootstrap artifact wrapper around the existing `BootstrapResponse`;
@@ -1026,6 +1030,26 @@ For the current bootstrap-trust-delivery-hardening stage:
   signed artifacts with signer pins;
 - trust-verification outcomes are operator-facing runtime diagnostics only and
   do not change bootstrap wire semantics or peer-ingest semantics.
+
+### 41. Conservative runtime persistence defaults for Milestone 25
+
+For the current runtime-persistence-recovery-hardening stage:
+
+- keep using the existing `.overlay-runtime/<config-stem>/runtime-status.json`
+  file as the only persisted recovery payload;
+- extend that bounded recovery payload with the persisted preferred bootstrap
+  source index, the last-known active bootstrap peers, and bounded local
+  service registration intent only;
+- restore the preferred bootstrap source ordering before the next live
+  bootstrap attempt;
+- restore active peers only when configured bootstrap sources are currently not
+  accepted;
+- restore bounded local service registration intent on startup without adding a
+  new distributed control plane or service database;
+- keep recovery explicit in persisted status, summary, doctor output, and
+  structured logs;
+- do not persist presence records, service-open sessions, relay tunnels, path
+  probes, or broad protocol-layer state.
 
 ## Rule
 

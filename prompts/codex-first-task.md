@@ -4,12 +4,12 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `VALIDATION.md`, `docs/OPEN_QUESTIONS.md`,
 
 Goal:
 Synchronize on the current repository stage,
-`milestone-24-bootstrap-trust-delivery-hardening`, and use the dedicated
-Milestone 22 prompt
+`milestone-25-runtime-persistence-recovery-hardening`, and use the dedicated
+Milestone 25 prompt
 for the next concrete current-stage task.
 
 Current repository baseline:
-- The current repository stage is `milestone-24-bootstrap-trust-delivery-hardening`.
+- The current repository stage is `milestone-25-runtime-persistence-recovery-hardening`.
 - Milestone 0 is already complete.
 - Milestone 1 foundations are already implemented, vectorized, and validated in
   `overlay-core` (`identity`, `records`, `wire`).
@@ -62,6 +62,10 @@ Current repository baseline:
   first-user-ready scenarios, fresh-node-join and
   relay-unavailable-service-open coverage in the distributed checklist, and
   synchronized acceptance-boundary docs.
+- Milestone 24 bootstrap trust and delivery hardening is landed baseline work.
+- Milestone 25 runtime persistence and recovery hardening is the current stage
+  with bounded recovery of persisted bootstrap-source preference,
+  last-known active bootstrap peers, and local service registration intent.
 
 Constraints:
 - do not restart the repository from Milestone 0;
@@ -71,8 +75,8 @@ Constraints:
 
 Tasks:
 - confirm the repository already sits at the closed Milestone 1-8 baseline;
-- use `prompts/codex-milestone-22.md` for the next concrete
-  `milestone-24-bootstrap-trust-delivery-hardening` task;
+- use `prompts/codex-milestone-25.md` for the next concrete
+  `milestone-25-runtime-persistence-recovery-hardening` task;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the repository baseline changes;
 - treat Milestones 1-12 as closed baseline work, touching them only for

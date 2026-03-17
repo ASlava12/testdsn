@@ -38,7 +38,7 @@ and the carried-forward distributed pilot pack under
 - [devnet/run-distributed-pilot-checklist.sh](../devnet/run-distributed-pilot-checklist.sh):
   wrapper for the current distributed pilot checklist
 - [devnet/run-first-user-acceptance.sh](../devnet/run-first-user-acceptance.sh):
-  wrapper for the current Milestone 24 first-user acceptance flow
+  wrapper for the current Milestone 25 first-user acceptance flow
 - [devnet/run-doctor-smoke.sh](../devnet/run-doctor-smoke.sh):
   wrapper for the landed Milestone 21 doctor/self-check surface
 - [devnet/run-pilot-checklist.sh](../devnet/run-pilot-checklist.sh):
@@ -129,7 +129,8 @@ This uses the dedicated `devnet/pilot/localhost` topology pack and validates:
 - the one-bootstrap-seed-unavailable path
 - the integrity-mismatch, trust-verification-fallback, stale-bootstrap, and
   empty-peer-set fallback paths
-- the service-host restart/status outcome
+- the service-host restart/status outcome through persisted local service
+  intent recovery
 - the tampered-bootstrap rejection path
 - the final `pilot_checklist_complete` summary with lookup latency and relay
   path fields
@@ -192,8 +193,9 @@ TMPDIR=/tmp cargo run -p overlay-cli -- doctor --config devnet/configs/node-a.js
   harness for publish/lookup/service/relay orchestration.
 - The distributed operator commands are explicit point-to-point CLI calls, not
   a persistent control plane or discovery system.
-- Restart recovery is bounded to the last-known active bootstrap peers only;
-  the devnet does not imply full durable protocol-state persistence.
+- Restart recovery is bounded to persisted bootstrap-source preference,
+  last-known active bootstrap peers, and local service registration intent
+  only; the devnet does not imply full durable protocol-state persistence.
 - Lookup is still exact-by-`node_id` only, and service resolution is still
   exact-by-`app_id` only.
 - The checked-in `tcp://127.0.0.1:*` dial hints in `hosts/localhost/` and

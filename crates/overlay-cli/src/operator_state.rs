@@ -494,6 +494,8 @@ struct RuntimeSummaryBootstrap {
     state: String,
     configured_sources: usize,
     accepted_sources: usize,
+    restored_preferred_source: bool,
+    recoverable_preferred_source_index: Option<usize>,
     last_attempt_summary: Value,
     last_success_unix_ms: Option<u64>,
 }
@@ -510,6 +512,9 @@ struct RuntimeSummaryPresence {
 struct RuntimeSummaryServices {
     registered: usize,
     open_sessions: usize,
+    restored_local_service_intents: usize,
+    recoverable_local_service_intents: usize,
+    failed_local_service_intents: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -554,6 +559,10 @@ fn build_status_summary(
             state: bootstrap_summary_state(health),
             configured_sources: health.bootstrap.configured_sources,
             accepted_sources: health.bootstrap.last_accepted_sources,
+            restored_preferred_source: health.recovery.restored_preferred_bootstrap_source,
+            recoverable_preferred_source_index: health
+                .recovery
+                .recoverable_preferred_bootstrap_source_index,
             last_attempt_summary: serde_json::to_value(&health.bootstrap.last_attempt_summary)
                 .expect("bootstrap attempt summary should serialize"),
             last_success_unix_ms: health.bootstrap.last_success_unix_ms,
@@ -567,6 +576,9 @@ fn build_status_summary(
         services: RuntimeSummaryServices {
             registered: health.services.registered_services,
             open_sessions: health.services.open_sessions,
+            restored_local_service_intents: health.recovery.restored_service_intents,
+            recoverable_local_service_intents: health.recovery.recoverable_service_intents,
+            failed_local_service_intents: health.recovery.failed_service_intents,
         },
         relay: RuntimeSummaryRelay {
             active_tunnels: health.relay.active_tunnels,

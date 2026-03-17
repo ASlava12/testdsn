@@ -1,7 +1,7 @@
 # Host-Style Devnet Layouts
 
 This directory contains the Milestone 16 host-style devnet assets carried into
-the current Milestone 24 bootstrap-trust-delivery-hardening stage.
+the current Milestone 25 runtime-persistence-recovery-hardening stage.
 
 ## Layouts
 

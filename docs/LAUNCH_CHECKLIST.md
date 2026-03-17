@@ -1,13 +1,13 @@
 # Launch Checklist
 
 This checklist defines the landed Milestone 17 operator-runtime gate that
-remains the first component of the current Milestone 24
-bootstrap-trust-delivery-hardening stage.
+remains the first component of the current Milestone 25
+runtime-persistence-recovery-hardening stage.
 
 It is a pilot gate, not a public-production or hostile-Internet readiness
 claim.
 
-For current Milestone 24 sign-off, the bounded acceptance flow is
+For current Milestone 25 sign-off, the bounded acceptance flow is
 `./devnet/run-first-user-acceptance.sh` on the same commit after the
 applicable workspace validation commands.
 
@@ -54,8 +54,9 @@ The current gate does not claim:
 - broad public bootstrap-provider infrastructure;
 - HTTPS, DNS-derived bootstrap, or a public bootstrap trust framework;
 - broad persistent on-disk peers, presence, services, sessions, or relay state
-  beyond bounded operator metadata, last-known health, and the last-known
-  active bootstrap peers;
+  beyond bounded operator metadata, last-known health, persisted
+  bootstrap-source state, and the last-known active bootstrap peers plus local
+  service registration intent;
 - global node or service discovery;
 - onion routing or stronger anonymity;
 - full post-quantum handshake;
@@ -102,8 +103,9 @@ Pass criteria:
 - the doctor smoke proves `overlay-cli doctor` returns `0` and reports a
   healthy running runtime;
 - the restart smoke proves a `SIGTERM`-driven clean shutdown, a readable
-  `overlay-cli status` surface, peer-cache recovery on the second startup, and
-  a second clean shutdown against the same config.
+  `overlay-cli status` surface, bootstrap-source plus peer-cache recovery,
+  local service-intent recovery on the second startup, and a second clean
+  shutdown against the same config.
 
 ## Current distributed follow-on
 
@@ -138,8 +140,9 @@ Pass criteria:
   accepted source while startup still reaches `running`;
 - the empty-bootstrap-fallback scenario reports one empty-peer-set source and
   one accepted source while startup still reaches `running`;
-- the service-host restart scenario reports a clean later startup and another
-  alternate-relay bind;
+- the service-host restart scenario reports a clean later startup, restored
+  local service intent on the restarted host, and another alternate-relay
+  bind;
 - the tampered-bootstrap scenario is rejected by the new integrity check;
 - the final output reaches `pilot_checklist_complete`.
 
@@ -223,12 +226,14 @@ Workflow:
 
 ## Known limitations to carry into every pilot note
 
-- The current runtime recovers only the last-known active bootstrap peers on
+- The current runtime recovers persisted bootstrap-source preference,
+  last-known active bootstrap peers, and local service registration intent on
   restart; sessions, presence, service-open state, relay tunnels, and path
   probes are rebuilt.
 - The current on-disk state is bounded to operator lock/status metadata and
-  the embedded peer-cache recovery payload under `.overlay-runtime/`; it is not
-  broad protocol-state persistence.
+  the embedded bootstrap-source, peer-cache, and local-service-intent
+  recovery payload under `.overlay-runtime/`; it is not broad
+  protocol-state persistence.
 - Bootstrap remains static signed JSON served over `http://`; trust comes from
   pinned signer keys with optional SHA-256 artifact pins rather than HTTPS or
   a public trust root.
@@ -247,7 +252,7 @@ Workflow:
 - Relay quotas and most service-open policy are still code-level defaults rather
   than a rich operator-configurable surface.
 
-## Remaining limitations after Milestone 24
+## Remaining limitations after Milestone 25
 
 - Run and attach the off-box pilot report for the exact commit being signed
   off; the localhost checklist is necessary but not sufficient evidence for a

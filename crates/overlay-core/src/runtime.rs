@@ -268,6 +268,11 @@ pub struct NodeRuntimeRecoverySnapshot {
     pub restored_from_peer_cache: bool,
     pub restored_active_peers: usize,
     pub recoverable_active_peers: usize,
+    pub restored_preferred_bootstrap_source: bool,
+    pub recoverable_preferred_bootstrap_source_index: Option<usize>,
+    pub restored_service_intents: usize,
+    pub recoverable_service_intents: usize,
+    pub failed_service_intents: usize,
     pub last_recovered_unix_ms: Option<u64>,
 }
 
@@ -292,6 +297,17 @@ pub struct RuntimeRecoveryState {
     pub node_id: NodeId,
     pub saved_at_unix_ms: u64,
     pub active_neighbors: Vec<NeighborStateEntry>,
+    #[serde(default)]
+    pub preferred_bootstrap_source_index: Option<usize>,
+    #[serde(default)]
+    pub local_service_intents: Vec<LocalServiceIntent>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LocalServiceIntent {
+    pub app_namespace: String,
+    pub service_name: String,
+    pub service_version: String,
 }
 
 #[derive(Debug, Error)]
@@ -545,6 +561,7 @@ pub struct NodeRuntime {
     cleanup_totals: RuntimeCleanupTotals,
     bootstrap_status: BootstrapRuntimeStatus,
     recovery_snapshot: NodeRuntimeRecoverySnapshot,
+    local_service_intents: BTreeMap<(String, String), LocalServiceIntent>,
 }
 
 impl NodeRuntime {
@@ -567,6 +584,7 @@ impl NodeRuntime {
                 ..BootstrapRuntimeStatus::default()
             },
             recovery_snapshot: NodeRuntimeRecoverySnapshot::default(),
+            local_service_intents: BTreeMap::new(),
         };
         runtime.log_state_transition(current_unix_ms(), NodeRuntimeState::Init);
         runtime
@@ -662,10 +680,12 @@ impl NodeRuntime {
 
     pub fn recovery_state_snapshot(&self, timestamp_unix_ms: u64) -> RuntimeRecoveryState {
         RuntimeRecoveryState {
-            version: 1,
+            version: 2,
             node_id: self.context.node_id,
             saved_at_unix_ms: timestamp_unix_ms,
             active_neighbors: self.context.peer_store.active_neighbor_entries(),
+            preferred_bootstrap_source_index: self.preferred_bootstrap_source_index,
+            local_service_intents: self.local_service_intents.values().cloned().collect(),
         }
     }
 
@@ -709,6 +729,11 @@ impl NodeRuntime {
                     timestamp_unix_ms,
                 ),
             )?;
+        self.remember_local_service_intent(LocalServiceIntent {
+            app_namespace: app_namespace.to_string(),
+            service_name: service_name.to_string(),
+            service_version: service_version.to_string(),
+        });
         Ok(record)
     }
 
@@ -729,11 +754,13 @@ impl NodeRuntime {
         self.log_state_transition(timestamp_unix_ms, NodeRuntimeState::Bootstrapping);
 
         self.bind_tcp_listener(timestamp_unix_ms)?;
+        self.restore_bootstrap_source_preference(recovery_state, timestamp_unix_ms);
         let now_unix_s = unix_ms_to_s(timestamp_unix_ms);
         let accepted_sources = self.refresh_bootstrap_sources(timestamp_unix_ms, now_unix_s)?;
         if accepted_sources == 0 {
-            self.restore_recovery_state(recovery_state, timestamp_unix_ms, now_unix_s);
+            self.restore_peer_cache_recovery_state(recovery_state, timestamp_unix_ms, now_unix_s);
         }
+        self.restore_local_service_intents(recovery_state, timestamp_unix_ms);
         self.sync_active_peer_gauge();
         self.sync_operating_state(timestamp_unix_ms);
         Ok(())
@@ -1189,6 +1216,15 @@ impl NodeRuntime {
             restored_from_peer_cache: self.recovery_snapshot.restored_from_peer_cache,
             restored_active_peers: self.recovery_snapshot.restored_active_peers,
             recoverable_active_peers: self.context.peer_store.active_neighbors().count(),
+            restored_preferred_bootstrap_source: self
+                .recovery_snapshot
+                .restored_preferred_bootstrap_source,
+            recoverable_preferred_bootstrap_source_index: self
+                .recovery_snapshot
+                .recoverable_preferred_bootstrap_source_index,
+            restored_service_intents: self.recovery_snapshot.restored_service_intents,
+            recoverable_service_intents: self.recovery_snapshot.recoverable_service_intents,
+            failed_service_intents: self.recovery_snapshot.failed_service_intents,
             last_recovered_unix_ms: self.recovery_snapshot.last_recovered_unix_ms,
         }
     }
@@ -1311,7 +1347,84 @@ impl NodeRuntime {
         Ok(accepted_sources)
     }
 
-    fn restore_recovery_state(
+    fn restore_bootstrap_source_preference(
+        &mut self,
+        recovery_state: Option<&RuntimeRecoveryState>,
+        timestamp_unix_ms: u64,
+    ) {
+        let Some(recovery_state) = recovery_state else {
+            self.context.observability.push_log(
+                allocate_log_context(
+                    &mut self.next_correlation_id,
+                    self.context.node_id,
+                    timestamp_unix_ms,
+                ),
+                LogComponent::Runtime,
+                "bootstrap_source_recovery",
+                "none",
+            );
+            return;
+        };
+        if recovery_state.node_id != self.context.node_id {
+            self.context.observability.push_log(
+                allocate_log_context(
+                    &mut self.next_correlation_id,
+                    self.context.node_id,
+                    timestamp_unix_ms,
+                ),
+                LogComponent::Runtime,
+                "bootstrap_source_recovery",
+                "rejected_node_id_mismatch",
+            );
+            return;
+        }
+
+        let Some(source_index) = recovery_state.preferred_bootstrap_source_index else {
+            self.context.observability.push_log(
+                allocate_log_context(
+                    &mut self.next_correlation_id,
+                    self.context.node_id,
+                    timestamp_unix_ms,
+                ),
+                LogComponent::Runtime,
+                "bootstrap_source_recovery",
+                "none",
+            );
+            return;
+        };
+
+        self.recovery_snapshot
+            .recoverable_preferred_bootstrap_source_index = Some(source_index);
+        if source_index >= self.bootstrap_sources.len() {
+            self.context.observability.push_log(
+                allocate_log_context(
+                    &mut self.next_correlation_id,
+                    self.context.node_id,
+                    timestamp_unix_ms,
+                ),
+                LogComponent::Runtime,
+                "bootstrap_source_recovery",
+                "rejected_out_of_range",
+            );
+            return;
+        }
+
+        self.preferred_bootstrap_source_index = Some(source_index);
+        self.recovery_snapshot.restored_preferred_bootstrap_source = true;
+        self.recovery_snapshot.last_recovered_unix_ms = Some(timestamp_unix_ms);
+        self.context.observability.push_log(
+            allocate_log_context(
+                &mut self.next_correlation_id,
+                self.context.node_id,
+                timestamp_unix_ms,
+            ),
+            LogComponent::Runtime,
+            "bootstrap_source_recovery",
+            "restored",
+        );
+    }
+
+    fn restore_peer_cache_recovery_state(
         &mut self,
         recovery_state: Option<&RuntimeRecoveryState>,
         timestamp_unix_ms: u64,
@@ -1376,6 +1489,102 @@ impl NodeRuntime {
             LogComponent::Runtime,
             "peer_cache_recovery",
             "restored",
+        );
+    }
+
+    fn restore_local_service_intents(
+        &mut self,
+        recovery_state: Option<&RuntimeRecoveryState>,
+        timestamp_unix_ms: u64,
+    ) {
+        let Some(recovery_state) = recovery_state else {
+            self.context.observability.push_log(
+                allocate_log_context(
+                    &mut self.next_correlation_id,
+                    self.context.node_id,
+                    timestamp_unix_ms,
+                ),
+                LogComponent::Runtime,
+                "service_intent_recovery",
+                "none",
+            );
+            return;
+        };
+        if recovery_state.node_id != self.context.node_id {
+            self.context.observability.push_log(
+                allocate_log_context(
+                    &mut self.next_correlation_id,
+                    self.context.node_id,
+                    timestamp_unix_ms,
+                ),
+                LogComponent::Runtime,
+                "service_intent_recovery",
+                "rejected_node_id_mismatch",
+            );
+            return;
+        }
+
+        self.recovery_snapshot.recoverable_service_intents =
+            recovery_state.local_service_intents.len();
+        if recovery_state.local_service_intents.is_empty() {
+            self.context.observability.push_log(
+                allocate_log_context(
+                    &mut self.next_correlation_id,
+                    self.context.node_id,
+                    timestamp_unix_ms,
+                ),
+                LogComponent::Runtime,
+                "service_intent_recovery",
+                "none",
+            );
+            return;
+        }
+
+        let mut restored = 0usize;
+        let mut failed = 0usize;
+        for intent in &recovery_state.local_service_intents {
+            match self.register_local_service(
+                &intent.app_namespace,
+                &intent.service_name,
+                &intent.service_version,
+                timestamp_unix_ms,
+            ) {
+                Ok(_) => {
+                    restored = restored.saturating_add(1);
+                }
+                Err(_) => {
+                    failed = failed.saturating_add(1);
+                }
+            }
+        }
+
+        self.recovery_snapshot.restored_service_intents = restored;
+        self.recovery_snapshot.failed_service_intents = failed;
+        if restored > 0 {
+            self.recovery_snapshot.last_recovered_unix_ms = Some(timestamp_unix_ms);
+        }
+        self.context.observability.push_log(
+            allocate_log_context(
+                &mut self.next_correlation_id,
+                self.context.node_id,
+                timestamp_unix_ms,
+            ),
+            LogComponent::Runtime,
+            "service_intent_recovery",
+            if failed > 0 && restored == 0 {
+                "rejected"
+            } else if failed > 0 {
+                "rejected_partial"
+            } else {
+                "restored"
+            },
+        );
+    }
+
+    fn remember_local_service_intent(&mut self, intent: LocalServiceIntent) {
+        self.local_service_intents.insert(
+            (intent.app_namespace.clone(), intent.service_name.clone()),
+            intent,
         );
     }
 
@@ -2898,7 +3107,7 @@ mod tests {
 
     use super::{
         sha256_hex, unix_ms_to_s, BootstrapSourceResult, NodeContext, NodeRuntime,
-        NodeRuntimeError, NodeRuntimeState, RuntimeTickSummary,
+        NodeRuntimeError, NodeRuntimeState, RuntimeRecoveryState, RuntimeTickSummary,
     };
     use crate::{
         bootstrap::{
@@ -3445,17 +3654,28 @@ mod tests {
         let good_config_path = dir.join("good-overlay-config.json");
         let recovery_config_path = dir.join("recovery-overlay-config.json");
         let bootstrap_path = dir.join("bootstrap.json");
-        let missing_bootstrap_path = dir.join("missing-bootstrap.json");
+        let recovery_secondary_bootstrap_path = dir.join("recovery-secondary-bootstrap.json");
         let signing_key = Ed25519SigningKey::from_seed([39_u8; 32]);
-        let mut config = sample_config("node.key", vec!["bootstrap.json".to_string()]);
+        let mut config = sample_config(
+            "node.key",
+            vec![
+                "priming-missing-bootstrap.json".to_string(),
+                "bootstrap.json".to_string(),
+            ],
+        );
         config.presence_ttl_s = 20;
 
         fs::write(&key_path, signing_key.as_bytes()).expect("key file should be written");
         write_json(&bootstrap_path, &sample_bootstrap_response())
             .expect("bootstrap file should be written");
         write_json(&good_config_path, &config).expect("config file should be written");
-        let mut recovery_config =
-            sample_config("node.key", vec!["missing-bootstrap.json".to_string()]);
+        let mut recovery_config = sample_config(
+            "node.key",
+            vec![
+                "recovery-primary-bootstrap.json".to_string(),
+                "recovery-secondary-bootstrap.json".to_string(),
+            ],
+        );
         recovery_config.presence_ttl_s = 20;
         write_json(&recovery_config_path, &recovery_config)
             .expect("recovery config should be written");
@@ -3465,8 +3685,13 @@ mod tests {
         primed_runtime
             .startup(START_UNIX_MS)
             .expect("startup should bootstrap successfully");
+        primed_runtime
+            .register_local_service("devnet", "terminal", "1.2.3", START_UNIX_MS + 1)
+            .expect("local service should register");
         let recovery_state = primed_runtime.recovery_state_snapshot(START_UNIX_MS + 1);
         assert_eq!(recovery_state.active_neighbors.len(), 3);
+        assert_eq!(recovery_state.preferred_bootstrap_source_index, Some(1));
+        assert_eq!(recovery_state.local_service_intents.len(), 1);
 
         let mut recovered_runtime = NodeRuntime::from_config_path(&recovery_config_path)
             .expect("runtime should load from recovery config");
@@ -3477,9 +3702,46 @@ mod tests {
         let recovered_health = recovered_runtime.health_snapshot();
         assert_eq!(recovered_runtime.state(), NodeRuntimeState::Running);
         assert_eq!(recovered_health.bootstrap.last_accepted_sources, 0);
+        assert_eq!(recovered_health.bootstrap.last_sources.len(), 2);
+        assert_eq!(recovered_health.bootstrap.last_sources[0].source_index, 1);
         assert!(recovered_health.recovery.restored_from_peer_cache);
         assert_eq!(recovered_health.recovery.restored_active_peers, 3);
+        assert!(
+            recovered_health
+                .recovery
+                .restored_preferred_bootstrap_source
+        );
+        assert_eq!(
+            recovered_health
+                .recovery
+                .recoverable_preferred_bootstrap_source_index,
+            Some(1)
+        );
+        assert_eq!(recovered_health.recovery.recoverable_service_intents, 1);
+        assert_eq!(recovered_health.recovery.restored_service_intents, 1);
+        assert_eq!(recovered_health.recovery.failed_service_intents, 0);
+        assert_eq!(recovered_health.services.registered_services, 1);
         assert_eq!(recovered_runtime.snapshot().active_peers, 3);
+        assert!(recovered_runtime
+            .context()
+            .observability()
+            .logs()
+            .iter()
+            .any(|entry| {
+                entry.component == crate::metrics::LogComponent::Runtime
+                    && entry.event == "bootstrap_source_recovery"
+                    && entry.result == "restored"
+            }));
+        assert!(recovered_runtime
+            .context()
+            .observability()
+            .logs()
+            .iter()
+            .any(|entry| {
+                entry.component == crate::metrics::LogComponent::Runtime
+                    && entry.event == "service_intent_recovery"
+                    && entry.result == "restored"
+            }));
         assert!(recovered_runtime
             .context()
             .observability()
@@ -3496,8 +3758,11 @@ mod tests {
             .expect("tick before retry window should succeed");
         assert!(!early_retry.bootstrap_retry_attempted);
 
-        write_json(&missing_bootstrap_path, &sample_bootstrap_response())
-            .expect("bootstrap file should be written before retry");
+        write_json(
+            &recovery_secondary_bootstrap_path,
+            &sample_bootstrap_response(),
+        )
+        .expect("bootstrap file should be written before retry");
         let recovered = recovered_runtime
             .tick(START_UNIX_MS + 5_002)
             .expect("running runtime should still retry bootstrap after peer-cache recovery");
@@ -3512,6 +3777,26 @@ mod tests {
                 .total_successes,
             1
         );
+        assert_eq!(
+            recovered_runtime.health_snapshot().bootstrap.last_sources[0].source_index,
+            1
+        );
+    }
+
+    #[test]
+    fn recovery_state_deserializes_legacy_payload_without_service_or_bootstrap_fields() {
+        let recovery_state = serde_json::from_value::<RuntimeRecoveryState>(serde_json::json!({
+            "version": 1,
+            "node_id": NodeId::from_bytes([0x42; 32]),
+            "saved_at_unix_ms": START_UNIX_MS,
+            "active_neighbors": [],
+        }))
+        .expect("legacy recovery payload should deserialize");
+
+        assert_eq!(recovery_state.version, 1);
+        assert!(recovery_state.active_neighbors.is_empty());
+        assert_eq!(recovery_state.preferred_bootstrap_source_index, None);
+        assert!(recovery_state.local_service_intents.is_empty());
     }
 
     #[test]

@@ -1,7 +1,7 @@
 # Pilot Runbook
 
-This runbook defines the current Milestone 24
-bootstrap-trust-delivery-hardening distributed exercise.
+This runbook defines the current Milestone 25
+runtime-persistence-recovery-hardening distributed exercise.
 
 It extends the landed Milestone 18 pilot pack with minimal distributed
 operator surfaces, two relay-capable fallback paths, conservative bootstrap
@@ -47,9 +47,10 @@ Current pilot limits remain in force:
   system;
 - lookup remains exact-by-`node_id` only and service resolution remains
   exact-by-`app_id` only;
-- only the last-known active bootstrap peers are recovered across restart;
-  presence, services, sessions, relay tunnels, and path probes still remain
-  in-memory runtime state;
+- restart recovery is bounded to persisted bootstrap-source preference,
+  last-known active bootstrap peers, and local service registration intent;
+  presence, service-open sessions, relay tunnels, and path probes still
+  remain in-memory runtime state;
 - this runbook still does not claim hostile-environment or public-Internet
   deployment readiness.
 
@@ -285,8 +286,9 @@ Record all eleven scenarios in the pilot report:
 
    - `node-b` is restarted after the baseline publish/lookup flow
    - expected outcome: the service host comes back cleanly, `startup_count`
-     increases, `open-service` succeeds again after restart, and the alternate
-     relay path binds again
+     increases, its persisted local service intent is restored without
+     re-passing `--service`, `open-service` succeeds again after restart, and
+     the alternate relay path binds again
 
 7. `integrity-mismatch-fallback`
 
@@ -343,17 +345,18 @@ Record all eleven scenarios in the pilot report:
 - service restart evidence from the persisted status JSON
 - tampered-bootstrap integrity-mismatch logs
 
-## Remaining limitations after Milestone 24
+## Remaining limitations after Milestone 25
 
-- The localhost acceptance pack is the current Milestone 24 green path, but it still
+- The localhost acceptance pack is the current Milestone 25 green path, but it still
   does not replace the required off-box pilot evidence on separate hosts for a
   release note.
 - Bootstrap remains static signed artifact delivery over `http://`; operators
   must keep the signer pin and any `#sha256=<hex>` URLs synchronized manually.
 - The distributed operator commands remain one-shot proof surfaces, not a
   general control plane or distributed discovery layer.
-- Runtime peers, presence, services, sessions, relay tunnels, and path probes
-  still reset on restart except for the bounded active-peer bootstrap cache.
+- Presence, service-open sessions, relay tunnels, and path probes still reset
+  on restart except for the bounded bootstrap-source, active-peer, and local
+  service-intent recovery state.
 - Relay proof remains bounded to the checked-in two-relay topology rather than
   arbitrary relay graphs or public-network conditions.
 

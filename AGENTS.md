@@ -86,7 +86,7 @@ Do not add by default:
   conservative bootstrap retry, runtime health snapshots, status dumps, and the
   logical soak path.
 - The current repository stage marker is
-  `milestone-24-bootstrap-trust-delivery-hardening`.
+  `milestone-25-runtime-persistence-recovery-hardening`.
 - Milestone 14 launch gate and pilot tag remains part of the landed pilot
   baseline.
 - Milestone 16 network bootstrap and multi-host devnet is implemented with
@@ -126,18 +126,24 @@ Do not add by default:
   first-user-ready acceptance scenarios, fresh-node-join and
   relay-unavailable-service-open proof inside the distributed checklist, and
   synchronized first-user-ready boundary docs.
-- Milestone 24 bootstrap trust and delivery hardening is the current stage with
-  signed bootstrap artifacts served over static `http://` sources, pinned
-  `ed25519=<hex>` signer trust roots with optional `sha256=<hex>` integrity
-  pins, richer bootstrap diagnostics for trust failures, and synchronized
-  operator/bootstrap docs. This stage still does not claim hostile-environment
-  or public-production readiness.
+- Milestone 24 bootstrap trust and delivery hardening remains part of the
+  landed baseline with signed bootstrap artifacts served over static `http://`
+  sources, pinned `ed25519=<hex>` signer trust roots with optional
+  `sha256=<hex>` integrity pins, richer bootstrap diagnostics for trust
+  failures, and synchronized operator/bootstrap docs. This stage still does
+  not claim hostile-environment or public-production readiness.
+- Milestone 25 runtime persistence and recovery hardening is the current stage
+  with bounded restart recovery of persisted bootstrap-source preference,
+  last-known active bootstrap peers, and local service registration intent,
+  explicit recovery fields on the status/doctor surfaces, updated restart
+  smoke/checklist proof, and synchronized recovery/runbook docs. This stage
+  still does not claim hostile-environment or public-production readiness.
 
 For normal work, touch Milestones 1-12 only for regression fixes, spec
 mismatches, vector maintenance, validation maintenance, or launch-maintenance
 updates unless the task explicitly reopens that stage. Treat current-stage work as narrow
-`milestone-24-bootstrap-trust-delivery-hardening` work, not as a restart from
-earlier milestones.
+`milestone-25-runtime-persistence-recovery-hardening` work, not as a restart
+from earlier milestones.
 
 ## 3. Change policy
 

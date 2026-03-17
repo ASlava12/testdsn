@@ -604,7 +604,7 @@ run_service_restart_scenario() {
   stop_process "${node_b_pid}"
   wait_for_lock_release "${old_node_b_pid}" "devnet/pilot/localhost/configs/node-b.json" "service host restart path"
   node_b_pid=""
-  node_b_pid="$(start_node "devnet/pilot/localhost/configs/node-b.json" "${node_b_log}" --service devnet:terminal)"
+  node_b_pid="$(start_node "devnet/pilot/localhost/configs/node-b.json" "${node_b_log}")"
   wait_for_runtime "${node_b_pid}" "devnet/pilot/localhost/configs/node-b.json" "${node_b_log}" '"event":"listen","result":"ok"'
   "${overlay_cli}" open-service \
     --config devnet/pilot/localhost/configs/node-a.json \
@@ -633,6 +633,9 @@ run_service_restart_scenario() {
     "${service_restart_status}" \
     "$(( ${previous_startup_count:-0} + 1 ))" \
     'service host restart status'
+  grep -q '"restored_service_intents":1' "${service_restart_status}"
+  grep -q '"recoverable_service_intents":1' "${service_restart_status}"
+  grep -q '"failed_service_intents":0' "${service_restart_status}"
 }
 
 run_integrity_fallback_check() {

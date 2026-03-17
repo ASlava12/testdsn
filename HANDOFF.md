@@ -13,7 +13,7 @@ A Codex-oriented handoff bundle containing:
 ## Current repository stage
 
 - The root `REPOSITORY_STAGE` marker and `overlay_core::REPOSITORY_STAGE` both
-  read `milestone-24-bootstrap-trust-delivery-hardening`.
+  read `milestone-25-runtime-persistence-recovery-hardening`.
 - Milestones 0-12 are a closed baseline in this repository, and Milestones
   14/16/17/18 are landed pilot-baseline work.
 - Milestone 17 operator-grade runtime hardening is part of the landed baseline
@@ -41,11 +41,15 @@ A Codex-oriented handoff bundle containing:
   with the bounded `./devnet/run-first-user-acceptance.sh` wrapper, explicit
   first-user-ready scenario coverage, and synchronized acceptance-boundary
   docs.
-- Milestone 24 bootstrap trust and delivery hardening is the current stage
-  with signed bootstrap artifacts, pinned signer-key verification with
-  optional SHA-256 integrity pins, `overlay-cli bootstrap-sign`,
-  `overlay-cli bootstrap-serve --signing-key-file`, trust-failure diagnostics,
-  and synchronized operator/bootstrap runbooks.
+- Milestone 24 bootstrap trust and delivery hardening remains part of the
+  landed baseline with signed bootstrap artifacts, pinned signer-key
+  verification with optional SHA-256 integrity pins, `overlay-cli
+  bootstrap-sign`, `overlay-cli bootstrap-serve --signing-key-file`,
+  trust-failure diagnostics, and synchronized operator/bootstrap runbooks.
+- Milestone 25 runtime persistence and recovery hardening is the current stage
+  with bounded recovery of persisted bootstrap-source preference, last-known
+  active bootstrap peers, and local service registration intent, explicit
+  recovery fields in status/doctor output, and updated restart proof paths.
 - The current validation green path is `./devnet/run-first-user-acceptance.sh`
   on the same commit after the applicable workspace validation commands.
 - Separate-host evidence is still required on the validated commit before
@@ -63,28 +67,29 @@ A Codex-oriented handoff bundle containing:
 scripts inside the current acceptance flow. `./devnet/run-pilot-checklist.sh`
 is retained only for the older Milestone 18 localhost rehearsal.
 
-## Remaining limitations after Milestone 24
+## Remaining limitations after Milestone 25
 
 - bootstrap remains static signed artifact delivery over `http://`
 - distributed operator commands remain one-shot proof surfaces, not a general
   control plane
-- only the last-known active bootstrap peers are recovered across restart;
-  presence, services, sessions, relay tunnels, and path probes still reset
+- restart recovery stays bounded to bootstrap-source state, last-known active
+  bootstrap peers, and local service registration intent; presence, service
+  sessions, relay tunnels, and path probes still reset
 - relay fallback proof remains bounded to the checked-in two-relay pilot pack
 - off-box evidence is still required on separate hosts for the exact release
   commit before claiming first-user-ready status
 
 ## Recommended first Codex task
 
-Use `prompts/codex-milestone-24.md` as the first task prompt for the current
-`milestone-24-bootstrap-trust-delivery-hardening` stage. It assumes the repository already has a
+Use `prompts/codex-milestone-25.md` as the first task prompt for the current
+`milestone-25-runtime-persistence-recovery-hardening` stage. It assumes the repository already has a
 closed Milestone 1-12 baseline and does not need to restart from Milestone
 0/1/2.
 
 ## Recommended workflow
 
 1. Confirm from `README.md`, `AGENTS.md`, and `IMPLEMENT.md` that the current
-   stage is `milestone-24-bootstrap-trust-delivery-hardening`.
+   stage is `milestone-25-runtime-persistence-recovery-hardening`.
 2. Do not restart from Milestone 0/1/2; treat Milestones 1-12 as
    regression-fix, vector-maintenance, validation-maintenance, and
    launch-maintenance territory only unless the task explicitly reopens them.

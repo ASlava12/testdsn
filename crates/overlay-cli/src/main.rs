@@ -1572,6 +1572,22 @@ fn build_doctor_report(config_path: &Path) -> (DoctorReport, u8) {
             .pointer("/health/recovery/restored_from_peer_cache")
             .and_then(Value::as_bool)
             .unwrap_or(false);
+        let restored_service_intents = status
+            .pointer("/health/recovery/restored_service_intents")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let recoverable_service_intents = status
+            .pointer("/health/recovery/recoverable_service_intents")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let failed_service_intents = status
+            .pointer("/health/recovery/failed_service_intents")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let registered_services = status
+            .pointer("/health/services/registered_services")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
         let recent_failures = status
             .pointer("/summary/recent_failures")
             .and_then(Value::as_array)
@@ -1674,6 +1690,33 @@ fn build_doctor_report(config_path: &Path) -> (DoctorReport, u8) {
             }
         };
         checks.push(bootstrap_check);
+
+        let service_recovery_check = if failed_service_intents > 0 {
+            result.escalate(DoctorResult::Warn);
+            DoctorCheck {
+                name: "service_recovery",
+                result: DoctorResult::Warn,
+                detail: format!(
+                    "recovered {restored_service_intents} of {recoverable_service_intents} persisted local service intent(s); {failed_service_intents} intent(s) still need manual re-registration"
+                ),
+            }
+        } else if recoverable_service_intents > 0 {
+            DoctorCheck {
+                name: "service_recovery",
+                result: DoctorResult::Ok,
+                detail: format!(
+                    "recovered {restored_service_intents} persisted local service intent(s); runtime currently has {registered_services} registered local service(s)"
+                ),
+            }
+        } else {
+            DoctorCheck {
+                name: "service_recovery",
+                result: DoctorResult::Ok,
+                detail: "no persisted local service intents were available for restart recovery"
+                    .to_string(),
+            }
+        };
+        checks.push(service_recovery_check);
 
         if recovered_from_unclean_shutdown {
             result.escalate(DoctorResult::Warn);

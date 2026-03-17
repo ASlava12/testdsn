@@ -1,7 +1,7 @@
 # Devnet
 
 This directory contains the checked-in devnet and pilot assets for the current
-Milestone 24 stage:
+Milestone 25 stage:
 
 - the original four-node local-file devnet under `configs/` and `bootstrap/`
 - the host-style multi-host devnet layouts under `hosts/`
@@ -28,7 +28,7 @@ Nodes:
 - `run-distributed-smoke.sh`: wrapper around the minimal multi-process localhost TCP smoke
 - `run-multihost-smoke.sh`: wrapper around the host-style network-bootstrap smoke
 - `run-distributed-pilot-checklist.sh`: wrapper around the current distributed pilot checklist
-- `run-first-user-acceptance.sh`: wrapper around the current Milestone 24
+- `run-first-user-acceptance.sh`: wrapper around the current Milestone 25
   first-user acceptance flow
 - `run-pilot-checklist.sh`: retained Milestone 18 localhost rehearsal pack,
   not the current sign-off path
@@ -134,6 +134,8 @@ This is the current localhost sign-off path after `./devnet/run-launch-gate.sh`.
   publish/lookup/service/relay steps
 - the distributed operator flows are explicit point-to-point CLI surfaces, not
   a general distributed control plane
-- restart recovery is bounded to the last-known active bootstrap peers only
+- restart recovery is bounded to persisted bootstrap-source preference,
+  last-known active bootstrap peers, and local service registration intent
+  only
 - lookup is still exact-by-`node_id` only, and service resolution is still
   exact-by-`app_id` only

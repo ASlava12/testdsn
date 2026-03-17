@@ -1,7 +1,7 @@
 # First-User Acceptance
 
-This document defines the current Milestone 24
-bootstrap-trust-delivery-hardening acceptance boundary.
+This document defines the current Milestone 25
+runtime-persistence-recovery-hardening acceptance boundary.
 
 It is the bounded basis for describing the repository as sufficiently working
 for first users. It is not a public-production or hostile-environment claim.
@@ -70,8 +70,10 @@ The current first-user-ready claim is bounded to these scenarios:
 8. `ordinary-restart-recovery`
    - a node receives an ordinary `SIGTERM` shutdown;
    - persisted status remains readable;
-   - the next startup recovers usable peer state through the bounded
-     peer-cache path;
+   - the next startup recovers usable bootstrap/source state through the
+     bounded bootstrap-source-preference plus peer-cache path;
+   - persisted local service registration intent is restored when it was
+     present before shutdown;
    - later startup state remains explicitly marked as recovered.
 
 9. `stale-presence-and-expired-state-recovery`
@@ -104,8 +106,9 @@ These outcomes are part of the current honest acceptance boundary:
   source;
 - a tampered bootstrap artifact with a bad `#sha256=<pin>` is expected to
   report `integrity_mismatch` and may leave startup degraded;
-- restart does not preserve presence records, registered services, sessions,
-  relay tunnels, or path probes beyond the bounded active-bootstrap-peer cache.
+- restart does not preserve presence records, service-open sessions, relay
+  tunnels, or path probes beyond the bounded bootstrap-source, active-peer,
+  and local-service-intent recovery state.
 
 ## First-user ready boundary
 
