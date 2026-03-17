@@ -8,11 +8,11 @@ The repository has a closed Milestone 1-12 baseline, a landed Milestone 14
 pilot launch gate, a landed Milestone 16 network-bootstrap stage, a landed
 Milestone 17 operator-runtime stage, a landed Milestone 18 real-pilot stage,
 the landed Milestone 20 regular-distributed-use-closure stage, and the current
-Milestone 25 runtime-persistence-recovery-hardening stage.
+Milestone 26 bounded-operator-control-plane stage.
 The current repository stage marker is
-`milestone-25-runtime-persistence-recovery-hardening`.
+`milestone-26-bounded-operator-control-plane`.
 
-## Current recovery-hardening green path
+## Current operator-surface green path
 
 Treat the current stage as having one localhost sign-off flow:
 
@@ -217,6 +217,13 @@ remains a retained Milestone 18 localhost rehearsal only.
   status/doctor surfaces, and updated restart-focused proof paths. The
   repository stage marker now advances to
   `milestone-25-runtime-persistence-recovery-hardening`.
+- Milestone 26 bounded-operator-control-plane support is now implemented in
+  `crates/overlay-cli/src/main.rs`, `devnet/run-multihost-smoke.sh`, and the
+  synchronized operator/runbook docs, with `overlay-cli inspect`, bounded
+  machine-readable operator reports that combine local status/doctor data with
+  explicit remote lookup/open-service/relay-intro probes, and updated host-style
+  smoke coverage for that operator surface. The repository stage marker now
+  advances to `milestone-26-bounded-operator-control-plane`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -224,8 +231,8 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Use `prompts/codex-milestone-25.md` as the recommended next-task prompt for the
-current `milestone-25-runtime-persistence-recovery-hardening` stage and keep
+Use `prompts/codex-milestone-26.md` as the recommended next-task prompt for the
+current `milestone-26-bounded-operator-control-plane` stage and keep
 work conservative from the current first-user-ready boundary:
 
 1. preserve the current launch surface documented in
@@ -234,7 +241,7 @@ work conservative from the current first-user-ready boundary:
 2. keep Milestones 1-12 limited to regression fixes, launch-maintenance
    updates, vector maintenance, or conservative spec-conformance fixes;
 3. prefer pilot execution support, validation maintenance, documentation sync,
-   and operator-surface hardening over feature expansion;
+   and bounded operator-surface hardening over feature expansion;
 4. rerun the documented first-user acceptance flow whenever `REPOSITORY_STAGE`,
    `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, `VALIDATION.md`,
    `docs/FIRST_USER_ACCEPTANCE.md`, launch docs, pilot docs, or current-stage

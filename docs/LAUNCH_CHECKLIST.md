@@ -1,13 +1,13 @@
 # Launch Checklist
 
 This checklist defines the landed Milestone 17 operator-runtime gate that
-remains the first component of the current Milestone 25
-runtime-persistence-recovery-hardening stage.
+remains the first component of the current Milestone 26
+bounded-operator-control-plane stage.
 
 It is a pilot gate, not a public-production or hostile-Internet readiness
 claim.
 
-For current Milestone 25 sign-off, the bounded acceptance flow is
+For current Milestone 26 sign-off, the bounded acceptance flow is
 `./devnet/run-first-user-acceptance.sh` on the same commit after the
 applicable workspace validation commands.
 
@@ -37,9 +37,11 @@ The current launchable MVP surface is frozen to:
 - structured logs, runtime health snapshots, and bounded counters;
 - `overlay-cli run`, `overlay-cli status`, `overlay-cli status --summary`, and
   `overlay-cli doctor` for single-node inspection;
+- `overlay-cli inspect` for one machine-readable operator report that combines
+  local persisted status/doctor data with explicit requested remote probes;
 - `overlay-cli run --service` for bounded local service registration;
 - `overlay-cli publish`, `lookup`, `open-service`, and `relay-intro` as
-  one-shot distributed operator surfaces;
+  explicit distributed operator surfaces;
 - `overlay-cli bootstrap-serve` for static devnet seed serving;
 - the checked-in devnet layouts, launch gate, and regular-distributed-use
   checklist.
@@ -98,7 +100,8 @@ Pass criteria:
 - the distributed smoke reaches `distributed_smoke_complete`;
 - the multi-host smoke reaches `smoke_complete`;
 - the multi-host smoke includes networked `publish_presence`, `lookup_node`,
-  `open_service`, `relay_fallback_planned`, and `relay_fallback_bound`;
+  `open_service`, `relay_fallback_planned`, `relay_fallback_bound`, and an
+  `operator_inspect` report with `result=ok`;
 - the bounded soak completes with cleanup and presence-refresh checks;
 - the doctor smoke proves `overlay-cli doctor` returns `0` and reports a
   healthy running runtime;
@@ -153,9 +156,10 @@ Pass criteria:
   ports or pins with `devnet/pilot/examples/`.
 - The checked-in pilot pack assumes three static bootstrap seed servers and one
   service host: `node-b` must start with `--service devnet:terminal`.
-- The distributed operator commands are explicit point-to-point CLI calls to a
-  chosen runtime listener; they do not auto-discover targets or route a
-  control plane through the overlay.
+- The distributed operator surfaces are explicit CLI calls to chosen runtime
+  listeners; `overlay-cli inspect` may bundle multiple requested probes, but
+  it still does not auto-discover targets or route a control plane through the
+  overlay.
 - If any bootstrap JSON changes, every referencing
   `http://...#ed25519=<pin>` config entry must still trust the intended
   signer, and every `#sha256=<pin>` value must be recomputed before the pilot
@@ -239,8 +243,10 @@ Workflow:
   a public trust root.
 - `overlay-cli bootstrap-serve` is a devnet seed server, not a public bootstrap
   service or trust framework.
-- The distributed operator commands are bounded one-shot CLI surfaces, not a
-  general distributed control plane, discovery layer, or rollout system.
+- The distributed operator surfaces remain bounded explicit CLI flows.
+  `overlay-cli inspect` bundles local state plus requested remote probes, but
+  it is not a general distributed control plane, discovery layer, or rollout
+  system.
 - The multi-host smoke and the distributed pilot checklist prove point-to-point
   networked operator flows only; they do not imply autonomous routing of those
   control messages through arbitrary peers.
@@ -252,7 +258,7 @@ Workflow:
 - Relay quotas and most service-open policy are still code-level defaults rather
   than a rich operator-configurable surface.
 
-## Remaining limitations after Milestone 25
+## Remaining limitations after Milestone 26
 
 - Run and attach the off-box pilot report for the exact commit being signed
   off; the localhost checklist is necessary but not sufficient evidence for a
@@ -263,9 +269,10 @@ Workflow:
 - Keep the current localhost sign-off path anchored on
   `./devnet/run-distributed-pilot-checklist.sh`; the older
   `./devnet/run-pilot-checklist.sh` remains a historical rehearsal only.
-- Treat the distributed operator commands as explicit proof surfaces only; they
-  are not a general distributed control plane, orchestration layer, or
-  discovery system.
+- Treat the distributed operator surfaces as bounded proof flows only;
+  `overlay-cli inspect` improves repeatable operator checks, but it is not a
+  general distributed control plane, orchestration layer, or discovery
+  system.
 - Expect restart loss of presence, service-open state, relay tunnels, and path
   probes until durable protocol-state persistence is explicitly added.
 - Treat the checked-in two-relay topology as the only proven relay closure

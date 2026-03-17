@@ -38,7 +38,7 @@ and the carried-forward distributed pilot pack under
 - [devnet/run-distributed-pilot-checklist.sh](../devnet/run-distributed-pilot-checklist.sh):
   wrapper for the current distributed pilot checklist
 - [devnet/run-first-user-acceptance.sh](../devnet/run-first-user-acceptance.sh):
-  wrapper for the current Milestone 25 first-user acceptance flow
+  wrapper for the current Milestone 26 first-user acceptance flow
 - [devnet/run-doctor-smoke.sh](../devnet/run-doctor-smoke.sh):
   wrapper for the landed Milestone 21 doctor/self-check surface
 - [devnet/run-pilot-checklist.sh](../devnet/run-pilot-checklist.sh):
@@ -92,7 +92,8 @@ Optional evidence-preserving form:
 
 This starts three static bootstrap seed servers with signed `overlay-cli
 bootstrap-serve --signing-key-file ...`, then starts the host-style runtimes from
-`devnet/hosts/localhost` and drives networked operator commands across them.
+`devnet/hosts/localhost` and drives networked operator commands plus one
+bundled `overlay-cli inspect` report across them.
 
 Expected additions beyond the local smoke:
 
@@ -100,7 +101,10 @@ Expected additions beyond the local smoke:
    with optional `#sha256=<pin>` integrity checks rather than local files;
 2. the session step uses the configured TCP listeners;
 3. `publish`, `lookup`, `open-service`, and `relay-intro` all complete over
-   real runtime sessions instead of local in-process injection.
+   real runtime sessions instead of local in-process injection;
+4. `overlay-cli inspect` emits one machine-readable report that bundles local
+   status/doctor data with explicit lookup, service-open, and relay-intro
+   probes.
 
 ## Distributed pilot checklist
 
@@ -184,6 +188,13 @@ that node's persisted state:
 TMPDIR=/tmp cargo run -p overlay-cli -- doctor --config devnet/configs/node-a.json
 ```
 
+Use `overlay-cli inspect` when you want that same local operator context plus
+explicit remote checks in one report:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- inspect --config devnet/hosts/localhost/configs/node-a.json --lookup tcp://127.0.0.1:4101,1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b --open-service tcp://127.0.0.1:4102,1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b,devnet,terminal --relay-intro tcp://127.0.0.1:4199,16f52d6fea63ef086405aa71b537dd4833bd0b36ffe054be0fd07fb525af157d,83561adb398fd87f8e7ed8331bff2fcb945733cc3012879cb9fab07928667062
+```
+
 ## Devnet limits
 
 - Bootstrap remains static signed JSON served over `http://`; trust comes from
@@ -191,8 +202,9 @@ TMPDIR=/tmp cargo run -p overlay-cli -- doctor --config devnet/configs/node-a.js
   or a public trust root.
 - The local `run-smoke.sh` path remains repo-local and still uses the checked-in
   harness for publish/lookup/service/relay orchestration.
-- The distributed operator commands are explicit point-to-point CLI calls, not
-  a persistent control plane or discovery system.
+- The distributed operator surfaces are explicit CLI calls. `overlay-cli
+  inspect` may bundle requested probes, but it is not a persistent control
+  plane or discovery system.
 - Restart recovery is bounded to persisted bootstrap-source preference,
   last-known active bootstrap peers, and local service registration intent
   only; the devnet does not imply full durable protocol-state persistence.

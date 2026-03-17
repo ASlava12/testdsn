@@ -47,6 +47,7 @@ publish_log="${tmpdir}/publish.log"
 lookup_log="${tmpdir}/lookup.log"
 service_log="${tmpdir}/service.log"
 relay_intro_log="${tmpdir}/relay-intro.log"
+inspect_log="${tmpdir}/inspect.json"
 relay_status_log="${tmpdir}/relay-status.json"
 bootstrap_a_pid=""
 bootstrap_b_pid=""
@@ -64,6 +65,7 @@ cleanup() {
       "${lookup_log}" \
       "${service_log}" \
       "${relay_intro_log}" \
+      "${inspect_log}" \
       "${node_a_log}" \
       "${node_b_log}" \
       "${node_c_log}" \
@@ -257,17 +259,31 @@ echo "{\"step\":\"relay_fallback_planned\",\"client_node\":\"node-a\",\"target_n
   --requester-node-id "${node_a_id}" \
   >"${relay_intro_log}"
 
+"${overlay_cli}" inspect \
+  --config devnet/hosts/localhost/configs/node-a.json \
+  --lookup "tcp://127.0.0.1:4101,${node_b_id}" \
+  --open-service "tcp://127.0.0.1:4102,${node_b_id},devnet,terminal" \
+  --relay-intro "tcp://127.0.0.1:4199,${relay_node_id},${node_a_id}" \
+  >"${inspect_log}"
+
+grep -q '"kind":"operator_inspect"' "${inspect_log}"
+grep -q '"result":"ok"' "${inspect_log}"
+grep -q '"kind":"lookup"' "${inspect_log}"
+grep -q '"kind":"open_service"' "${inspect_log}"
+grep -q '"kind":"relay_intro"' "${inspect_log}"
+
 wait_for_status_pattern \
   "${relay_pid}" \
   "devnet/hosts/localhost/configs/node-relay.json" \
   "${relay_status_log}" \
-  '"active_tunnels":1' \
-  'relay tunnel bind'
+  '"relay_bind_total":[2-9]' \
+  'relay bind evidence'
 
 cat "${publish_log}"
 cat "${lookup_log}"
 cat "${service_log}"
 cat "${relay_intro_log}"
+cat "${inspect_log}"
 
 echo "{\"step\":\"smoke_complete\",\"result\":\"ok\",\"node_a_id\":\"${node_a_id}\",\"node_b_id\":\"${node_b_id}\",\"relay_node_id\":\"${relay_node_id}\"}"
 if [[ "${preserve_evidence}" == "yes" ]]; then

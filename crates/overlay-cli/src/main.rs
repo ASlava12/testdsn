@@ -44,16 +44,26 @@ fn main() -> ExitCode {
         }
     };
 
-    if let Command::Doctor { config_path } = command {
-        return doctor_command(config_path);
-    }
-
-    match execute_command(command) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("overlay-cli: {error}");
-            ExitCode::from(1)
-        }
+    match command {
+        Command::Doctor { config_path } => doctor_command(config_path),
+        Command::Inspect {
+            config_path,
+            lookup_checks,
+            open_service_checks,
+            relay_intro_checks,
+        } => inspect_command(
+            config_path,
+            lookup_checks,
+            open_service_checks,
+            relay_intro_checks,
+        ),
+        other => match execute_command(other) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("overlay-cli: {error}");
+                ExitCode::from(1)
+            }
+        },
     }
 }
 
@@ -128,6 +138,7 @@ fn execute_command(command: Command) -> Result<(), String> {
             signing_key_file,
             output_path,
         } => bootstrap_sign_command(&bootstrap_file, &signing_key_file, &output_path),
+        Command::Inspect { .. } => unreachable!("inspect is handled before execute_command"),
         Command::Publish {
             config_path,
             target,
@@ -185,6 +196,28 @@ struct LocalServiceSpec {
     service_version: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct InspectLookupSpec {
+    target: String,
+    node_id: NodeId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct InspectOpenServiceSpec {
+    target: String,
+    target_node_id: NodeId,
+    app_namespace: String,
+    service_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct InspectRelayIntroSpec {
+    target: String,
+    relay_node_id: NodeId,
+    requester_node_id: NodeId,
+    expires_in_s: u64,
+}
+
 #[derive(Debug, PartialEq, Eq)]
 enum Command {
     Stage,
@@ -221,6 +254,12 @@ enum Command {
         bootstrap_file: PathBuf,
         signing_key_file: PathBuf,
         output_path: PathBuf,
+    },
+    Inspect {
+        config_path: PathBuf,
+        lookup_checks: Vec<InspectLookupSpec>,
+        open_service_checks: Vec<InspectOpenServiceSpec>,
+        relay_intro_checks: Vec<InspectRelayIntroSpec>,
     },
     Publish {
         config_path: PathBuf,
@@ -270,6 +309,7 @@ fn parse_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, St
         "smoke" => parse_smoke_command(args),
         "bootstrap-serve" => parse_bootstrap_serve_command(args),
         "bootstrap-sign" => parse_bootstrap_sign_command(args),
+        "inspect" => parse_inspect_command(args),
         "publish" => parse_publish_command(args),
         "lookup" => parse_lookup_command(args),
         "open-service" => parse_open_service_command(args),
@@ -657,6 +697,113 @@ fn parse_bootstrap_sign_command(
     })
 }
 
+fn parse_inspect_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, String> {
+    let mut config_path = None;
+    let mut lookup_checks = Vec::new();
+    let mut open_service_checks = Vec::new();
+    let mut relay_intro_checks = Vec::new();
+    let mut args = args.into_iter();
+
+    while let Some(arg) = args.next() {
+        match arg.to_string_lossy().as_ref() {
+            "--config" => {
+                let Some(value) = args.next() else {
+                    return Err("--config requires a path".to_string());
+                };
+                config_path = Some(PathBuf::from(value));
+            }
+            "--lookup" => {
+                let Some(value) = args.next() else {
+                    return Err("--lookup requires tcp://host:port,<node-id-hex>".to_string());
+                };
+                lookup_checks.push(parse_inspect_lookup_spec(&value.to_string_lossy())?);
+            }
+            "--open-service" => {
+                let Some(value) = args.next() else {
+                    return Err(
+                        "--open-service requires tcp://host:port,<target-node-id-hex>,<namespace>,<name>"
+                            .to_string(),
+                    );
+                };
+                open_service_checks
+                    .push(parse_inspect_open_service_spec(&value.to_string_lossy())?);
+            }
+            "--relay-intro" => {
+                let Some(value) = args.next() else {
+                    return Err(
+                        "--relay-intro requires tcp://host:port,<relay-node-id-hex>,<requester-node-id-hex>[,<expires-in-s>]"
+                            .to_string(),
+                    );
+                };
+                relay_intro_checks.push(parse_inspect_relay_intro_spec(&value.to_string_lossy())?);
+            }
+            "-h" | "--help" => return Ok(Command::Help),
+            other => return Err(format!("unknown inspect flag '{other}'")),
+        }
+    }
+
+    Ok(Command::Inspect {
+        config_path: config_path.ok_or_else(|| "inspect requires --config <path>".to_string())?,
+        lookup_checks,
+        open_service_checks,
+        relay_intro_checks,
+    })
+}
+
+fn parse_inspect_lookup_spec(value: &str) -> Result<InspectLookupSpec, String> {
+    let fields = parse_csv_fields(value, 2, "--lookup requires tcp://host:port,<node-id-hex>")?;
+    Ok(InspectLookupSpec {
+        target: fields[0].to_string(),
+        node_id: parse_node_id_hex(fields[1])?,
+    })
+}
+
+fn parse_inspect_open_service_spec(value: &str) -> Result<InspectOpenServiceSpec, String> {
+    let fields = parse_csv_fields(
+        value,
+        4,
+        "--open-service requires tcp://host:port,<target-node-id-hex>,<namespace>,<name>",
+    )?;
+    Ok(InspectOpenServiceSpec {
+        target: fields[0].to_string(),
+        target_node_id: parse_node_id_hex(fields[1])?,
+        app_namespace: fields[2].to_string(),
+        service_name: fields[3].to_string(),
+    })
+}
+
+fn parse_inspect_relay_intro_spec(value: &str) -> Result<InspectRelayIntroSpec, String> {
+    let fields: Vec<&str> = value.split(',').map(str::trim).collect();
+    if !(fields.len() == 3 || fields.len() == 4) || fields.iter().any(|field| field.is_empty()) {
+        return Err(
+            "--relay-intro requires tcp://host:port,<relay-node-id-hex>,<requester-node-id-hex>[,<expires-in-s>]"
+                .to_string(),
+        );
+    }
+    Ok(InspectRelayIntroSpec {
+        target: fields[0].to_string(),
+        relay_node_id: parse_node_id_hex(fields[1])?,
+        requester_node_id: parse_node_id_hex(fields[2])?,
+        expires_in_s: if fields.len() == 4 {
+            parse_non_zero_u64_value("--relay-intro", fields[3])?
+        } else {
+            300
+        },
+    })
+}
+
+fn parse_csv_fields<'a>(
+    value: &'a str,
+    expected: usize,
+    usage: &str,
+) -> Result<Vec<&'a str>, String> {
+    let fields: Vec<&str> = value.split(',').map(str::trim).collect();
+    if fields.len() != expected || fields.iter().any(|field| field.is_empty()) {
+        return Err(usage.to_string());
+    }
+    Ok(fields)
+}
+
 fn parse_lookup_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, String> {
     let mut config_path = None;
     let mut target = None;
@@ -851,6 +998,17 @@ fn parse_non_zero_u64_flag(flag: &str, value: &OsString) -> Result<u64, String> 
     Ok(parsed)
 }
 
+fn parse_non_zero_u64_value(flag: &str, value: &str) -> Result<u64, String> {
+    let parsed = value
+        .trim()
+        .parse::<u64>()
+        .map_err(|error| format!("{flag} must be an unsigned integer: {error}"))?;
+    if parsed == 0 {
+        return Err(format!("{flag} must be greater than zero"));
+    }
+    Ok(parsed)
+}
+
 fn parse_usize_flag(flag: &str, value: &OsString) -> Result<usize, String> {
     value
         .to_string_lossy()
@@ -1035,58 +1193,7 @@ fn publish_command(
 }
 
 fn lookup_command(config_path: PathBuf, target: &str, node_id: NodeId) -> Result<(), String> {
-    let mut client = operator_client::OperatorSessionClient::connect(&config_path, target)?;
-    let lookup_started = std::time::Instant::now();
-    let (message_type, _, body) =
-        client.request(&overlay_core::rendezvous::LookupNode { node_id })?;
-    let lookup_latency_ms = lookup_started
-        .elapsed()
-        .as_millis()
-        .min(u128::from(u64::MAX)) as u64;
-    let _ = client.close();
-
-    match message_type {
-        MessageType::LookupResult => {
-            let result: LookupResult =
-                serde_json::from_slice(&body).map_err(|error| error.to_string())?;
-            println!(
-                "{}",
-                serde_json::to_string(&serde_json::json!({
-                    "step": "lookup_node",
-                    "target": target,
-                    "result": "found",
-                    "node_id": result.node_id.to_string(),
-                    "remaining_budget": result.remaining_budget,
-                    "lookup_latency_ms": lookup_latency_ms,
-                    "record": result.record,
-                }))
-                .map_err(|error| error.to_string())?
-            );
-            Ok(())
-        }
-        MessageType::LookupNotFound => {
-            let not_found: LookupNotFound =
-                serde_json::from_slice(&body).map_err(|error| error.to_string())?;
-            println!(
-                "{}",
-                serde_json::to_string(&serde_json::json!({
-                    "step": "lookup_node",
-                    "target": target,
-                    "result": "not_found",
-                    "node_id": not_found.node_id.to_string(),
-                    "reason": not_found.reason,
-                    "remaining_budget": not_found.remaining_budget,
-                    "lookup_latency_ms": lookup_latency_ms,
-                }))
-                .map_err(|error| error.to_string())?
-            );
-            Err(format!(
-                "lookup for {} returned {:?}",
-                not_found.node_id, not_found.reason
-            ))
-        }
-        other => Err(format!("lookup expected a lookup response, got {other:?}")),
-    }
+    emit_probe_command_outcome(lookup_probe(&config_path, target, node_id)?)
 }
 
 fn open_service_command(
@@ -1096,58 +1203,13 @@ fn open_service_command(
     app_namespace: &str,
     service_name: &str,
 ) -> Result<(), String> {
-    let app_id = derive_app_id(&target_node_id, app_namespace, service_name);
-    let mut client = operator_client::OperatorSessionClient::connect(&config_path, target)?;
-    let response: ServiceRecordResponse = client.request_typed(
-        &GetServiceRecord { app_id },
-        MessageType::ServiceRecordResponse,
-    )?;
-    if response.status != ServiceRecordResponseStatus::Found {
-        let _ = client.close();
-        println!(
-            "{}",
-            serde_json::to_string(&serde_json::json!({
-                "step": "open_service",
-                "target": target,
-                "app_id": app_id.to_string(),
-                "resolve_status": response.status,
-            }))
-            .map_err(|error| error.to_string())?
-        );
-        return Err(format!("service {app_id} was not found on {target}"));
-    }
-    let record = response
-        .record
-        .ok_or_else(|| format!("service {app_id} was found without a record payload"))?;
-    let opened: OpenAppSessionResult = client.request_typed(
-        &OpenAppSession {
-            app_id,
-            reachability_ref: record.reachability_ref.clone(),
-        },
-        MessageType::OpenAppSessionResult,
-    )?;
-    let _ = client.close();
-    println!(
-        "{}",
-        serde_json::to_string(&serde_json::json!({
-            "step": "open_service",
-            "target": target,
-            "app_id": app_id.to_string(),
-            "resolve_status": response.status,
-            "open_status": opened.status,
-            "session_id": opened.session_id,
-            "service_name": service_name,
-        }))
-        .map_err(|error| error.to_string())?
-    );
-    if opened.session_id.is_some() {
-        Ok(())
-    } else {
-        Err(format!(
-            "open_service for {app_id} returned {:?}",
-            opened.status
-        ))
-    }
+    emit_probe_command_outcome(open_service_probe(
+        &config_path,
+        target,
+        target_node_id,
+        app_namespace,
+        service_name,
+    )?)
 }
 
 fn relay_intro_command(
@@ -1157,7 +1219,148 @@ fn relay_intro_command(
     requester_node_id: NodeId,
     expires_in_s: u64,
 ) -> Result<(), String> {
-    let runtime = NodeRuntime::from_config_path(&config_path).map_err(|error| error.to_string())?;
+    emit_probe_command_outcome(relay_intro_probe(
+        &config_path,
+        target,
+        relay_node_id,
+        requester_node_id,
+        expires_in_s,
+    )?)
+}
+
+fn emit_probe_command_outcome(outcome: ProbeCommandOutcome) -> Result<(), String> {
+    println!(
+        "{}",
+        serde_json::to_string(&outcome.output).map_err(|error| error.to_string())?
+    );
+    match outcome.error {
+        Some(error) => Err(error),
+        None => Ok(()),
+    }
+}
+
+fn lookup_probe(
+    config_path: &Path,
+    target: &str,
+    node_id: NodeId,
+) -> Result<ProbeCommandOutcome, String> {
+    let mut client = operator_client::OperatorSessionClient::connect(config_path, target)?;
+    let lookup_started = std::time::Instant::now();
+    let lookup_result = client.request(&overlay_core::rendezvous::LookupNode { node_id });
+    let lookup_latency_ms = lookup_started
+        .elapsed()
+        .as_millis()
+        .min(u128::from(u64::MAX)) as u64;
+    let _ = client.close();
+    let (message_type, _, body) = lookup_result?;
+
+    match message_type {
+        MessageType::LookupResult => {
+            let result: LookupResult =
+                serde_json::from_slice(&body).map_err(|error| error.to_string())?;
+            Ok(ProbeCommandOutcome::success(serde_json::json!({
+                "step": "lookup_node",
+                "target": target,
+                "result": "found",
+                "node_id": result.node_id.to_string(),
+                "remaining_budget": result.remaining_budget,
+                "lookup_latency_ms": lookup_latency_ms,
+                "record": result.record,
+            })))
+        }
+        MessageType::LookupNotFound => {
+            let not_found: LookupNotFound =
+                serde_json::from_slice(&body).map_err(|error| error.to_string())?;
+            Ok(ProbeCommandOutcome::failure(
+                serde_json::json!({
+                    "step": "lookup_node",
+                    "target": target,
+                    "result": "not_found",
+                    "node_id": not_found.node_id.to_string(),
+                    "reason": not_found.reason,
+                    "remaining_budget": not_found.remaining_budget,
+                    "lookup_latency_ms": lookup_latency_ms,
+                }),
+                format!(
+                    "lookup for {} returned {:?}",
+                    not_found.node_id, not_found.reason
+                ),
+            ))
+        }
+        other => Err(format!("lookup expected a lookup response, got {other:?}")),
+    }
+}
+
+fn open_service_probe(
+    config_path: &Path,
+    target: &str,
+    target_node_id: NodeId,
+    app_namespace: &str,
+    service_name: &str,
+) -> Result<ProbeCommandOutcome, String> {
+    let app_id = derive_app_id(&target_node_id, app_namespace, service_name);
+    let mut client = operator_client::OperatorSessionClient::connect(config_path, target)?;
+    let response: ServiceRecordResponse = client.request_typed(
+        &GetServiceRecord { app_id },
+        MessageType::ServiceRecordResponse,
+    )?;
+    if response.status != ServiceRecordResponseStatus::Found {
+        let _ = client.close();
+        return Ok(ProbeCommandOutcome::failure(
+            serde_json::json!({
+                "step": "open_service",
+                "target": target,
+                "app_id": app_id.to_string(),
+                "resolve_status": response.status,
+            }),
+            format!("service {app_id} was not found on {target}"),
+        ));
+    }
+    let record = match response.record {
+        Some(record) => record,
+        None => {
+            let _ = client.close();
+            return Err(format!(
+                "service {app_id} was found without a record payload"
+            ));
+        }
+    };
+    let open_result = client.request_typed(
+        &OpenAppSession {
+            app_id,
+            reachability_ref: record.reachability_ref.clone(),
+        },
+        MessageType::OpenAppSessionResult,
+    );
+    let _ = client.close();
+    let opened: OpenAppSessionResult = open_result?;
+    let output = serde_json::json!({
+        "step": "open_service",
+        "target": target,
+        "app_id": app_id.to_string(),
+        "resolve_status": response.status,
+        "open_status": opened.status,
+        "session_id": opened.session_id,
+        "service_name": service_name,
+    });
+    if opened.session_id.is_some() {
+        Ok(ProbeCommandOutcome::success(output))
+    } else {
+        Ok(ProbeCommandOutcome::failure(
+            output,
+            format!("open_service for {app_id} returned {:?}", opened.status),
+        ))
+    }
+}
+
+fn relay_intro_probe(
+    config_path: &Path,
+    target: &str,
+    relay_node_id: NodeId,
+    requester_node_id: NodeId,
+    expires_in_s: u64,
+) -> Result<ProbeCommandOutcome, String> {
+    let runtime = NodeRuntime::from_config_path(config_path).map_err(|error| error.to_string())?;
     let signing_key = runtime.context().signing_key().clone();
     let now_unix_ms = current_unix_ms()?;
     let now_unix_s = now_unix_ms / 1_000;
@@ -1176,7 +1379,7 @@ fn relay_intro_command(
         .map_err(|error| error.to_string())?;
     ticket.signature = signing_key.sign(&body).as_bytes().to_vec();
 
-    let mut client = operator_client::OperatorSessionClient::connect(&config_path, target)?;
+    let mut client = operator_client::OperatorSessionClient::connect(config_path, target)?;
     let response: IntroResponse = client.request_typed(
         &ResolveIntro {
             relay_node_id,
@@ -1185,27 +1388,26 @@ fn relay_intro_command(
         MessageType::IntroResponse,
     )?;
     let _ = client.close();
-    println!(
-        "{}",
-        serde_json::to_string(&serde_json::json!({
-            "step": if response.status == overlay_core::relay::IntroResponseStatus::Forwarded {
-                "relay_fallback_bound"
-            } else {
-                "relay_intro"
-            },
-            "target": target,
-            "relay_node_id": response.relay_node_id.to_string(),
-            "target_node_id": response.target_node_id.to_string(),
-            "ticket_id_hex": hex_encode(&response.ticket_id),
-            "status": response.status,
-            "requester_node_id": requester_node_id.to_string(),
-        }))
-        .map_err(|error| error.to_string())?
-    );
+    let output = serde_json::json!({
+        "step": if response.status == overlay_core::relay::IntroResponseStatus::Forwarded {
+            "relay_fallback_bound"
+        } else {
+            "relay_intro"
+        },
+        "target": target,
+        "relay_node_id": response.relay_node_id.to_string(),
+        "target_node_id": response.target_node_id.to_string(),
+        "ticket_id_hex": hex_encode(&response.ticket_id),
+        "status": response.status,
+        "requester_node_id": requester_node_id.to_string(),
+    });
     if response.status == overlay_core::relay::IntroResponseStatus::Forwarded {
-        Ok(())
+        Ok(ProbeCommandOutcome::success(output))
     } else {
-        Err(format!("relay intro returned {:?}", response.status))
+        Ok(ProbeCommandOutcome::failure(
+            output,
+            format!("relay intro returned {:?}", response.status),
+        ))
     }
 }
 
@@ -1458,12 +1660,83 @@ struct DoctorReport {
     summary: Option<Value>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct InspectLocalReport {
+    doctor: DoctorReport,
+    status: Option<Value>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct InspectRemoteCheckReport {
+    kind: &'static str,
+    target: String,
+    subject: String,
+    result: DoctorResult,
+    detail: String,
+    output: Value,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct InspectReport {
+    kind: &'static str,
+    stage: &'static str,
+    config_path: String,
+    result: DoctorResult,
+    exit_code: u8,
+    local: InspectLocalReport,
+    remote_checks: Vec<InspectRemoteCheckReport>,
+}
+
+#[derive(Debug, Clone)]
+struct ProbeCommandOutcome {
+    output: Value,
+    error: Option<String>,
+}
+
+impl ProbeCommandOutcome {
+    fn success(output: Value) -> Self {
+        Self {
+            output,
+            error: None,
+        }
+    }
+
+    fn failure(output: Value, error: impl Into<String>) -> Self {
+        Self {
+            output,
+            error: Some(error.into()),
+        }
+    }
+}
+
 fn doctor_command(config_path: PathBuf) -> ExitCode {
     let (report, exit_code) = build_doctor_report(&config_path);
     match serde_json::to_string(&report) {
         Ok(encoded) => println!("{encoded}"),
         Err(error) => {
             eprintln!("overlay-cli: failed to encode doctor report: {error}");
+            return ExitCode::from(1);
+        }
+    }
+    ExitCode::from(exit_code)
+}
+
+fn inspect_command(
+    config_path: PathBuf,
+    lookup_checks: Vec<InspectLookupSpec>,
+    open_service_checks: Vec<InspectOpenServiceSpec>,
+    relay_intro_checks: Vec<InspectRelayIntroSpec>,
+) -> ExitCode {
+    let (report, exit_code) = build_inspect_report(
+        &config_path,
+        &lookup_checks,
+        &open_service_checks,
+        &relay_intro_checks,
+    );
+    match serde_json::to_string(&report) {
+        Ok(encoded) => println!("{encoded}"),
+        Err(error) => {
+            eprintln!("overlay-cli: failed to encode inspect report: {error}");
             return ExitCode::from(1);
         }
     }
@@ -1762,6 +2035,180 @@ fn build_doctor_report(config_path: &Path) -> (DoctorReport, u8) {
     )
 }
 
+fn build_inspect_report(
+    config_path: &Path,
+    lookup_checks: &[InspectLookupSpec],
+    open_service_checks: &[InspectOpenServiceSpec],
+    relay_intro_checks: &[InspectRelayIntroSpec],
+) -> (InspectReport, u8) {
+    let (doctor, _) = build_doctor_report(config_path);
+    let status = OperatorStateManager::read_status_value(config_path).ok();
+    let mut result = doctor.result;
+    let mut remote_checks = Vec::with_capacity(
+        lookup_checks.len() + open_service_checks.len() + relay_intro_checks.len(),
+    );
+
+    for spec in lookup_checks {
+        let check = build_lookup_inspect_check(config_path, spec);
+        result.escalate(check.result);
+        remote_checks.push(check);
+    }
+    for spec in open_service_checks {
+        let check = build_open_service_inspect_check(config_path, spec);
+        result.escalate(check.result);
+        remote_checks.push(check);
+    }
+    for spec in relay_intro_checks {
+        let check = build_relay_intro_inspect_check(config_path, spec);
+        result.escalate(check.result);
+        remote_checks.push(check);
+    }
+
+    let exit_code = result.exit_code();
+    (
+        InspectReport {
+            kind: "operator_inspect",
+            stage: REPOSITORY_STAGE,
+            config_path: config_path.display().to_string(),
+            result,
+            exit_code,
+            local: InspectLocalReport { doctor, status },
+            remote_checks,
+        },
+        exit_code,
+    )
+}
+
+fn build_lookup_inspect_check(
+    config_path: &Path,
+    spec: &InspectLookupSpec,
+) -> InspectRemoteCheckReport {
+    let subject = spec.node_id.to_string();
+    let success_detail = format!("lookup succeeded for node_id {}", spec.node_id);
+    build_probe_check(
+        "lookup",
+        &spec.target,
+        &subject,
+        success_detail,
+        lookup_probe(config_path, &spec.target, spec.node_id),
+        |error| {
+            serde_json::json!({
+                "step": "lookup_node",
+                "target": spec.target,
+                "node_id": spec.node_id.to_string(),
+                "result": "error",
+                "error": error,
+            })
+        },
+    )
+}
+
+fn build_open_service_inspect_check(
+    config_path: &Path,
+    spec: &InspectOpenServiceSpec,
+) -> InspectRemoteCheckReport {
+    let subject = format!(
+        "{}:{}@{}",
+        spec.app_namespace, spec.service_name, spec.target_node_id
+    );
+    let success_detail = format!(
+        "open-service succeeded for {}:{} on {}",
+        spec.app_namespace, spec.service_name, spec.target_node_id
+    );
+    build_probe_check(
+        "open_service",
+        &spec.target,
+        &subject,
+        success_detail,
+        open_service_probe(
+            config_path,
+            &spec.target,
+            spec.target_node_id,
+            &spec.app_namespace,
+            &spec.service_name,
+        ),
+        |error| {
+            serde_json::json!({
+                "step": "open_service",
+                "target": spec.target,
+                "target_node_id": spec.target_node_id.to_string(),
+                "service_namespace": spec.app_namespace,
+                "service_name": spec.service_name,
+                "result": "error",
+                "error": error,
+            })
+        },
+    )
+}
+
+fn build_relay_intro_inspect_check(
+    config_path: &Path,
+    spec: &InspectRelayIntroSpec,
+) -> InspectRemoteCheckReport {
+    let subject = format!("{} for {}", spec.relay_node_id, spec.requester_node_id);
+    let success_detail = format!(
+        "relay-intro succeeded through relay {} for requester {}",
+        spec.relay_node_id, spec.requester_node_id
+    );
+    build_probe_check(
+        "relay_intro",
+        &spec.target,
+        &subject,
+        success_detail,
+        relay_intro_probe(
+            config_path,
+            &spec.target,
+            spec.relay_node_id,
+            spec.requester_node_id,
+            spec.expires_in_s,
+        ),
+        |error| {
+            serde_json::json!({
+                "step": "relay_intro",
+                "target": spec.target,
+                "relay_node_id": spec.relay_node_id.to_string(),
+                "requester_node_id": spec.requester_node_id.to_string(),
+                "result": "error",
+                "error": error,
+            })
+        },
+    )
+}
+
+fn build_probe_check(
+    kind: &'static str,
+    target: &str,
+    subject: &str,
+    success_detail: String,
+    outcome: Result<ProbeCommandOutcome, String>,
+    error_output: impl FnOnce(&str) -> Value,
+) -> InspectRemoteCheckReport {
+    match outcome {
+        Ok(outcome) => {
+            let (result, detail) = match outcome.error {
+                Some(error) => (DoctorResult::Fail, error),
+                None => (DoctorResult::Ok, success_detail),
+            };
+            InspectRemoteCheckReport {
+                kind,
+                target: target.to_string(),
+                subject: subject.to_string(),
+                result,
+                detail,
+                output: outcome.output,
+            }
+        }
+        Err(error) => InspectRemoteCheckReport {
+            kind,
+            target: target.to_string(),
+            subject: subject.to_string(),
+            result: DoctorResult::Fail,
+            detail: error.clone(),
+            output: error_output(&error),
+        },
+    }
+}
+
 fn bootstrap_failure_detail(status: &Value) -> Option<String> {
     let summary = status.pointer("/health/bootstrap/last_attempt_summary")?;
     let mut parts = Vec::new();
@@ -1860,6 +2307,9 @@ fn print_usage() {
         "  overlay-cli bootstrap-sign --bootstrap-file <path> --signing-key-file <path> --output <path>"
     );
     println!(
+        "  overlay-cli inspect --config <path> [--lookup <tcp://host:port>,<node-id-hex> ...] [--open-service <tcp://host:port>,<target-node-id-hex>,<namespace>,<name> ...] [--relay-intro <tcp://host:port>,<relay-node-id-hex>,<requester-node-id-hex>[,<expires-in-s>] ...]"
+    );
+    println!(
         "  overlay-cli publish --config <path> --target <tcp://host:port> [--relay-ref <node-id-hex> ...] [--capability <value> ...] [--transport-class <value> ...] [--expires-in <seconds>]"
     );
     println!("  overlay-cli lookup --config <path> --target <tcp://host:port> --node-id <hex>");
@@ -1884,7 +2334,7 @@ mod tests {
 
     use super::{
         parse_command, render_config_template, write_config_template_file, Command,
-        LocalServiceSpec,
+        InspectLookupSpec, InspectOpenServiceSpec, InspectRelayIntroSpec, LocalServiceSpec,
     };
     use overlay_core::{
         config::{ConfigTemplateProfile, OverlayConfig},
@@ -2322,6 +2772,66 @@ mod tests {
                 bootstrap_file: PathBuf::from("devnet/bootstrap/node-foundation.json"),
                 signing_key_file: PathBuf::from("devnet/keys/bootstrap-signer.key"),
                 output_path: PathBuf::from("/tmp/node-foundation.signed.json"),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_command_parses_inspect_flags() {
+        assert_eq!(
+            parse_command([
+                OsString::from("overlay-cli"),
+                OsString::from("inspect"),
+                OsString::from("--config"),
+                OsString::from("devnet/hosts/localhost/configs/node-a.json"),
+                OsString::from("--lookup"),
+                OsString::from(
+                    "tcp://127.0.0.1:4101,1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b"
+                ),
+                OsString::from("--open-service"),
+                OsString::from(
+                    "tcp://127.0.0.1:4112,1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b,devnet,terminal"
+                ),
+                OsString::from("--relay-intro"),
+                OsString::from(
+                    "tcp://127.0.0.1:4198,16f52d6fea63ef086405aa71b537dd4833bd0b36ffe054be0fd07fb525af157d,83561adb398fd87f8e7ed8331bff2fcb945733cc3012879cb9fab07928667062,120"
+                ),
+            ])
+            .unwrap(),
+            Command::Inspect {
+                config_path: PathBuf::from("devnet/hosts/localhost/configs/node-a.json"),
+                lookup_checks: vec![InspectLookupSpec {
+                    target: "tcp://127.0.0.1:4101".to_string(),
+                    node_id: NodeId::from_bytes([
+                        0x1e, 0xed, 0x29, 0xb1, 0x65, 0x4f, 0xbc, 0xa9, 0x46, 0x17, 0x00,
+                        0x4d, 0x79, 0x69, 0xdf, 0xc4, 0x65, 0x2b, 0x1f, 0x30, 0xa7, 0xa8,
+                        0xb7, 0x71, 0xc3, 0x48, 0x00, 0x15, 0x54, 0x83, 0x38, 0x0b,
+                    ]),
+                }],
+                open_service_checks: vec![InspectOpenServiceSpec {
+                    target: "tcp://127.0.0.1:4112".to_string(),
+                    target_node_id: NodeId::from_bytes([
+                        0x1e, 0xed, 0x29, 0xb1, 0x65, 0x4f, 0xbc, 0xa9, 0x46, 0x17, 0x00,
+                        0x4d, 0x79, 0x69, 0xdf, 0xc4, 0x65, 0x2b, 0x1f, 0x30, 0xa7, 0xa8,
+                        0xb7, 0x71, 0xc3, 0x48, 0x00, 0x15, 0x54, 0x83, 0x38, 0x0b,
+                    ]),
+                    app_namespace: "devnet".to_string(),
+                    service_name: "terminal".to_string(),
+                }],
+                relay_intro_checks: vec![InspectRelayIntroSpec {
+                    target: "tcp://127.0.0.1:4198".to_string(),
+                    relay_node_id: NodeId::from_bytes([
+                        0x16, 0xf5, 0x2d, 0x6f, 0xea, 0x63, 0xef, 0x08, 0x64, 0x05, 0xaa,
+                        0x71, 0xb5, 0x37, 0xdd, 0x48, 0x33, 0xbd, 0x0b, 0x36, 0xff, 0xe0,
+                        0x54, 0xbe, 0x0f, 0xd0, 0x7f, 0xb5, 0x25, 0xaf, 0x15, 0x7d,
+                    ]),
+                    requester_node_id: NodeId::from_bytes([
+                        0x83, 0x56, 0x1a, 0xdb, 0x39, 0x8f, 0xd8, 0x7f, 0x8e, 0x7e, 0xd8,
+                        0x33, 0x1b, 0xff, 0x2f, 0xcb, 0x94, 0x57, 0x33, 0xcc, 0x30, 0x12,
+                        0x87, 0x9c, 0xb9, 0xfa, 0xb0, 0x79, 0x28, 0x66, 0x70, 0x62,
+                    ]),
+                    expires_in_s: 120,
+                }],
             }
         );
     }

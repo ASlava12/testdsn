@@ -13,7 +13,7 @@ A Codex-oriented handoff bundle containing:
 ## Current repository stage
 
 - The root `REPOSITORY_STAGE` marker and `overlay_core::REPOSITORY_STAGE` both
-  read `milestone-25-runtime-persistence-recovery-hardening`.
+  read `milestone-26-bounded-operator-control-plane`.
 - Milestones 0-12 are a closed baseline in this repository, and Milestones
   14/16/17/18 are landed pilot-baseline work.
 - Milestone 17 operator-grade runtime hardening is part of the landed baseline
@@ -46,10 +46,15 @@ A Codex-oriented handoff bundle containing:
   verification with optional SHA-256 integrity pins, `overlay-cli
   bootstrap-sign`, `overlay-cli bootstrap-serve --signing-key-file`,
   trust-failure diagnostics, and synchronized operator/bootstrap runbooks.
-- Milestone 25 runtime persistence and recovery hardening is the current stage
-  with bounded recovery of persisted bootstrap-source preference, last-known
-  active bootstrap peers, and local service registration intent, explicit
-  recovery fields in status/doctor output, and updated restart proof paths.
+- Milestone 25 runtime persistence and recovery hardening remains part of the
+  landed baseline with bounded recovery of persisted bootstrap-source
+  preference, last-known active bootstrap peers, and local service
+  registration intent, explicit recovery fields in status/doctor output, and
+  updated restart proof paths.
+- Milestone 26 bounded operator control plane is the current stage
+  with `overlay-cli inspect`, bounded machine-readable operator reports that
+  combine local status/doctor data with explicit remote lookup, service, and
+  relay probes, and synchronized operator/runbook docs.
 - The current validation green path is `./devnet/run-first-user-acceptance.sh`
   on the same commit after the applicable workspace validation commands.
 - Separate-host evidence is still required on the validated commit before
@@ -67,11 +72,12 @@ A Codex-oriented handoff bundle containing:
 scripts inside the current acceptance flow. `./devnet/run-pilot-checklist.sh`
 is retained only for the older Milestone 18 localhost rehearsal.
 
-## Remaining limitations after Milestone 25
+## Remaining limitations after Milestone 26
 
 - bootstrap remains static signed artifact delivery over `http://`
-- distributed operator commands remain one-shot proof surfaces, not a general
-  control plane
+- operator surfaces remain bounded and operator-directed; `overlay-cli
+  inspect` aggregates explicit requested probes, but the repo still has no
+  general control plane
 - restart recovery stays bounded to bootstrap-source state, last-known active
   bootstrap peers, and local service registration intent; presence, service
   sessions, relay tunnels, and path probes still reset
@@ -81,15 +87,15 @@ is retained only for the older Milestone 18 localhost rehearsal.
 
 ## Recommended first Codex task
 
-Use `prompts/codex-milestone-25.md` as the first task prompt for the current
-`milestone-25-runtime-persistence-recovery-hardening` stage. It assumes the repository already has a
+Use `prompts/codex-milestone-26.md` as the first task prompt for the current
+`milestone-26-bounded-operator-control-plane` stage. It assumes the repository already has a
 closed Milestone 1-12 baseline and does not need to restart from Milestone
 0/1/2.
 
 ## Recommended workflow
 
 1. Confirm from `README.md`, `AGENTS.md`, and `IMPLEMENT.md` that the current
-   stage is `milestone-25-runtime-persistence-recovery-hardening`.
+   stage is `milestone-26-bounded-operator-control-plane`.
 2. Do not restart from Milestone 0/1/2; treat Milestones 1-12 as
    regression-fix, vector-maintenance, validation-maintenance, and
    launch-maintenance territory only unless the task explicitly reopens them.

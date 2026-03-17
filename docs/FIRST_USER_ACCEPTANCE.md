@@ -1,7 +1,7 @@
 # First-User Acceptance
 
-This document defines the current Milestone 25
-runtime-persistence-recovery-hardening acceptance boundary.
+This document defines the current Milestone 26
+bounded-operator-control-plane acceptance boundary.
 
 It is the bounded basis for describing the repository as sufficiently working
 for first users. It is not a public-production or hostile-environment claim.
@@ -117,8 +117,10 @@ when all of the following are true:
 
 - the commands above passed on the same commit;
 - the acceptance wrapper reached `first_user_acceptance_complete`;
-- operators stay within the checked-in topology, point-to-point command
-  surfaces, and signed bootstrap-artifact model described in the runbooks;
+- operators stay within the checked-in topology, bounded explicit operator
+  surfaces (`publish`, `lookup`, `open-service`, `relay-intro`, and
+  `inspect`), and the signed bootstrap-artifact model described in the
+  runbooks;
 - separate-host evidence is collected for the same commit before the claim is
   used in a release note or handoff.
 

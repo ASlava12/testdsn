@@ -1,7 +1,7 @@
 # Pilot Runbook
 
-This runbook defines the current Milestone 25
-runtime-persistence-recovery-hardening distributed exercise.
+This runbook defines the current Milestone 26
+bounded-operator-control-plane distributed exercise.
 
 It extends the landed Milestone 18 pilot pack with minimal distributed
 operator surfaces, two relay-capable fallback paths, conservative bootstrap
@@ -35,6 +35,7 @@ Use this runbook to prove:
   `runtime_status.health.bootstrap.last_attempt_summary` and `last_sources`;
 - persisted status summaries through `overlay-cli status --summary`;
 - local self-diagnosis through `overlay-cli doctor --config <path>`;
+- bounded machine-readable operator reports through `overlay-cli inspect`;
 - an operator-collected off-box report with exact hosts, date, and commit SHA.
 
 Current pilot limits remain in force:
@@ -42,9 +43,9 @@ Current pilot limits remain in force:
 - bootstrap remains static signed JSON served over `http://`; trust comes from
   pinned `#ed25519=<hex>` URL fragments with optional `#sha256=<hex>` defense
   in depth, not from HTTPS or a public trust root;
-- the distributed operator commands are one-shot, point-to-point, and
-  operator-directed, not a general distributed control plane or discovery
-  system;
+- the distributed operator surfaces are explicit and operator-directed.
+  `overlay-cli inspect` may bundle multiple requested probes, but the repo
+  still has no general distributed control plane or discovery system;
 - lookup remains exact-by-`node_id` only and service resolution remains
   exact-by-`app_id` only;
 - restart recovery is bounded to persisted bootstrap-source preference,
@@ -211,11 +212,19 @@ Run the baseline off-box proof in this order.
    TMPDIR=/tmp cargo run -p overlay-cli -- relay-intro --config /path/to/node-b.json --target tcp://198.51.100.15:4197 --relay-node-id 90bdeef49d5d2664e6ef317c3fc4dec4975f13287af7ce3ff4dd9fdf19bb2d7e --requester-node-id 83561adb398fd87f8e7ed8331bff2fcb945733cc3012879cb9fab07928667062
    ```
 
+6. Capture one bounded operator inspection report from `node-a`:
+
+   ```bash
+   TMPDIR=/tmp cargo run -p overlay-cli -- inspect --config /path/to/node-a.json --lookup tcp://198.51.100.10:4111,1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b --open-service tcp://198.51.100.11:4112,1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b,devnet,terminal --relay-intro tcp://198.51.100.13:4198,16f52d6fea63ef086405aa71b537dd4833bd0b36ffe054be0fd07fb525af157d,83561adb398fd87f8e7ed8331bff2fcb945733cc3012879cb9fab07928667062
+   ```
+
 These commands are intentionally bounded and explicit:
 
 - each command loads one local node config and its signing key;
-- each command opens one temporary session to one target runtime;
-- each command proves a real networked runtime flow without adding a new
+- each one-shot command opens one temporary session to one target runtime;
+- `overlay-cli inspect` reuses one local persisted status/doctor snapshot and
+  opens one temporary session per requested probe target;
+- these commands prove real networked runtime flows without adding a new
   always-on control socket or orchestration layer.
 
 ## Pilot checklist command
@@ -338,6 +347,7 @@ Record all eleven scenarios in the pilot report:
 - per-host `overlay-cli status --config ...` JSON snapshots
 - per-host `overlay-cli status --config ... --summary` excerpts
 - at least one `overlay-cli doctor --config ...` output from a live node
+- at least one `overlay-cli inspect ...` output from a live node
 - bootstrap status excerpts showing `last_attempt_summary` and `last_sources`
   for any degraded or fallback startup
 - lookup latency values from the `lookup` command
@@ -345,15 +355,16 @@ Record all eleven scenarios in the pilot report:
 - service restart evidence from the persisted status JSON
 - tampered-bootstrap integrity-mismatch logs
 
-## Remaining limitations after Milestone 25
+## Remaining limitations after Milestone 26
 
-- The localhost acceptance pack is the current Milestone 25 green path, but it still
+- The localhost acceptance pack is the current Milestone 26 green path, but it still
   does not replace the required off-box pilot evidence on separate hosts for a
   release note.
 - Bootstrap remains static signed artifact delivery over `http://`; operators
   must keep the signer pin and any `#sha256=<hex>` URLs synchronized manually.
-- The distributed operator commands remain one-shot proof surfaces, not a
-  general control plane or distributed discovery layer.
+- The distributed operator surfaces remain explicit proof flows.
+  `overlay-cli inspect` improves repeatable checks, but it is not a general
+  control plane or distributed discovery layer.
 - Presence, service-open sessions, relay tunnels, and path probes still reset
   on restart except for the bounded bootstrap-source, active-peer, and local
   service-intent recovery state.

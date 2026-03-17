@@ -1,7 +1,7 @@
 # Pilot Devnet
 
 This directory contains the Milestone 20 regular-distributed-use assets carried
-into the current Milestone 25 runtime-persistence-recovery-hardening stage.
+into the current Milestone 26 bounded-operator-control-plane stage.
 
 It keeps the landed pilot topology pack and extends it with:
 

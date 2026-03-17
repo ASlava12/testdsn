@@ -33,8 +33,11 @@ What exists today:
 - `overlay-cli doctor --config <path>` checks config validity, persisted
   runtime state, bootstrap health, and bounded restart recovery using local
   files only
-- `overlay-cli publish`, `lookup`, `open-service`, and `relay-intro` provide
-  bounded one-shot operator flows over established runtime sessions
+- `overlay-cli inspect --config <path> ...` emits one machine-readable
+  operator report with local persisted status/doctor data plus explicit
+  requested remote `lookup`, `open-service`, and `relay-intro` probes
+- `overlay-cli publish`, `lookup`, `open-service`, and `relay-intro` remain
+  bounded explicit operator flows over established runtime sessions
 - `overlay-cli smoke --devnet-dir <path>` still starts the local four-node
   devnet in-process for the checked-in repo-local proof path
 - `overlay-cli bootstrap-serve --bind <addr> --bootstrap-file <path> [--signing-key-file <path>]`
@@ -49,7 +52,7 @@ What exists today:
 What does not exist today:
 
 - no public bootstrap-provider infrastructure or HTTPS bootstrap fetch
-- no general distributed control plane beyond the explicit operator commands
+- no general distributed control plane beyond the explicit operator surfaces
 - no broad persistent on-disk runtime state beyond bounded operator metadata,
   last-known health, and the persisted bootstrap-source, active-peer, and
   local-service-intent state used for restart recovery
@@ -87,7 +90,7 @@ What does not exist today:
 9. If bootstrap is degraded or unexpectedly slow, inspect
    `health.bootstrap.last_attempt_summary`, `health.bootstrap.last_sources`,
    and `overlay-cli status --config <path> --summary` before changing configs.
-10. For cross-node behavior, use the distributed operator commands or the
+10. For cross-node behavior, use the distributed operator surfaces or the
    checked-in smoke/checklist wrappers after single-node startup looks healthy.
 
 ## Launch commands
@@ -128,7 +131,13 @@ Run the local doctor surface:
 TMPDIR=/tmp cargo run -p overlay-cli -- doctor --config docs/config-examples/user-node.json
 ```
 
-One-shot distributed operator commands:
+Run one bounded operator inspection report:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- inspect --config /path/to/node-a.json --lookup tcp://127.0.0.1:4111,1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b --open-service tcp://127.0.0.1:4112,1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b,devnet,terminal --relay-intro tcp://127.0.0.1:4198,16f52d6fea63ef086405aa71b537dd4833bd0b36ffe054be0fd07fb525af157d,83561adb398fd87f8e7ed8331bff2fcb945733cc3012879cb9fab07928667062
+```
+
+Explicit distributed operator commands:
 
 ```bash
 TMPDIR=/tmp cargo run -p overlay-cli -- publish --config /path/to/node-b.json --target tcp://127.0.0.1:4111 --relay-ref 16f52d6fea63ef086405aa71b537dd4833bd0b36ffe054be0fd07fb525af157d --capability service-host
@@ -217,6 +226,9 @@ Structured log records are emitted as one JSON object per line, for example:
 - `health.resource_limits`: effective local limits after config projection
 - `summary`: a concise persisted operator surface for peers, bootstrap,
   presence, services, relay usage, and recent failures
+- `operator_inspect`: one machine-readable local-plus-remote operator report
+  with the embedded doctor result, persisted status payload, and per-probe
+  remote check outcomes
 
 Important fields to watch first:
 

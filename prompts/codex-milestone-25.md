@@ -6,7 +6,7 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `README.md`, `HANDOFF.md`, `VALIDATION.md`,
 `spec/state-machines.md`.
 
 Goal:
-Work within the current repository stage,
+Work within the repository stage that preceded Milestone 26,
 `milestone-25-runtime-persistence-recovery-hardening`, from the landed
 Milestone 1-24 baseline and keep Milestone 25 focused on bounded runtime
 persistence, explicit recovery semantics, operator diagnostics, and honest

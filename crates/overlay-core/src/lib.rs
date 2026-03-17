@@ -15,7 +15,7 @@ pub mod session;
 pub mod transport;
 pub mod wire;
 
-pub const REPOSITORY_STAGE: &str = "milestone-25-runtime-persistence-recovery-hardening";
+pub const REPOSITORY_STAGE: &str = "milestone-26-bounded-operator-control-plane";
 
 #[cfg(test)]
 mod tests {

@@ -2,7 +2,8 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
-    process,
+    process, thread,
+    time::Duration,
 };
 
 use overlay_core::{
@@ -17,6 +18,8 @@ use crate::signal::{process_exists, ShutdownSignal};
 
 const STATUS_VERSION: u8 = 1;
 const MAX_SUMMARY_FAILURES: usize = 8;
+const STATUS_READ_RETRY_ATTEMPTS: usize = 4;
+const STATUS_READ_RETRY_DELAY_MS: u64 = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -189,12 +192,32 @@ impl OperatorStateManager {
 
     pub fn read_status_file(config_path: &Path) -> Result<String, String> {
         let status_file = Self::status_file_path(config_path)?;
-        fs::read_to_string(&status_file).map_err(|error| {
-            format!(
-                "failed to read operator status file {}: {error}",
-                status_file.display()
-            )
-        })
+        let mut last_error = None;
+
+        for attempt in 0..STATUS_READ_RETRY_ATTEMPTS {
+            match fs::read_to_string(&status_file) {
+                Ok(status) => return Ok(status),
+                Err(error)
+                    if error.kind() == std::io::ErrorKind::NotFound
+                        && attempt + 1 < STATUS_READ_RETRY_ATTEMPTS =>
+                {
+                    last_error = Some(error);
+                    thread::sleep(Duration::from_millis(STATUS_READ_RETRY_DELAY_MS));
+                }
+                Err(error) => {
+                    return Err(format!(
+                        "failed to read operator status file {}: {error}",
+                        status_file.display()
+                    ))
+                }
+            }
+        }
+
+        let error = last_error.expect("status read retries should leave a final error");
+        Err(format!(
+            "failed to read operator status file {}: {error}",
+            status_file.display()
+        ))
     }
 
     pub fn read_status_value(config_path: &Path) -> Result<Value, String> {
@@ -639,7 +662,7 @@ fn log_entry_is_recent_failure(entry: &StructuredLogEntry) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path::PathBuf};
+    use std::{fs, path::PathBuf, thread, time::Duration};
 
     use overlay_core::{
         identity::NodeId,
@@ -648,8 +671,8 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        log_entry_is_recent_failure, parse_shutdown_reason, OperatorStateManager,
-        RuntimeShutdownReason, STATUS_VERSION,
+        log_entry_is_recent_failure, parse_shutdown_reason, write_json_atomically,
+        OperatorStateManager, RuntimeShutdownReason, STATUS_VERSION,
     };
 
     fn unique_test_dir(name: &str) -> PathBuf {
@@ -685,6 +708,41 @@ mod tests {
         let error = OperatorStateManager::read_status_file(&config_path)
             .expect_err("missing status file should fail");
         assert!(error.contains("runtime-status.json"));
+    }
+
+    #[test]
+    fn status_reader_retries_transient_missing_file() {
+        let dir = unique_test_dir("transient-missing");
+        let config_path = dir.join("node-a.json");
+        fs::write(&config_path, b"{}").expect("config file should be written");
+
+        let status_path = OperatorStateManager::status_file_path(&config_path)
+            .expect("status path should resolve");
+        fs::create_dir_all(
+            status_path
+                .parent()
+                .expect("status path should have a parent directory"),
+        )
+        .expect("status directory should be created");
+
+        let writer_path = status_path.clone();
+        let writer = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(15));
+            write_json_atomically(
+                &writer_path,
+                &json!({
+                    "kind": "runtime_status",
+                    "version": STATUS_VERSION,
+                }),
+            )
+            .expect("status file should be written");
+        });
+
+        let status = OperatorStateManager::read_status_file(&config_path)
+            .expect("reader should recover after transient missing file");
+        writer.join().expect("writer thread should succeed");
+
+        assert!(status.contains("\"kind\":\"runtime_status\""));
     }
 
     #[test]

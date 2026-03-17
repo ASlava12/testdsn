@@ -1,7 +1,7 @@
 # Devnet
 
 This directory contains the checked-in devnet and pilot assets for the current
-Milestone 25 stage:
+Milestone 26 stage:
 
 - the original four-node local-file devnet under `configs/` and `bootstrap/`
 - the host-style multi-host devnet layouts under `hosts/`
@@ -27,8 +27,9 @@ Nodes:
 - `run-smoke.sh`: wrapper around `overlay-cli smoke`
 - `run-distributed-smoke.sh`: wrapper around the minimal multi-process localhost TCP smoke
 - `run-multihost-smoke.sh`: wrapper around the host-style network-bootstrap smoke
+  plus the bounded `overlay-cli inspect` report
 - `run-distributed-pilot-checklist.sh`: wrapper around the current distributed pilot checklist
-- `run-first-user-acceptance.sh`: wrapper around the current Milestone 25
+- `run-first-user-acceptance.sh`: wrapper around the current Milestone 26
   first-user acceptance flow
 - `run-pilot-checklist.sh`: retained Milestone 18 localhost rehearsal pack,
   not the current sign-off path
@@ -79,6 +80,12 @@ Run the local self-check surface:
 TMPDIR=/tmp cargo run -p overlay-cli -- doctor --config devnet/configs/node-a.json
 ```
 
+Run the bounded operator inspection surface:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- inspect --config devnet/hosts/localhost/configs/node-a.json --lookup tcp://127.0.0.1:4101,1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b --open-service tcp://127.0.0.1:4102,1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b,devnet,terminal --relay-intro tcp://127.0.0.1:4199,16f52d6fea63ef086405aa71b537dd4833bd0b36ffe054be0fd07fb525af157d,83561adb398fd87f8e7ed8331bff2fcb945733cc3012879cb9fab07928667062
+```
+
 ## Distributed TCP smoke
 
 ```bash
@@ -103,7 +110,7 @@ Optional evidence-preserving form:
 
 This starts the static seed servers, then starts the host-style runtimes and
 drives bounded `publish`, `lookup`, `open-service`, and `relay-intro` commands
-across them.
+across them, then captures one bounded `overlay-cli inspect` report.
 
 ## Pilot checklist
 
@@ -132,8 +139,9 @@ This is the current localhost sign-off path after `./devnet/run-launch-gate.sh`.
   pinned SHA-256 artifact URLs rather than HTTPS or a public trust root
 - the local `run-smoke.sh` path remains repo-local and harness-driven for the
   publish/lookup/service/relay steps
-- the distributed operator flows are explicit point-to-point CLI surfaces, not
-  a general distributed control plane
+- the distributed operator surfaces are explicit CLI flows; `overlay-cli
+  inspect` may bundle requested probes, but the repo still has no general
+  distributed control plane
 - restart recovery is bounded to persisted bootstrap-source preference,
   last-known active bootstrap peers, and local service registration intent
   only

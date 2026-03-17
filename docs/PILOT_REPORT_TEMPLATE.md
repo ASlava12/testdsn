@@ -8,7 +8,7 @@ public deployment.
 ## Metadata
 
 - Date: `<YYYY-MM-DD>`
-- Repository stage: `milestone-25-runtime-persistence-recovery-hardening`
+- Repository stage: `milestone-26-bounded-operator-control-plane`
 - Commit: `<git-sha>`
 - Operator: `<name>`
 - Topology: `pilot-5-host-two-relay`
@@ -43,6 +43,8 @@ public deployment.
   host=`<host>`; target=`<host:port>`; result=`<pass/fail>`; path=`node-a -> node-relay -> node-b`
 - `relay-intro` alternate path:
   host=`<host>`; target=`<host:port>`; result=`<pass/fail>`; path=`node-a -> node-relay-b -> node-b`
+- `inspect`:
+  host=`<host>`; result=`<pass/fail>`; notes=`<summary or path>`
 
 ## Lookup Latency
 
@@ -108,11 +110,13 @@ public deployment.
 - bootstrap remains static signed JSON served over `http://`; trust comes from
   pinned `ed25519=<hex>` URLs with optional SHA-256 artifact pins rather than
   HTTPS or a public trust root
-- the distributed operator commands are one-shot and operator-directed rather
-  than a general distributed control plane
+- operator surfaces remain explicit and operator-directed; `overlay-cli
+  inspect` improves repeatable checks but does not add a general distributed
+  control plane
 - lookup is still exact-by-`node_id` only, and service resolution is still
   exact-by-`app_id` only
-- only the last-known active bootstrap peers are recovered across restart;
+- restart recovery is bounded to persisted bootstrap-source preference,
+  last-known active bootstrap peers, and local service registration intent;
   presence, services, sessions, relay tunnels, and path probes remain
   in-memory runtime state
 - this stage still does not claim hostile-environment or public-Internet

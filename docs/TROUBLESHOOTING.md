@@ -32,6 +32,13 @@ TMPDIR=/tmp cargo run -p overlay-cli -- status --config <config-path> --summary
 TMPDIR=/tmp cargo run -p overlay-cli -- doctor --config <config-path>
 ```
 
+When you need the same local context plus explicit remote service or relay
+checks in one bundle:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- inspect --config <config-path> --lookup <tcp://host:port>,<node-id-hex> --open-service <tcp://host:port>,<target-node-id-hex>,<namespace>,<name> --relay-intro <tcp://host:port>,<relay-node-id-hex>,<requester-node-id-hex>
+```
+
 After fixing a current-stage issue, rerun
 `./devnet/run-first-user-acceptance.sh` before treating the repository as
 first-user-ready again.
@@ -83,9 +90,9 @@ first-user-ready again.
 
 - `overlay-cli run` is single-node inspection, not distributed orchestration.
 - `overlay-cli smoke` is the supported repo-local proof path.
-- `overlay-cli publish`, `lookup`, `open-service`, and `relay-intro` are
-  explicit point-to-point operator commands; they do not provide discovery or
-  autonomous distributed routing.
+- `overlay-cli publish`, `lookup`, `open-service`, `relay-intro`, and
+  `inspect` are explicit operator-directed surfaces; they do not provide
+  discovery or autonomous distributed routing.
 - A relay-enabled node still uses compiled default quotas; there is no JSON knob
   for per-minute intro rate or tunnel cap.
 - `overlay-cli run` now handles `SIGINT` and `SIGTERM` gracefully, but any
@@ -93,3 +100,6 @@ first-user-ready again.
   until the next startup recovers it.
 - `overlay-cli doctor` uses only local config, status, and process state; it
   does not probe the overlay through a new control socket.
+- `overlay-cli inspect` reuses that same local status/doctor data and opens one
+  temporary session per requested remote probe; it does not add a persistent
+  remote admin socket.

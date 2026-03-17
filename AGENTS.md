@@ -86,7 +86,7 @@ Do not add by default:
   conservative bootstrap retry, runtime health snapshots, status dumps, and the
   logical soak path.
 - The current repository stage marker is
-  `milestone-25-runtime-persistence-recovery-hardening`.
+  `milestone-26-bounded-operator-control-plane`.
 - Milestone 14 launch gate and pilot tag remains part of the landed pilot
   baseline.
 - Milestone 16 network bootstrap and multi-host devnet is implemented with
@@ -132,18 +132,24 @@ Do not add by default:
   `sha256=<hex>` integrity pins, richer bootstrap diagnostics for trust
   failures, and synchronized operator/bootstrap docs. This stage still does
   not claim hostile-environment or public-production readiness.
-- Milestone 25 runtime persistence and recovery hardening is the current stage
+- Milestone 25 runtime persistence and recovery hardening remains part of the
+  landed baseline
   with bounded restart recovery of persisted bootstrap-source preference,
   last-known active bootstrap peers, and local service registration intent,
   explicit recovery fields on the status/doctor surfaces, updated restart
   smoke/checklist proof, and synchronized recovery/runbook docs. This stage
   still does not claim hostile-environment or public-production readiness.
+- Milestone 26 bounded operator control plane is the current stage with
+  `overlay-cli inspect`, machine-readable bounded operator reports that bundle
+  local status/doctor data with explicit remote lookup/service/relay probes,
+  improved operator runbooks, and synchronized Milestone 26 docs. This stage
+  still does not claim hostile-environment or public-production readiness.
 
 For normal work, touch Milestones 1-12 only for regression fixes, spec
 mismatches, vector maintenance, validation maintenance, or launch-maintenance
 updates unless the task explicitly reopens that stage. Treat current-stage work as narrow
-`milestone-25-runtime-persistence-recovery-hardening` work, not as a restart
-from earlier milestones.
+`milestone-26-bounded-operator-control-plane` work, not as a restart from
+earlier milestones.
 
 ## 3. Change policy
 

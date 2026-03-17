@@ -2,7 +2,7 @@
 
 This file exists so Codex does not silently invent protocol details.
 All currently known MVP ambiguities affecting the current
-`milestone-25-runtime-persistence-recovery-hardening` baseline are resolved below and should be reused
+`milestone-26-bounded-operator-control-plane` baseline are resolved below and should be reused
 as the conservative defaults.
 
 ## Resolved conservative choices for MVP
@@ -265,7 +265,7 @@ For current work, treat the repository stage as:
 - Milestone 12 launch hardening is implemented with bounded cleanup, degraded
   bootstrap retry, runtime health snapshots, and the logical soak path;
 - the current repository stage marker is
-  `milestone-25-runtime-persistence-recovery-hardening`;
+  `milestone-26-bounded-operator-control-plane`;
 - Milestone 17 operator-grade runtime hardening is part of the landed baseline,
   with `docs/LAUNCH_CHECKLIST.md`, the documented green-path validation and
   launch sequence, signal-aware `overlay-cli run`, config-local
@@ -296,10 +296,14 @@ For current work, treat the repository stage as:
   landed baseline, with signed bootstrap artifacts, pinned signer-key
   verification with optional SHA-256 integrity pins, trust-failure
   diagnostics, and the synchronized operator/bootstrap runbooks;
-- Milestone 25 runtime persistence and recovery hardening is now the current
-  stage, with persisted bootstrap-source preference, bounded local
+- Milestone 25 runtime persistence and recovery hardening is now part of the
+  landed baseline, with persisted bootstrap-source preference, bounded local
   service-registration intent recovery, explicit recovery fields on the
   status/doctor surfaces, and the synchronized restart/runbook docs;
+- Milestone 26 bounded operator control plane is now the current stage, with
+  `overlay-cli inspect`, bounded machine-readable operator reports that bundle
+  local status/doctor data with explicit remote lookup/open-service/relay-intro
+  probes, and the synchronized operator/runbook docs;
 
 That means:
 
@@ -317,10 +321,10 @@ That means:
   vectors, or spec mismatches;
 - Milestone 8 is closed and should be touched only for regressions,
   vectors, or spec mismatches;
-- Milestone 25 is the current stage and should stay limited to bounded runtime
-  persistence/recovery hardening, operator-runtime maintenance, regression
-  fixes, validation maintenance, and documentation synchronization unless a
-  task explicitly reopens scope;
+- Milestone 26 is the current stage and should stay limited to bounded
+  operator-surface hardening, operator-runtime maintenance, regression fixes,
+  validation maintenance, and documentation synchronization unless a task
+  explicitly reopens scope;
 - the current localhost sign-off flow is `./devnet/run-first-user-acceptance.sh`
   on the same commit after the applicable workspace validation commands;
 - `./devnet/run-pilot-checklist.sh` is retained only as the older Milestone 18
@@ -1050,6 +1054,24 @@ For the current runtime-persistence-recovery-hardening stage:
   structured logs;
 - do not persist presence records, service-open sessions, relay tunnels, path
   probes, or broad protocol-layer state.
+
+### 42. Conservative bounded operator-control-plane defaults for Milestone 26
+
+For the current bounded-operator-control-plane stage:
+
+- keep `overlay-cli doctor` local-only; it should continue to diagnose config,
+  persisted runtime state, bootstrap health, and recovery from local files;
+- add one bounded `overlay-cli inspect` surface that combines local persisted
+  status plus the existing doctor report with an explicit list of requested
+  remote `lookup`, `open-service`, and `relay-intro` probes;
+- `overlay-cli inspect` should stay machine-readable and report each requested
+  remote probe separately rather than inventing a new continuous control
+  session;
+- each requested remote probe may open one temporary operator session to the
+  chosen runtime listener and should reuse existing runtime messages rather
+  than adding a new remote status protocol;
+- these operator surfaces remain explicit and operator-directed; they do not
+  imply distributed discovery, autonomous orchestration, or a broad admin API.
 
 ## Rule
 

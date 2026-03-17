@@ -5,12 +5,12 @@ Specification-first Rust workspace for a censorship-resistant overlay network.
 ## Current Stage
 
 The current repository stage is
-`milestone-25-runtime-persistence-recovery-hardening`.
+`milestone-26-bounded-operator-control-plane`.
 
 Milestones 0-21 are landed baseline work. Current tasks should stay narrow:
 maintain the hardened bootstrap and bounded recovery boundary, keep the
-acceptance/runbook docs honest, and fix validation or runtime regressions
-without widening protocol scope.
+acceptance/runbook docs honest, and improve bounded operator usability without
+widening protocol scope.
 
 ## Current Green Path
 
@@ -34,8 +34,8 @@ The current validated surface includes:
   presence publish, exact lookup by `node_id`, relay fallback, path scoring,
   service registration/open, and structured metrics/logs;
 - `overlay-cli run`, `status`, `status --summary`, `doctor`,
-  `bootstrap-serve`, `bootstrap-sign`, `publish`, `lookup`, `open-service`,
-  and `relay-intro`;
+  `inspect`, `bootstrap-serve`, `bootstrap-sign`, `publish`, `lookup`,
+  `open-service`, and `relay-intro`;
 - repo-local proof paths in `devnet/run-smoke.sh`,
   `devnet/run-distributed-smoke.sh`, `devnet/run-multihost-smoke.sh`,
   `devnet/run-launch-gate.sh`,
@@ -49,6 +49,10 @@ The current validated surface includes:
   last-known active bootstrap peers, and local service registration intent
   embedded in `runtime_status`, plus continued bootstrap retry until a live
   source succeeds again;
+- a bounded operator inspection surface through `overlay-cli inspect`, which
+  combines one local persisted status/doctor report with an explicit set of
+  requested `lookup`, `open-service`, and `relay-intro` probes in one
+  machine-readable result;
 - an explicit acceptance pack covering fresh join, service publish/open,
   relay-fallback proof, one-bootstrap-down startup, one-relay-down service
   open, ordinary restart recovery, and stale-state cleanup;
@@ -62,8 +66,8 @@ within this bounded claim:
 - the exact acceptance scenarios in `docs/FIRST_USER_ACCEPTANCE.md` passed on
   the same commit;
 - operators use static signed bootstrap artifacts over `http://`, pinned
-  signer keys with optional SHA-256 pins, explicit point-to-point operator
-  commands, and the checked-in two-relay pilot topology;
+  signer keys with optional SHA-256 pins, explicit bounded operator surfaces,
+  and the checked-in two-relay pilot topology;
 - expected degraded cases remain explicit, including one failed primary
   relay-intro during relay-unavailable rehearsal and rejected tampered
   bootstrap artifacts;
@@ -81,12 +85,13 @@ within this bounded claim:
 - `docs/DEVNET.md`: checked-in devnet layouts and proof wrappers
 - `docs/OPEN_QUESTIONS.md`: conservative defaults for underspecified areas
 
-## Remaining Limitations After Milestone 25
+## Remaining Limitations After Milestone 26
 
 - bootstrap is still static signed artifact delivery over `http://`, not HTTPS
   or a public trust framework
-- the distributed operator commands are one-shot point-to-point proof
-  surfaces, not a general distributed control plane or discovery layer
+- operator surfaces remain explicit and operator-directed; `overlay-cli
+  inspect` bundles requested remote probes, but the repo still has no general
+  distributed control plane or discovery layer
 - restart recovery remains bounded to bootstrap-source state, last-known
   active bootstrap peers, and local service registration intent; presence
   records, service-open sessions, relay tunnels, and path probes are still

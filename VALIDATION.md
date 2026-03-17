@@ -2,7 +2,7 @@
 
 Run the following commands when applicable.
 
-## Current Milestone 25 sign-off path
+## Current Milestone 26 sign-off path
 
 Use the current first-user acceptance-pack sign-off order on the commit you intend to
 validate:
@@ -99,7 +99,7 @@ cargo test -p overlay-core --test integration_service_open
 ```
 
 Use this only when you need the older localhost rehearsal path for the landed
-Milestone 18 baseline. It is not part of current Milestone 25 sign-off.
+Milestone 18 baseline. It is not part of current Milestone 26 sign-off.
 
 ## Current first-user acceptance flow
 
@@ -249,10 +249,11 @@ cargo test -p overlay-core --test integration_service_open
 
 - Milestones 1-12 are considered implemented baseline work, and the current
   repository stage marker is
-  `milestone-25-runtime-persistence-recovery-hardening` (Milestone 25 runtime
-  persistence/recovery hardening on top of the landed Milestone 24 bootstrap
-  trust baseline and the Milestone 22 first-user acceptance baseline).
-- The current sign-off path is the top-level Milestone 25 section above:
+  `milestone-26-bounded-operator-control-plane` (Milestone 26 bounded
+  operator-control-plane hardening on top of the landed Milestone 25 runtime
+  persistence/recovery baseline, the Milestone 24 bootstrap trust baseline,
+  and the Milestone 22 first-user acceptance baseline).
+- The current sign-off path is the top-level Milestone 26 section above:
   workspace format/lint/build/test, then
   `./devnet/run-first-user-acceptance.sh`.
 - Use the Milestone 1-12 regression runs, stage-boundary smoke tests, the
@@ -302,16 +303,17 @@ cargo test -p overlay-core --test integration_service_open
   step instead of the earlier placeholder-only path.
 - `./devnet/run-multihost-smoke.sh` is the current network-bootstrap and
   host-style devnet proof path. It starts static signed bootstrap seed servers
-  over `http://`, then uses the bounded distributed operator commands to
+  over `http://`, then uses the bounded distributed operator surfaces to
   validate bootstrap, session establishment, publish, lookup, service open,
-  and relay fallback against the multi-host config layout.
+  relay fallback, and the machine-readable `overlay-cli inspect` report
+  against the multi-host config layout.
 - The Milestone 17 gate keeps the distributed and multi-host network-bootstrap
   smoke commands, upgrades the restart smoke to validate signal-driven clean
   shutdown plus `overlay-cli status`, and folds the bounded logical soak into
   the required launch order.
 - `./devnet/run-pilot-checklist.sh` remains the Milestone 18 localhost
   rehearsal pack for the smoke-harness pilot boundary; it is retained for the
-  landed baseline but is not the current Milestone 25 sign-off path.
+  landed baseline but is not the current Milestone 26 sign-off path.
 - `./devnet/run-distributed-pilot-checklist.sh` remains the current
   distributed component proof path for the dedicated pilot topology pack, the
   expanded fault matrix, the repeated relay-bind evidence, the fresh-node-join
@@ -320,13 +322,14 @@ cargo test -p overlay-core --test integration_service_open
 - `./devnet/run-doctor-smoke.sh` remains the landed operator-surface proof for
   `overlay-cli doctor` against a live runtime and is exercised through
   `./devnet/run-launch-gate.sh`.
-- `./devnet/run-first-user-acceptance.sh` is the current Milestone 25 wrapper
+- `./devnet/run-first-user-acceptance.sh` is the current Milestone 26 wrapper
   that combines the landed launch gate and the distributed acceptance
   scenarios into one bounded first-user-ready proof.
-- Milestone 25 restart-focused work should rerun `./devnet/run-restart-smoke.sh`
-  and `./devnet/run-distributed-pilot-checklist.sh` in addition to the full
-  acceptance wrapper so persisted recovery and service-host restart behavior
-  stay aligned.
+- Milestone 26 operator-surface work should rerun
+  `./devnet/run-multihost-smoke.sh`,
+  `./devnet/run-distributed-pilot-checklist.sh`, and the full acceptance
+  wrapper so the bounded inspect surface, distributed operator proofs, and
+  current-stage docs stay aligned.
 - The Milestone 12 soak path also stays in-process and advances logical time
   through repeated runtime ticks so stale-session/service/relay/probe cleanup,
   bootstrap retry, and health snapshots can be exercised without a separate

@@ -8,7 +8,7 @@ public deployment.
 ## Release metadata
 
 - Tag: `pilot-v0.1.0-rcN`
-- Repository stage: `milestone-25-runtime-persistence-recovery-hardening`
+- Repository stage: `milestone-26-bounded-operator-control-plane`
 - Commit: `<git-sha>`
 - Release date: `<YYYY-MM-DD>`
 - Operator: `<name>`
@@ -24,6 +24,8 @@ Short statement of what this pilot candidate is intended to prove.
   path, reusing the landed launch gate and distributed checklist
 - supporting repo-local proof paths in `./devnet/run-smoke.sh`,
   `./devnet/run-distributed-smoke.sh`, and `./devnet/run-multihost-smoke.sh`
+- `overlay-cli inspect` for bounded machine-readable operator reports over the
+  current host-style proof path
 - exact `node_id` lookup, exact `app_id` service resolution, and the two
   documented relay fallback paths
 - structured JSON logs and `runtime_status` snapshots
@@ -57,15 +59,18 @@ Short statement of what this pilot candidate is intended to prove.
 - `open_service`: `<notes>`
 - `relay_fallback_planned`: `<notes>`
 - `relay_fallback_bound`: `<notes>`
+- `operator_inspect`: `<notes>`
 - `smoke_complete`: `<notes>`
 
 ## Known limitations
 
-- only the last-known active bootstrap peers are recovered across restart;
-  presence, services, sessions, relay tunnels, and path probes still rebuild
+- restart recovery is bounded to bootstrap-source preference, last-known
+  active bootstrap peers, and local service registration intent; presence,
+  services, sessions, relay tunnels, and path probes still rebuild
 - static signed bootstrap over `http://...#ed25519=<pin>` with optional
   `#sha256=<pin>` integrity checks only
-- distributed operator commands are one-shot and operator-directed
+- operator surfaces are explicit and operator-directed; `overlay-cli inspect`
+  improves repeatable checks but does not add a distributed control plane
 - off-box evidence must still be collected manually from separate hosts
 - relay fallback validated only on the documented
   `node-a -> node-relay -> node-b` and `node-a -> node-relay-b -> node-b`
