@@ -722,6 +722,22 @@ pub fn build_reachability_plan(
         })
         .collect::<Result<Vec<_>, RelayError>>()?;
 
+    // Normalize duplicate relay hints first so the highest-scored candidate
+    // for a given relay+transport pair survives before final fallback ordering.
+    relay_fallbacks.sort_by(|left, right| {
+        left.relay_node_id
+            .cmp(&right.relay_node_id)
+            .then_with(|| {
+                left.relay_transport_class
+                    .as_str()
+                    .cmp(right.relay_transport_class.as_str())
+            })
+            .then_with(|| right.relay_score.cmp(&left.relay_score))
+    });
+    relay_fallbacks.dedup_by(|left, right| {
+        left.relay_node_id == right.relay_node_id
+            && left.relay_transport_class == right.relay_transport_class
+    });
     relay_fallbacks.sort_by(|left, right| {
         right
             .relay_score
@@ -732,10 +748,6 @@ pub fn build_reachability_plan(
                     .as_str()
                     .cmp(right.relay_transport_class.as_str())
             })
-    });
-    relay_fallbacks.dedup_by(|left, right| {
-        left.relay_node_id == right.relay_node_id
-            && left.relay_transport_class == right.relay_transport_class
     });
 
     Ok(ReachabilityPlan {
@@ -1153,7 +1165,7 @@ mod tests {
     }
 
     #[test]
-    fn reachability_plan_prefers_direct_first_and_keeps_secondary_relays() {
+    fn reachability_plan_prefers_direct_first_and_keeps_ordered_bounded_relays() {
         let target_signing_key = Ed25519SigningKey::from_seed([21_u8; 32]);
         let target_node_id = derive_node_id(target_signing_key.public_key().as_bytes());
         let requester_binding = b"requester-binding";
@@ -1174,10 +1186,31 @@ mod tests {
             relay_policy: vec![2_u8],
             expiry: 1_700_000_800,
         };
+        let relay_c = RelayHint {
+            relay_node_id: NodeId::from_bytes([3_u8; 32]),
+            relay_transport_class: "ws".to_string(),
+            relay_score: 75,
+            relay_policy: vec![3_u8],
+            expiry: 1_700_000_800,
+        };
+        let duplicate_relay_b = RelayHint {
+            relay_node_id: NodeId::from_bytes([1_u8; 32]),
+            relay_transport_class: "tcp".to_string(),
+            relay_score: 5,
+            relay_policy: vec![9_u8],
+            expiry: 1_700_000_800,
+        };
+        let stale_hint = RelayHint {
+            relay_node_id: NodeId::from_bytes([4_u8; 32]),
+            relay_transport_class: "tcp".to_string(),
+            relay_score: 100,
+            relay_policy: vec![4_u8],
+            expiry: 1_700_000_000,
+        };
 
         let plan = build_reachability_plan(
             &target_presence,
-            &[relay_a, relay_b],
+            &[relay_a, relay_b, relay_c, duplicate_relay_b, stale_hint],
             &verified_ticket,
             requester_binding,
             1_700_000_100,
@@ -1188,13 +1221,17 @@ mod tests {
             plan.direct_attempts,
             vec![TransportClass::Quic, TransportClass::Tcp]
         );
-        assert_eq!(plan.relay_fallback_count(), 2);
+        assert_eq!(plan.relay_fallback_count(), 3);
         assert_eq!(
             plan.relay_fallbacks[0].relay_node_id,
             NodeId::from_bytes([1_u8; 32])
         );
         assert_eq!(
             plan.relay_fallbacks[1].relay_node_id,
+            NodeId::from_bytes([3_u8; 32])
+        );
+        assert_eq!(
+            plan.relay_fallbacks[2].relay_node_id,
             NodeId::from_bytes([2_u8; 32])
         );
     }

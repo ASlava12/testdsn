@@ -1,8 +1,8 @@
 {
   "node_key_path": "../../../keys/node-relay.key",
   "bootstrap_sources": [
-    "http://127.0.0.1:4303/node-ab-seed.json#sha256=75f4106fce064522d787c6e7ce19f83f1f09e8a4f529075386891b925a4dd5b7&ed25519=03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
-    "http://127.0.0.1:4301/node-foundation.json#sha256=23c07fa403b7a117781789216a7ae403fd3014b2fa656c6c943a87b1099424e5&ed25519=03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8"
+    "http://127.0.0.1:4303/node-ab-seed.json#sha256=f8fe5832092fd86971cd1aa080f00655c7f1362ad0fa91da583b18249d132f25&ed25519=03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+    "http://127.0.0.1:4301/node-foundation.json#sha256=e8d7a479ee46d8dcf79e8187b4de5b90ea522379c018d5ea600d0fd524062455&ed25519=03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8"
   ],
   "tcp_listener_addr": "127.0.0.1:4198",
   "max_total_neighbors": 8,

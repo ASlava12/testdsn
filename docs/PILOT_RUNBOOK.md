@@ -1,12 +1,12 @@
 # Pilot Runbook
 
-This runbook defines the current Milestone 26
-bounded-operator-control-plane distributed exercise.
+This runbook defines the current Milestone 27
+relay-topology-generalization distributed exercise.
 
 It extends the landed Milestone 18 pilot pack with minimal distributed
-operator surfaces, two relay-capable fallback paths, conservative bootstrap
-artifact trust pins, and the evidence expected from the first real off-box
-pilot closure run.
+operator surfaces, three bounded relay-capable fallback paths, conservative
+bootstrap artifact trust pins, and the evidence expected from the first real
+off-box pilot closure run.
 
 It is still a pilot-only document. It does not claim public-production or
 hostile-environment readiness.
@@ -15,7 +15,7 @@ hostile-environment readiness.
 
 Use this runbook to prove:
 
-- 5 overlay nodes on 3-5 separate hosts;
+- 6 overlay nodes on 4-6 separate hosts;
 - 3 static bootstrap seeds served over `http://` as signed artifacts with
   pinned `ed25519=<hex>` trust roots and optional `sha256=<hex>` integrity
   pins;
@@ -24,10 +24,12 @@ Use this runbook to prove:
   established runtime sessions;
 - a fresh-node-join proof where `node-c` joins after the rest of the topology
   is already running;
-- two documented relay fallback paths:
-  `node-a -> node-relay -> node-b` and
-  `node-a -> node-relay-b -> node-b`;
-- the node-down, primary-relay-down, relay-unavailable-service-open,
+- three documented relay fallback paths:
+  `node-a -> node-relay -> node-b`,
+  `node-a -> node-relay-b -> node-b`, and
+  `node-a -> node-relay-c -> node-b`;
+- the node-down, primary-relay-down, repeated-relay-bind-failure-recovery,
+  relay-unavailable-service-open,
   bootstrap-seed-down, integrity-mismatch, trust-verification-fallback,
   stale-bootstrap, empty-peer-set, service-restart, and tampered-bootstrap
   scenarios;
@@ -59,13 +61,14 @@ Current pilot limits remain in force:
 
 Use the files under [devnet/pilot](../devnet/pilot).
 
-Suggested 5-host pilot:
+Suggested 6-host pilot:
 
 - `host-a`: `node-a`, seed server `0.0.0.0:4301`
 - `host-b`: `node-b`, seed server `0.0.0.0:4302`
 - `host-c`: `node-c`
 - `host-relay-a`: `node-relay`, seed server `0.0.0.0:4303`
 - `host-relay-b-ops`: `node-relay-b`, operator/report collection host
+- `host-relay-c`: `node-relay-c`
 
 Separate-host example addresses:
 
@@ -74,6 +77,7 @@ Separate-host example addresses:
 - `host-c`: `198.51.100.12`, `node-c` listener `198.51.100.12:4113`
 - `host-relay-a`: `198.51.100.13`, `node-relay` listener `198.51.100.13:4198`
 - `host-relay-b-ops`: `198.51.100.15`, `node-relay-b` listener `198.51.100.15:4197`
+- `host-relay-c`: `198.51.100.16`, `node-relay-c` listener `198.51.100.16:4196`
 
 Example node IDs from the checked-in deterministic keys:
 
@@ -81,6 +85,7 @@ Example node IDs from the checked-in deterministic keys:
 - `node-b`: `1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b`
 - `node-relay`: `16f52d6fea63ef086405aa71b537dd4833bd0b36ffe054be0fd07fb525af157d`
 - `node-relay-b`: `90bdeef49d5d2664e6ef317c3fc4dec4975f13287af7ce3ff4dd9fdf19bb2d7e`
+- `node-relay-c`: `529eb3098bf4c47a11adee0f63dbbaa72d91359d2d89b4fed36d0da93d199d35`
 
 Files:
 
@@ -135,7 +140,7 @@ Files:
    TMPDIR=/tmp cargo run -p overlay-cli -- bootstrap-serve --bind 0.0.0.0:4303 --bootstrap-file devnet/pilot/examples/bootstrap/node-ab-seed.json --signing-key-file devnet/keys/bootstrap-signer.key
    ```
 
-2. Start the four always-on runtimes on their matching hosts:
+2. Start the five always-on runtimes on their matching hosts:
 
    ```bash
    TMPDIR=/tmp cargo run -p overlay-cli -- run --config /path/to/node-a.json --status-every 30
@@ -143,6 +148,18 @@ Files:
 
    ```bash
    TMPDIR=/tmp cargo run -p overlay-cli -- run --config /path/to/node-b.json --service devnet:terminal --status-every 30
+   ```
+
+   ```bash
+   TMPDIR=/tmp cargo run -p overlay-cli -- run --config /path/to/node-relay.json --status-every 30
+   ```
+
+   ```bash
+   TMPDIR=/tmp cargo run -p overlay-cli -- run --config /path/to/node-relay-b.json --status-every 30
+   ```
+
+   ```bash
+   TMPDIR=/tmp cargo run -p overlay-cli -- run --config /path/to/node-relay-c.json --status-every 30
    ```
 
 3. Confirm each always-on node emits:
@@ -185,7 +202,7 @@ Run the baseline off-box proof in this order.
 1. Publish `node-b` presence to `node-a`:
 
    ```bash
-   TMPDIR=/tmp cargo run -p overlay-cli -- publish --config /path/to/node-b.json --target tcp://198.51.100.10:4111 --relay-ref 16f52d6fea63ef086405aa71b537dd4833bd0b36ffe054be0fd07fb525af157d --relay-ref 90bdeef49d5d2664e6ef317c3fc4dec4975f13287af7ce3ff4dd9fdf19bb2d7e --capability service-host
+   TMPDIR=/tmp cargo run -p overlay-cli -- publish --config /path/to/node-b.json --target tcp://198.51.100.10:4111 --relay-ref 16f52d6fea63ef086405aa71b537dd4833bd0b36ffe054be0fd07fb525af157d --relay-ref 90bdeef49d5d2664e6ef317c3fc4dec4975f13287af7ce3ff4dd9fdf19bb2d7e --relay-ref 529eb3098bf4c47a11adee0f63dbbaa72d91359d2d89b4fed36d0da93d199d35 --capability service-host
    ```
 
 2. Lookup `node-b` from `node-a` against the runtime that stored the presence:
@@ -212,7 +229,13 @@ Run the baseline off-box proof in this order.
    TMPDIR=/tmp cargo run -p overlay-cli -- relay-intro --config /path/to/node-b.json --target tcp://198.51.100.15:4197 --relay-node-id 90bdeef49d5d2664e6ef317c3fc4dec4975f13287af7ce3ff4dd9fdf19bb2d7e --requester-node-id 83561adb398fd87f8e7ed8331bff2fcb945733cc3012879cb9fab07928667062
    ```
 
-6. Capture one bounded operator inspection report from `node-a`:
+6. Prove the tertiary relay path:
+
+   ```bash
+   TMPDIR=/tmp cargo run -p overlay-cli -- relay-intro --config /path/to/node-b.json --target tcp://198.51.100.16:4196 --relay-node-id 529eb3098bf4c47a11adee0f63dbbaa72d91359d2d89b4fed36d0da93d199d35 --requester-node-id 83561adb398fd87f8e7ed8331bff2fcb945733cc3012879cb9fab07928667062
+   ```
+
+7. Capture one bounded operator inspection report from `node-a`:
 
    ```bash
    TMPDIR=/tmp cargo run -p overlay-cli -- inspect --config /path/to/node-a.json --lookup tcp://198.51.100.10:4111,1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b --open-service tcp://198.51.100.11:4112,1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b,devnet,terminal --relay-intro tcp://198.51.100.13:4198,16f52d6fea63ef086405aa71b537dd4833bd0b36ffe054be0fd07fb525af157d,83561adb398fd87f8e7ed8331bff2fcb945733cc3012879cb9fab07928667062
@@ -238,28 +261,31 @@ Run from the repository root for the localhost closure proof:
 This script:
 
 - starts the pilot bootstrap servers on `127.0.0.1:4301-4303`
-- starts `node-a`, `node-b`, `node-relay`, and `node-relay-b`, then starts
-  `node-c` later for the fresh-node-join proof
-- drives networked `publish`, `lookup`, `open-service`, and both relay-intro
-  paths over real runtime sessions
+- starts `node-a`, `node-b`, `node-relay`, `node-relay-b`, and
+  `node-relay-c`, then starts `node-c` later for the fresh-node-join proof
+- drives networked `publish`, `lookup`, `open-service`, and all three
+  relay-intro paths over real runtime sessions
 - exercises the fresh-node-join, node-down, primary-relay-down,
-  relay-unavailable-service-open, bootstrap-seed-down,
+  repeated-relay-bind-failure-recovery, relay-unavailable-service-open, bootstrap-seed-down,
   integrity-mismatch, trust-verification-fallback, stale-bootstrap,
   empty-peer-set, service-host-restart, and tampered-bootstrap-artifact
   scenarios
 - emits JSON lines for each scenario plus a final `pilot_checklist_complete`
   summary
 
-Operational note:
+Operational notes:
 
 - during `relay-unavailable`, the first relay-intro attempt against
   `node-relay` is expected to fail once before the alternate `node-relay-b`
   path succeeds; treat the final scenario result and
   `pilot_checklist_complete` summary as the pass signal.
+- during `repeated-relay-bind-failure-recovery`, the relay-intro attempts
+  against `node-relay` and `node-relay-b` are expected to fail before the
+  tertiary `node-relay-c` path succeeds.
 
 ## Fault scenarios
 
-Record all eleven scenarios in the pilot report:
+Record all thirteen scenarios in the pilot report:
 
 1. `fresh-node-join`
 
@@ -270,8 +296,8 @@ Record all eleven scenarios in the pilot report:
 2. `node-c-down`
 
    - `node-c` is unavailable
-   - expected outcome: `publish`, `lookup`, `open-service`, and both relay
-     paths still succeed
+   - expected outcome: `publish`, `lookup`, `open-service`, and all three
+     relay paths still succeed
 
 3. `relay-unavailable`
 
@@ -285,13 +311,26 @@ Record all eleven scenarios in the pilot report:
    - expected outcome: the primary relay-intro attempt degrades once, the
      alternate relay path still binds, and `open-service` still succeeds
 
-5. `bootstrap-seed-unavailable`
+5. `three-relay-candidate-set`
+
+   - the checked-in pilot pack exposes `node-relay`, `node-relay-b`, and
+     `node-relay-c` as bounded relay candidates
+   - expected outcome: all three documented relay paths bind in the baseline
+     proof
+
+6. `repeated-relay-bind-failure-recovery`
+
+   - `node-relay` and `node-relay-b` are unavailable
+   - expected outcome: two relay-intro attempts fail explicitly, and the
+     tertiary path via `node-relay-c` still succeeds
+
+7. `bootstrap-seed-unavailable`
 
    - the `node-a-seed.json` server is intentionally unavailable
    - expected outcome: bootstrap still succeeds with the remaining pinned seed
      URLs
 
-6. `service-host-restart`
+8. `service-host-restart`
 
    - `node-b` is restarted after the baseline publish/lookup flow
    - expected outcome: the service host comes back cleanly, `startup_count`
@@ -299,35 +338,35 @@ Record all eleven scenarios in the pilot report:
      re-passing `--service`, `open-service` succeeds again after restart, and
      the alternate relay path binds again
 
-7. `integrity-mismatch-fallback`
+9. `integrity-mismatch-fallback`
 
    - one configured bootstrap source uses a deliberately bad SHA-256 pin
    - expected outcome: startup still reaches `running` through the later
      configured source, and `health.bootstrap.last_attempt_summary` reports one
      `integrity_mismatch_sources`
 
-8. `trust-verification-fallback`
+10. `trust-verification-fallback`
 
    - one configured bootstrap source uses a deliberately bad signer pin
    - expected outcome: startup still reaches `running` through the later
      configured source, and `health.bootstrap.last_attempt_summary` reports one
      `trust_verification_failed_sources`
 
-9. `stale-bootstrap-fallback`
+11. `stale-bootstrap-fallback`
 
    - one configured bootstrap source is present but expired
    - expected outcome: startup still reaches `running` through the later
      configured source, and `health.bootstrap.last_attempt_summary` reports one
      `stale_sources`
 
-10. `empty-bootstrap-fallback`
+12. `empty-bootstrap-fallback`
 
    - one configured bootstrap source validates but contains an empty peer set
    - expected outcome: startup still reaches `running` through the later
      configured source, and `health.bootstrap.last_attempt_summary` reports one
      `empty_peer_set_sources`
 
-11. `tampered-bootstrap-artifact`
+13. `tampered-bootstrap-artifact`
 
    - a config is pointed at a deliberately pin-mismatched bootstrap artifact
    - expected outcome: `bootstrap_fetch` reports `integrity_mismatch` and
@@ -342,7 +381,7 @@ Record all eleven scenarios in the pilot report:
 - `./devnet/run-multihost-smoke.sh` result on the validated commit
 - `./devnet/run-distributed-pilot-checklist.sh --evidence-dir <dir>` result on
   the validated commit
-- the raw off-box `publish`, `lookup`, `open-service`, and both `relay-intro`
+- the raw off-box `publish`, `lookup`, `open-service`, and all three `relay-intro`
   command outputs
 - per-host `overlay-cli status --config ...` JSON snapshots
 - per-host `overlay-cli status --config ... --summary` excerpts
@@ -351,13 +390,13 @@ Record all eleven scenarios in the pilot report:
 - bootstrap status excerpts showing `last_attempt_summary` and `last_sources`
   for any degraded or fallback startup
 - lookup latency values from the `lookup` command
-- relay path evidence from both `relay-intro` commands and relay status output
+- relay path evidence from all three `relay-intro` commands and relay status output
 - service restart evidence from the persisted status JSON
 - tampered-bootstrap integrity-mismatch logs
 
-## Remaining limitations after Milestone 26
+## Remaining limitations after Milestone 27
 
-- The localhost acceptance pack is the current Milestone 26 green path, but it still
+- The localhost acceptance pack is the current Milestone 27 green path, but it still
   does not replace the required off-box pilot evidence on separate hosts for a
   release note.
 - Bootstrap remains static signed artifact delivery over `http://`; operators
@@ -368,7 +407,7 @@ Record all eleven scenarios in the pilot report:
 - Presence, service-open sessions, relay tunnels, and path probes still reset
   on restart except for the bounded bootstrap-source, active-peer, and local
   service-intent recovery state.
-- Relay proof remains bounded to the checked-in two-relay topology rather than
+- Relay proof remains bounded to the checked-in three-relay topology rather than
   arbitrary relay graphs or public-network conditions.
 
 Use [docs/PILOT_REPORT_TEMPLATE.md](PILOT_REPORT_TEMPLATE.md)

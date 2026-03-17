@@ -37,6 +37,13 @@
       "capabilities": ["relay-forward", "relay-intro"],
       "dial_hints": ["tcp://127.0.0.1:4197"],
       "observed_role": "relay"
+    },
+    {
+      "node_id": [82, 158, 179, 9, 139, 244, 196, 122, 17, 173, 238, 15, 99, 219, 186, 167, 45, 145, 53, 157, 45, 137, 180, 254, 211, 109, 13, 169, 61, 25, 157, 53],
+      "transport_classes": ["relay", "tcp"],
+      "capabilities": ["relay-forward", "relay-intro"],
+      "dial_hints": ["tcp://127.0.0.1:4196"],
+      "observed_role": "relay"
     }
   ],
   "bridge_hints": []

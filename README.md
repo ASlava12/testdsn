@@ -5,12 +5,12 @@ Specification-first Rust workspace for a censorship-resistant overlay network.
 ## Current Stage
 
 The current repository stage is
-`milestone-26-bounded-operator-control-plane`.
+`milestone-27-relay-topology-generalization`.
 
-Milestones 0-21 are landed baseline work. Current tasks should stay narrow:
+Milestones 0-26 are landed baseline work. Current tasks should stay narrow:
 maintain the hardened bootstrap and bounded recovery boundary, keep the
-acceptance/runbook docs honest, and improve bounded operator usability without
-widening protocol scope.
+acceptance/runbook docs honest, and improve bounded relay-topology proof
+coverage without widening protocol scope.
 
 ## Current Green Path
 
@@ -54,8 +54,9 @@ The current validated surface includes:
   requested `lookup`, `open-service`, and `relay-intro` probes in one
   machine-readable result;
 - an explicit acceptance pack covering fresh join, service publish/open,
-  relay-fallback proof, one-bootstrap-down startup, one-relay-down service
-  open, ordinary restart recovery, and stale-state cleanup;
+  deterministic three-relay candidate proof, one-bootstrap-down startup,
+  one-relay-down service open, repeated relay-bind failure recovery, ordinary
+  restart recovery, and stale-state cleanup;
 - the dedicated distributed pilot pack under `devnet/pilot/`.
 
 ## First-User Ready Boundary
@@ -67,10 +68,11 @@ within this bounded claim:
   the same commit;
 - operators use static signed bootstrap artifacts over `http://`, pinned
   signer keys with optional SHA-256 pins, explicit bounded operator surfaces,
-  and the checked-in two-relay pilot topology;
+  and the checked-in bounded three-relay pilot topology;
 - expected degraded cases remain explicit, including one failed primary
-  relay-intro during relay-unavailable rehearsal and rejected tampered
-  bootstrap artifacts;
+  relay-intro during relay-unavailable rehearsal, two failed relay-intro
+  attempts before tertiary recovery in the repeated-failure rehearsal, and
+  rejected tampered bootstrap artifacts;
 - separate-host evidence is still attached before the claim is used for a
   release note.
 
@@ -85,7 +87,7 @@ within this bounded claim:
 - `docs/DEVNET.md`: checked-in devnet layouts and proof wrappers
 - `docs/OPEN_QUESTIONS.md`: conservative defaults for underspecified areas
 
-## Remaining Limitations After Milestone 26
+## Remaining Limitations After Milestone 27
 
 - bootstrap is still static signed artifact delivery over `http://`, not HTTPS
   or a public trust framework
@@ -96,8 +98,8 @@ within this bounded claim:
   active bootstrap peers, and local service registration intent; presence
   records, service-open sessions, relay tunnels, and path probes are still
   rebuilt
-- relay fallback is proven for the checked-in two-relay pilot topology, not
-  arbitrary relay graphs or public-network conditions
+- relay fallback is proven for the checked-in bounded three-relay pilot
+  topology, not arbitrary relay graphs or public-network conditions
 - off-box evidence still must be collected on the validated commit before a
   release note can claim first-user-ready status
 

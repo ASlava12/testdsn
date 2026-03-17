@@ -1,10 +1,10 @@
 {
-  "node_key_path": "../../../keys/node-b.key",
+  "node_key_path": "../../../keys/node-relay-c.key",
   "bootstrap_sources": [
-    "http://198.51.100.11:4302/node-a-seed.json#sha256=ead3604779b8c6e20ca474a416f31195362bb82f5737bd1514110f3f047a28af&ed25519=03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+    "http://198.51.100.13:4303/node-ab-seed.json#sha256=546736583f3f593c3c90f8f9e187da2eefa02ec867e0ef81d8cb022330d5389d&ed25519=03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
     "http://198.51.100.10:4301/node-foundation.json#sha256=d0fd2583a48fdb105716c81b2bc6a3379faad212c2acbb2e6d929330ac28dd00&ed25519=03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8"
   ],
-  "tcp_listener_addr": "198.51.100.11:4112",
+  "tcp_listener_addr": "198.51.100.16:4196",
   "max_total_neighbors": 8,
   "max_presence_records": 64,
   "max_service_records": 16,
@@ -12,6 +12,6 @@
   "epoch_duration_s": 60,
   "path_probe_interval_ms": 5000,
   "max_transport_buffer_bytes": 65536,
-  "relay_mode": false,
+  "relay_mode": true,
   "log_level": "info"
 }

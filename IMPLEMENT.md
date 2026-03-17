@@ -8,9 +8,9 @@ The repository has a closed Milestone 1-12 baseline, a landed Milestone 14
 pilot launch gate, a landed Milestone 16 network-bootstrap stage, a landed
 Milestone 17 operator-runtime stage, a landed Milestone 18 real-pilot stage,
 the landed Milestone 20 regular-distributed-use-closure stage, and the current
-Milestone 26 bounded-operator-control-plane stage.
+Milestone 27 relay-topology-generalization stage.
 The current repository stage marker is
-`milestone-26-bounded-operator-control-plane`.
+`milestone-27-relay-topology-generalization`.
 
 ## Current operator-surface green path
 
@@ -224,6 +224,15 @@ remains a retained Milestone 18 localhost rehearsal only.
   explicit remote lookup/open-service/relay-intro probes, and updated host-style
   smoke coverage for that operator surface. The repository stage marker now
   advances to `milestone-26-bounded-operator-control-plane`.
+- Milestone 27 relay-topology-generalization support is now implemented in
+  `crates/overlay-core/src/relay/mod.rs`,
+  `crates/overlay-core/tests/integration_relay_fallback.rs`,
+  `devnet/run-distributed-pilot-checklist.sh`,
+  `devnet/pilot/`, and the synchronized relay/runbook docs, with bounded
+  three-relay pilot topology proof, deterministic multi-candidate relay-plan
+  coverage, repeated relay-bind failure recovery through a later bounded
+  candidate, and synchronized Milestone 27 docs. The repository stage marker
+  now advances to `milestone-27-relay-topology-generalization`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -231,8 +240,8 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Use `prompts/codex-milestone-26.md` as the recommended next-task prompt for the
-current `milestone-26-bounded-operator-control-plane` stage and keep
+Use `prompts/codex-milestone-27.md` as the recommended next-task prompt for the
+current `milestone-27-relay-topology-generalization` stage and keep
 work conservative from the current first-user-ready boundary:
 
 1. preserve the current launch surface documented in
@@ -241,7 +250,7 @@ work conservative from the current first-user-ready boundary:
 2. keep Milestones 1-12 limited to regression fixes, launch-maintenance
    updates, vector maintenance, or conservative spec-conformance fixes;
 3. prefer pilot execution support, validation maintenance, documentation sync,
-   and bounded operator-surface hardening over feature expansion;
+   and bounded relay-topology hardening over feature expansion;
 4. rerun the documented first-user acceptance flow whenever `REPOSITORY_STAGE`,
    `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, `VALIDATION.md`,
    `docs/FIRST_USER_ACCEPTANCE.md`, launch docs, pilot docs, or current-stage

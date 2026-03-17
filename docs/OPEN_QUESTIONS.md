@@ -2,7 +2,7 @@
 
 This file exists so Codex does not silently invent protocol details.
 All currently known MVP ambiguities affecting the current
-`milestone-26-bounded-operator-control-plane` baseline are resolved below and should be reused
+`milestone-27-relay-topology-generalization` baseline are resolved below and should be reused
 as the conservative defaults.
 
 ## Resolved conservative choices for MVP
@@ -265,7 +265,7 @@ For current work, treat the repository stage as:
 - Milestone 12 launch hardening is implemented with bounded cleanup, degraded
   bootstrap retry, runtime health snapshots, and the logical soak path;
 - the current repository stage marker is
-  `milestone-26-bounded-operator-control-plane`;
+  `milestone-27-relay-topology-generalization`;
 - Milestone 17 operator-grade runtime hardening is part of the landed baseline,
   with `docs/LAUNCH_CHECKLIST.md`, the documented green-path validation and
   launch sequence, signal-aware `overlay-cli run`, config-local
@@ -300,10 +300,15 @@ For current work, treat the repository stage as:
   landed baseline, with persisted bootstrap-source preference, bounded local
   service-registration intent recovery, explicit recovery fields on the
   status/doctor surfaces, and the synchronized restart/runbook docs;
-- Milestone 26 bounded operator control plane is now the current stage, with
+- Milestone 26 bounded operator control plane is now part of the landed
+  baseline, with
   `overlay-cli inspect`, bounded machine-readable operator reports that bundle
   local status/doctor data with explicit remote lookup/open-service/relay-intro
   probes, and the synchronized operator/runbook docs;
+- Milestone 27 relay and topology generalization is now the current stage,
+  with bounded three-relay pilot topology proof, deterministic
+  multi-candidate relay-plan coverage, repeated relay-bind failure recovery
+  through a later bounded candidate, and the synchronized relay/runbook docs;
 
 That means:
 
@@ -321,8 +326,8 @@ That means:
   vectors, or spec mismatches;
 - Milestone 8 is closed and should be touched only for regressions,
   vectors, or spec mismatches;
-- Milestone 26 is the current stage and should stay limited to bounded
-  operator-surface hardening, operator-runtime maintenance, regression fixes,
+- Milestone 27 is the current stage and should stay limited to bounded
+  relay-topology hardening, operator-runtime maintenance, regression fixes,
   validation maintenance, and documentation synchronization unless a task
   explicitly reopens scope;
 - the current localhost sign-off flow is `./devnet/run-first-user-acceptance.sh`
@@ -1072,6 +1077,23 @@ For the current bounded-operator-control-plane stage:
   than adding a new remote status protocol;
 - these operator surfaces remain explicit and operator-directed; they do not
   imply distributed discovery, autonomous orchestration, or a broad admin API.
+
+### 43. Conservative bounded relay-topology defaults for Milestone 27
+
+For the current relay-topology-generalization stage:
+
+- keep relay planning local, deterministic, and bounded to the explicit relay
+  candidates already present in the plan or pilot config;
+- the current proof pack may expose up to three relay-capable candidates, but
+  it must not imply arbitrary relay-graph exploration or public-network relay
+  closure;
+- when a relay-intro attempt fails or a relay is unavailable, advance only to
+  the next deterministic candidate in fallback order; do not recurse through
+  relay-on-relay chains or invent discovery;
+- make repeated relay failures explicit in logs, checklist output, and
+  runbooks instead of silently suppressing them;
+- keep the broader first-user-ready claim bounded to the checked-in
+  three-relay pilot topology until a larger topology is separately validated.
 
 ## Rule
 

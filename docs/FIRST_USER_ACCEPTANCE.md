@@ -1,7 +1,7 @@
 # First-User Acceptance
 
-This document defines the current Milestone 26
-bounded-operator-control-plane acceptance boundary.
+This document defines the current Milestone 27
+relay-topology-generalization acceptance boundary.
 
 It is the bounded basis for describing the repository as sufficiently working
 for first users. It is not a public-production or hostile-environment claim.
@@ -52,22 +52,31 @@ The current first-user-ready claim is bounded to these scenarios:
    - direct attempts are treated as lost for the rehearsal path;
    - relay fallback is planned and bound on the documented relay paths.
 
-5. `bootstrap-source-unavailable`
+5. `three-relay-candidate-set`
+   - the checked-in pilot pack exposes three bounded relay-capable candidates;
+   - each documented relay path binds successfully in the baseline proof.
+
+6. `bootstrap-source-unavailable`
    - one configured bootstrap source is unavailable;
    - startup still succeeds through the remaining configured sources.
 
-6. `trust-verification-fallback`
+7. `trust-verification-fallback`
    - one configured bootstrap source uses a deliberately bad signer pin;
    - startup still succeeds through a later configured trusted source;
    - runtime bootstrap status reports a trust-verification failure explicitly.
 
-7. `relay-unavailable-service-open`
+8. `relay-unavailable-service-open`
    - the primary relay is unavailable;
    - the primary relay-intro attempt degrades as expected;
    - the alternate relay path still binds;
    - `open-service` still succeeds where expected.
 
-8. `ordinary-restart-recovery`
+9. `repeated-relay-bind-failure-recovery`
+   - the primary and secondary relays are unavailable;
+   - two relay-intro attempts fail explicitly;
+   - the tertiary relay path still binds successfully.
+
+10. `ordinary-restart-recovery`
    - a node receives an ordinary `SIGTERM` shutdown;
    - persisted status remains readable;
    - the next startup recovers usable bootstrap/source state through the
@@ -76,7 +85,7 @@ The current first-user-ready claim is bounded to these scenarios:
      present before shutdown;
    - later startup state remains explicitly marked as recovered.
 
-9. `stale-presence-and-expired-state-recovery`
+11. `stale-presence-and-expired-state-recovery`
    - presence refresh republishes before local expiry;
    - stale managed sessions, stale service-open sessions, stale relay tunnels,
      and stale path probes are pruned during the bounded soak path.
@@ -87,9 +96,11 @@ The current first-user-ready claim is bounded to these scenarios:
 - `service-publish`: `./devnet/run-distributed-pilot-checklist.sh`
 - `service-discover-and-open`: `./devnet/run-distributed-pilot-checklist.sh`
 - `direct-path-loss-relay-fallback`: `./devnet/run-distributed-pilot-checklist.sh`
+- `three-relay-candidate-set`: `./devnet/run-distributed-pilot-checklist.sh`
 - `bootstrap-source-unavailable`: `./devnet/run-distributed-pilot-checklist.sh`
 - `trust-verification-fallback`: `./devnet/run-distributed-pilot-checklist.sh`
 - `relay-unavailable-service-open`: `./devnet/run-distributed-pilot-checklist.sh`
+- `repeated-relay-bind-failure-recovery`: `./devnet/run-distributed-pilot-checklist.sh`
 - `ordinary-restart-recovery`: `./devnet/run-restart-smoke.sh` and the
   service-host-restart scenario inside
   `./devnet/run-distributed-pilot-checklist.sh`
@@ -101,6 +112,8 @@ These outcomes are part of the current honest acceptance boundary:
 
 - during `relay-unavailable`, one primary relay-intro failure against the
   unavailable relay is expected before the alternate relay path succeeds;
+- during `repeated-relay-bind-failure-recovery`, two relay-intro failures
+  against unavailable relays are expected before the tertiary path succeeds;
 - a bootstrap source with a bad `#ed25519=<pin>` is expected to report
   `trust_verification_failed` and may still recover through a later trusted
   source;
@@ -119,8 +132,8 @@ when all of the following are true:
 - the acceptance wrapper reached `first_user_acceptance_complete`;
 - operators stay within the checked-in topology, bounded explicit operator
   surfaces (`publish`, `lookup`, `open-service`, `relay-intro`, and
-  `inspect`), and the signed bootstrap-artifact model described in the
-  runbooks;
+  `inspect`), the signed bootstrap-artifact model described in the runbooks,
+  and the checked-in bounded three-relay pilot topology;
 - separate-host evidence is collected for the same commit before the claim is
   used in a release note or handoff.
 

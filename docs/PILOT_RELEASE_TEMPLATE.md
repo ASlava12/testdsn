@@ -8,7 +8,7 @@ public deployment.
 ## Release metadata
 
 - Tag: `pilot-v0.1.0-rcN`
-- Repository stage: `milestone-26-bounded-operator-control-plane`
+- Repository stage: `milestone-27-relay-topology-generalization`
 - Commit: `<git-sha>`
 - Release date: `<YYYY-MM-DD>`
 - Operator: `<name>`
@@ -26,7 +26,7 @@ Short statement of what this pilot candidate is intended to prove.
   `./devnet/run-distributed-smoke.sh`, and `./devnet/run-multihost-smoke.sh`
 - `overlay-cli inspect` for bounded machine-readable operator reports over the
   current host-style proof path
-- exact `node_id` lookup, exact `app_id` service resolution, and the two
+- exact `node_id` lookup, exact `app_id` service resolution, and the three
   documented relay fallback paths
 - structured JSON logs and `runtime_status` snapshots
 
@@ -73,8 +73,9 @@ Short statement of what this pilot candidate is intended to prove.
   improves repeatable checks but does not add a distributed control plane
 - off-box evidence must still be collected manually from separate hosts
 - relay fallback validated only on the documented
-  `node-a -> node-relay -> node-b` and `node-a -> node-relay-b -> node-b`
-  paths
+  `node-a -> node-relay -> node-b`,
+  `node-a -> node-relay-b -> node-b`, and
+  `node-a -> node-relay-c -> node-b` paths
 - pilot-only release; not a public-production deployment claim
 
 ## Go / no-go

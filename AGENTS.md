@@ -86,7 +86,7 @@ Do not add by default:
   conservative bootstrap retry, runtime health snapshots, status dumps, and the
   logical soak path.
 - The current repository stage marker is
-  `milestone-26-bounded-operator-control-plane`.
+  `milestone-27-relay-topology-generalization`.
 - Milestone 14 launch gate and pilot tag remains part of the landed pilot
   baseline.
 - Milestone 16 network bootstrap and multi-host devnet is implemented with
@@ -139,16 +139,22 @@ Do not add by default:
   explicit recovery fields on the status/doctor surfaces, updated restart
   smoke/checklist proof, and synchronized recovery/runbook docs. This stage
   still does not claim hostile-environment or public-production readiness.
-- Milestone 26 bounded operator control plane is the current stage with
+- Milestone 26 bounded operator control plane remains part of the landed
+  baseline with
   `overlay-cli inspect`, machine-readable bounded operator reports that bundle
   local status/doctor data with explicit remote lookup/service/relay probes,
   improved operator runbooks, and synchronized Milestone 26 docs. This stage
+  still does not claim hostile-environment or public-production readiness.
+- Milestone 27 relay and topology generalization is the current stage with a
+  bounded third relay-capable pilot node, deterministic multi-candidate relay
+  planning proof, repeated relay-bind failure recovery through a later bounded
+  candidate, and synchronized Milestone 27 docs. This stage
   still does not claim hostile-environment or public-production readiness.
 
 For normal work, touch Milestones 1-12 only for regression fixes, spec
 mismatches, vector maintenance, validation maintenance, or launch-maintenance
 updates unless the task explicitly reopens that stage. Treat current-stage work as narrow
-`milestone-26-bounded-operator-control-plane` work, not as a restart from
+`milestone-27-relay-topology-generalization` work, not as a restart from
 earlier milestones.
 
 ## 3. Change policy

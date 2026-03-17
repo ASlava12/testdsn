@@ -141,6 +141,11 @@ The concise operator summary can be read with:
 TMPDIR=/tmp cargo run -p overlay-cli -- status --config <example-path> --summary
 ```
 
+For the current bounded relay-topology proof pack, the dedicated pilot examples
+under [devnet/pilot/examples/configs](../devnet/pilot/examples/configs)
+now include three relay-capable nodes:
+`node-relay.json`, `node-relay-b.json`, and `node-relay-c.json`.
+
 ## Bootstrap seed files
 
 Bootstrap seed JSON files are separate from node config JSON files. The checked

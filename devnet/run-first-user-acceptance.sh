@@ -72,13 +72,17 @@ grep -q '"restored_service_intents":1' "${launch_gate_log}"
 grep -q '"state":"recovered_from_peer_cache"' "${launch_gate_log}"
 
 grep -q '"step":"pilot_scenario","scenario":"fresh-node-join","result":"ok"' "${distributed_acceptance_log}"
+grep -q '"step":"pilot_scenario","scenario":"three-relay-candidate-set","result":"ok"' "${distributed_acceptance_log}"
 grep -q '"step":"pilot_scenario","scenario":"relay-unavailable-service-open","result":"ok"' "${distributed_acceptance_log}"
+grep -q '"step":"pilot_scenario","scenario":"repeated-relay-bind-failure-recovery","result":"ok"' "${distributed_acceptance_log}"
 grep -q '"fresh_node_join":"ok"' "${distributed_acceptance_log}"
 grep -q '"service_publish":"ok"' "${distributed_acceptance_log}"
 grep -q '"service_open":"ok"' "${distributed_acceptance_log}"
 grep -q '"direct_path_loss_relay_fallback":"ok"' "${distributed_acceptance_log}"
+grep -q '"three_relay_candidate_set":"ok"' "${distributed_acceptance_log}"
 grep -q '"bootstrap_seed_unavailable":"ok"' "${distributed_acceptance_log}"
 grep -q '"relay_unavailable_service_open":"ok"' "${distributed_acceptance_log}"
+grep -q '"repeated_relay_bind_failure_recovery":"ok"' "${distributed_acceptance_log}"
 grep -q '"service_restart":"ok"' "${distributed_acceptance_log}"
 grep -q '"tampered_bootstrap":"rejected"' "${distributed_acceptance_log}"
 
@@ -89,13 +93,15 @@ echo '{"step":"acceptance_scenario","scenario":"fresh-node-join","result":"ok"}'
 echo '{"step":"acceptance_scenario","scenario":"service-publish","result":"ok"}'
 echo '{"step":"acceptance_scenario","scenario":"service-discover-and-open","result":"ok"}'
 echo '{"step":"acceptance_scenario","scenario":"direct-path-loss-relay-fallback","result":"ok"}'
+echo '{"step":"acceptance_scenario","scenario":"three-relay-candidate-set","result":"ok"}'
 echo '{"step":"acceptance_scenario","scenario":"bootstrap-source-unavailable","result":"ok"}'
 echo '{"step":"acceptance_scenario","scenario":"relay-unavailable-service-open","result":"ok"}'
+echo '{"step":"acceptance_scenario","scenario":"repeated-relay-bind-failure-recovery","result":"ok"}'
 echo '{"step":"acceptance_scenario","scenario":"ordinary-restart-recovery","result":"ok"}'
 echo '{"step":"acceptance_scenario","scenario":"stale-presence-and-expired-state-recovery","result":"ok"}'
 echo '{"step":"acceptance_scenario","scenario":"tampered-bootstrap-artifact","result":"expected_rejected"}'
 
-echo '{"step":"first_user_acceptance_complete","launch_gate":"ok","distributed_acceptance":"ok","fresh_node_join":"ok","service_publish":"ok","service_discover_and_open":"ok","direct_path_loss_relay_fallback":"ok","bootstrap_source_unavailable":"ok","relay_unavailable":"expected_degraded","relay_unavailable_service_open":"ok","restart_recovery":"ok","stale_presence_and_expired_state_recovery":"ok","tampered_bootstrap":"expected_rejected","boundary":"first-user-ready-bounded"}'
+echo '{"step":"first_user_acceptance_complete","launch_gate":"ok","distributed_acceptance":"ok","fresh_node_join":"ok","service_publish":"ok","service_discover_and_open":"ok","direct_path_loss_relay_fallback":"ok","three_relay_candidate_set":"ok","bootstrap_source_unavailable":"ok","relay_unavailable":"expected_degraded","relay_unavailable_service_open":"ok","repeated_relay_bind_failure_recovery":"ok","restart_recovery":"ok","stale_presence_and_expired_state_recovery":"ok","tampered_bootstrap":"expected_rejected","boundary":"first-user-ready-bounded"}'
 if [[ "${preserve_evidence}" == "yes" ]]; then
   echo "{\"step\":\"first_user_acceptance_evidence\",\"path\":\"${tmpdir}\"}"
 fi

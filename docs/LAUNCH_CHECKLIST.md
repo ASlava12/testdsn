@@ -1,13 +1,13 @@
 # Launch Checklist
 
 This checklist defines the landed Milestone 17 operator-runtime gate that
-remains the first component of the current Milestone 26
-bounded-operator-control-plane stage.
+remains the first component of the current Milestone 27
+relay-topology-generalization stage.
 
 It is a pilot gate, not a public-production or hostile-Internet readiness
 claim.
 
-For current Milestone 26 sign-off, the bounded acceptance flow is
+For current Milestone 27 sign-off, the bounded acceptance flow is
 `./devnet/run-first-user-acceptance.sh` on the same commit after the
 applicable workspace validation commands.
 
@@ -128,8 +128,11 @@ Optional evidence-preserving form:
 Pass criteria:
 
 - the baseline distributed operator flow succeeds;
-- the `node-c-down` scenario still completes and both relay paths bind again;
+- the `node-c-down` scenario still completes and all three relay paths bind
+  again;
 - the primary-relay-down scenario falls back to the alternate relay path;
+- the repeated-relay-bind-failure-recovery scenario reaches the tertiary relay
+  path after two explicit relay-intro failures;
 - the primary relay may emit one expected connection failure during the
   `relay-unavailable` scenario, but the checklist still passes only if the
   alternate relay path succeeds and the final summary reaches
@@ -168,8 +171,10 @@ Pass criteria:
   raw logs and status snapshots that back the final summary.
 - The current checklist proves the documented relay paths
   `node-a -> node-relay -> node-b` and
-  `node-a -> node-relay-b -> node-b` across the checked-in node-down,
-  primary-relay-down, and service-restart scenarios only.
+  `node-a -> node-relay-b -> node-b` and
+  `node-a -> node-relay-c -> node-b` across the checked-in node-down,
+  primary-relay-down, repeated-relay-failure, and service-restart scenarios
+  only.
 
 ## Green path launch sequence
 
@@ -250,15 +255,16 @@ Workflow:
 - The multi-host smoke and the distributed pilot checklist prove point-to-point
   networked operator flows only; they do not imply autonomous routing of those
   control messages through arbitrary peers.
-- Relay fallback is now proven for the checked-in two-relay topology only:
+- Relay fallback is now proven for the checked-in three-relay topology only:
   `node-a -> node-relay -> node-b` and
-  `node-a -> node-relay-b -> node-b`.
+  `node-a -> node-relay-b -> node-b` and
+  `node-a -> node-relay-c -> node-b`.
 - Lookup is exact-by-`node_id` only, and service resolution is exact-by-`app_id`
   only.
 - Relay quotas and most service-open policy are still code-level defaults rather
   than a rich operator-configurable surface.
 
-## Remaining limitations after Milestone 26
+## Remaining limitations after Milestone 27
 
 - Run and attach the off-box pilot report for the exact commit being signed
   off; the localhost checklist is necessary but not sufficient evidence for a
@@ -275,5 +281,5 @@ Workflow:
   system.
 - Expect restart loss of presence, service-open state, relay tunnels, and path
   probes until durable protocol-state persistence is explicitly added.
-- Treat the checked-in two-relay topology as the only proven relay closure
+- Treat the checked-in three-relay topology as the only proven relay closure
   layout for the current stage.

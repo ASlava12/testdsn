@@ -1,7 +1,7 @@
 # Devnet
 
 This directory contains the checked-in devnet and pilot assets for the current
-Milestone 26 stage:
+Milestone 27 stage:
 
 - the original four-node local-file devnet under `configs/` and `bootstrap/`
 - the host-style multi-host devnet layouts under `hosts/`
@@ -16,6 +16,7 @@ Nodes:
 - `node-c`: extra peer so the seed set is not a 2-node degenerate case
 - `node-relay`: primary relay node
 - `node-relay-b`: alternate relay node in the pilot pack
+- `node-relay-c`: tertiary relay node in the pilot pack
 
 ## Files
 
@@ -29,7 +30,7 @@ Nodes:
 - `run-multihost-smoke.sh`: wrapper around the host-style network-bootstrap smoke
   plus the bounded `overlay-cli inspect` report
 - `run-distributed-pilot-checklist.sh`: wrapper around the current distributed pilot checklist
-- `run-first-user-acceptance.sh`: wrapper around the current Milestone 26
+- `run-first-user-acceptance.sh`: wrapper around the current Milestone 27
   first-user acceptance flow
 - `run-pilot-checklist.sh`: retained Milestone 18 localhost rehearsal pack,
   not the current sign-off path
@@ -127,9 +128,9 @@ Optional evidence-preserving form:
 This starts the dedicated pilot bootstrap servers, runs the current distributed
 operator flow against `pilot/localhost/`, exercises the documented fault
 scenarios including unavailable/integrity/stale/empty bootstrap cases, checks
-service-host restart/status behavior plus repeated relay binds, validates
-tampered bootstrap rejection, and emits a final `pilot_checklist_complete`
-summary.
+service-host restart/status behavior plus three relay candidates and repeated
+relay-bind failure recovery, validates tampered bootstrap rejection, and emits
+a final `pilot_checklist_complete` summary.
 
 This is the current localhost sign-off path after `./devnet/run-launch-gate.sh`.
 
@@ -147,3 +148,5 @@ This is the current localhost sign-off path after `./devnet/run-launch-gate.sh`.
   only
 - lookup is still exact-by-`node_id` only, and service resolution is still
   exact-by-`app_id` only
+- relay fallback proof remains bounded to the checked-in three-relay pilot
+  pack, not arbitrary relay graphs

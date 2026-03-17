@@ -34,6 +34,13 @@ fn relay_fallback_plan_tracks_current_stage_boundary() {
             relay_policy: vec![2_u8],
             expiry: now_unix_s + 600,
         },
+        RelayHint {
+            relay_node_id: overlay_core::identity::NodeId::from_bytes([13_u8; 32]),
+            relay_transport_class: "ws".to_string(),
+            relay_score: 70,
+            relay_policy: vec![3_u8],
+            expiry: now_unix_s + 600,
+        },
     ];
     let mut relay_manager = RelayManager::new(RelayConfig::default().with_relay_mode(true))
         .expect("relay config should be valid");
@@ -55,10 +62,14 @@ fn relay_fallback_plan_tracks_current_stage_boundary() {
             overlay_core::transport::TransportClass::Tcp
         ]
     );
-    assert_eq!(plan.relay_fallbacks.len(), 2);
+    assert_eq!(plan.relay_fallbacks.len(), 3);
     assert_eq!(
         plan.relay_fallbacks[0].relay_node_id,
         relay_hints[1].relay_node_id
+    );
+    assert_eq!(
+        plan.relay_fallbacks[1].relay_node_id,
+        relay_hints[2].relay_node_id
     );
 
     let resolve_intro = ResolveIntro {
@@ -87,8 +98,37 @@ fn relay_fallback_plan_tracks_current_stage_boundary() {
         .note_relayed_bytes(tunnel.relay_node_id, 1024, now_unix_s)
         .expect("relay byte accounting should fit quota");
 
+    let tertiary_ticket =
+        sample_intro_ticket(&target_signing_key, requester_binding, now_unix_s + 300);
+    let tertiary_resolve_intro = ResolveIntro {
+        relay_node_id: plan.relay_fallbacks[2].relay_node_id,
+        intro_ticket: tertiary_ticket.into_inner(),
+    }
+    .verify_with_public_key(&target_signing_key.public_key())
+    .expect("tertiary resolve intro request should verify before relay handling");
+    let tertiary_intro_response = relay_manager.process_resolve_intro(
+        plan.relay_fallbacks[2].relay_node_id,
+        tertiary_resolve_intro,
+        requester_binding,
+        now_unix_s,
+    );
+
+    assert_eq!(
+        tertiary_intro_response.status,
+        IntroResponseStatus::Forwarded
+    );
+    let tertiary_tunnel = relay_manager
+        .bind_tunnel(
+            8,
+            plan.relay_fallbacks[2].relay_node_id,
+            target_node_id,
+            now_unix_s,
+        )
+        .expect("tertiary fallback relay bind should fit quota");
+
     assert_eq!(tunnel.target_node_id, target_node_id);
-    assert_eq!(relay_manager.active_tunnel_count(), 1);
+    assert_eq!(tertiary_tunnel.target_node_id, target_node_id);
+    assert_eq!(relay_manager.active_tunnel_count(), 2);
 }
 
 fn sample_presence_record(

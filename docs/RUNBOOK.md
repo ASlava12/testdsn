@@ -140,7 +140,7 @@ TMPDIR=/tmp cargo run -p overlay-cli -- inspect --config /path/to/node-a.json --
 Explicit distributed operator commands:
 
 ```bash
-TMPDIR=/tmp cargo run -p overlay-cli -- publish --config /path/to/node-b.json --target tcp://127.0.0.1:4111 --relay-ref 16f52d6fea63ef086405aa71b537dd4833bd0b36ffe054be0fd07fb525af157d --capability service-host
+TMPDIR=/tmp cargo run -p overlay-cli -- publish --config /path/to/node-b.json --target tcp://127.0.0.1:4111 --relay-ref 16f52d6fea63ef086405aa71b537dd4833bd0b36ffe054be0fd07fb525af157d --relay-ref 90bdeef49d5d2664e6ef317c3fc4dec4975f13287af7ce3ff4dd9fdf19bb2d7e --relay-ref 529eb3098bf4c47a11adee0f63dbbaa72d91359d2d89b4fed36d0da93d199d35 --capability service-host
 ```
 
 ```bash
@@ -174,13 +174,14 @@ as the host-style layout reference and
 [devnet/pilot/README.md](../devnet/pilot/README.md)
 for the current pilot pack.
 
-Suggested five-host pilot topology:
+Suggested six-host pilot topology:
 
 - `host-a`: `node-a`, seed server for `node-foundation.json`
 - `host-b`: `node-b`, seed server for `node-a-seed.json`
 - `host-c`: `node-c`
 - `host-relay-a`: `node-relay`, seed server for `node-ab-seed.json`
 - `host-relay-b-ops`: `node-relay-b`, operator/report collection host
+- `host-relay-c`: `node-relay-c`
 
 Bring the lab up in this order:
 
@@ -197,7 +198,7 @@ Bring the lab up in this order:
 6. Use `./devnet/run-distributed-smoke.sh` for the repo-local bootstrap plus
    session-establishment proof.
 7. Use `./devnet/run-multihost-smoke.sh` for the repo-local host-style proof
-   of bootstrap, publish, lookup, service open, and relay fallback.
+   of bootstrap, publish, lookup, service open, and bounded relay fallback.
 8. Use `./devnet/run-distributed-pilot-checklist.sh` for the localhost
    distributed acceptance checklist. Add `--evidence-dir <dir>` when you want
    the wrapper to preserve raw logs and status files automatically.

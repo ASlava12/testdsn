@@ -8,10 +8,10 @@ public deployment.
 ## Metadata
 
 - Date: `<YYYY-MM-DD>`
-- Repository stage: `milestone-26-bounded-operator-control-plane`
+- Repository stage: `milestone-27-relay-topology-generalization`
 - Commit: `<git-sha>`
 - Operator: `<name>`
-- Topology: `pilot-5-host-two-relay`
+- Topology: `pilot-6-host-three-relay`
 - Off-box run window: `<start-end with timezone>`
 
 ## Host Map
@@ -21,6 +21,7 @@ public deployment.
 - `host-c` / `node-c` / `198.51.100.12`: `<status>`
 - `host-relay-a` / `node-relay` / `198.51.100.13`: `<status>`
 - `host-relay-b-ops` / `node-relay-b` / `198.51.100.15`: `<status>`
+- `host-relay-c` / `node-relay-c` / `198.51.100.16`: `<status>`
 
 ## Validation Summary
 
@@ -43,6 +44,8 @@ public deployment.
   host=`<host>`; target=`<host:port>`; result=`<pass/fail>`; path=`node-a -> node-relay -> node-b`
 - `relay-intro` alternate path:
   host=`<host>`; target=`<host:port>`; result=`<pass/fail>`; path=`node-a -> node-relay-b -> node-b`
+- `relay-intro` tertiary path:
+  host=`<host>`; target=`<host:port>`; result=`<pass/fail>`; path=`node-a -> node-relay-c -> node-b`
 - `inspect`:
   host=`<host>`; result=`<pass/fail>`; notes=`<summary or path>`
 
@@ -57,9 +60,12 @@ public deployment.
 
 - Primary relay path bound: `<yes/no>`
 - Alternate relay path bound: `<yes/no>`
+- Tertiary relay path bound: `<yes/no>`
 - Primary-relay-down outcome: `<alternate_path_used/fail>`
+- Repeated relay-bind failure recovery outcome: `<tertiary_path_used/fail>`
 - `node-relay` status snapshot notes: `<notes>`
 - `node-relay-b` status snapshot notes: `<notes>`
+- `node-relay-c` status snapshot notes: `<notes>`
 - Relay byte counters, if non-zero: `<notes>`
 
 ## Bootstrap Integrity
@@ -85,8 +91,10 @@ public deployment.
 
 - `node-c-down`: `<pass/fail>`; observed outcome: `<notes>`
 - `fresh-node-join`: `<pass/fail>`; observed outcome: `<notes>`
+- `three-relay-candidate-set`: `<pass/fail>`; observed outcome: `<notes>`
 - `relay-unavailable`: `<pass/fail>`; observed outcome: `<notes>`
 - `relay-unavailable-service-open`: `<pass/fail>`; observed outcome: `<notes>`
+- `repeated-relay-bind-failure-recovery`: `<pass/fail>`; observed outcome: `<notes>`
 - `bootstrap-seed-unavailable`: `<pass/fail>`; observed outcome: `<notes>`
 - `integrity-mismatch-fallback`: `<pass/fail>`; observed outcome: `<notes>`
 - `trust-verification-fallback`: `<pass/fail>`; observed outcome: `<notes>`

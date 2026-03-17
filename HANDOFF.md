@@ -13,7 +13,7 @@ A Codex-oriented handoff bundle containing:
 ## Current repository stage
 
 - The root `REPOSITORY_STAGE` marker and `overlay_core::REPOSITORY_STAGE` both
-  read `milestone-26-bounded-operator-control-plane`.
+  read `milestone-27-relay-topology-generalization`.
 - Milestones 0-12 are a closed baseline in this repository, and Milestones
   14/16/17/18 are landed pilot-baseline work.
 - Milestone 17 operator-grade runtime hardening is part of the landed baseline
@@ -51,10 +51,15 @@ A Codex-oriented handoff bundle containing:
   preference, last-known active bootstrap peers, and local service
   registration intent, explicit recovery fields in status/doctor output, and
   updated restart proof paths.
-- Milestone 26 bounded operator control plane is the current stage
+- Milestone 26 bounded operator control plane remains part of the landed
+  baseline
   with `overlay-cli inspect`, bounded machine-readable operator reports that
   combine local status/doctor data with explicit remote lookup, service, and
   relay probes, and synchronized operator/runbook docs.
+- Milestone 27 relay and topology generalization is the current stage with a
+  bounded third relay-capable pilot node, deterministic multi-candidate relay
+  proof, repeated relay-bind failure recovery through a later bounded
+  candidate, and synchronized relay/runbook docs.
 - The current validation green path is `./devnet/run-first-user-acceptance.sh`
   on the same commit after the applicable workspace validation commands.
 - Separate-host evidence is still required on the validated commit before
@@ -72,7 +77,7 @@ A Codex-oriented handoff bundle containing:
 scripts inside the current acceptance flow. `./devnet/run-pilot-checklist.sh`
 is retained only for the older Milestone 18 localhost rehearsal.
 
-## Remaining limitations after Milestone 26
+## Remaining limitations after Milestone 27
 
 - bootstrap remains static signed artifact delivery over `http://`
 - operator surfaces remain bounded and operator-directed; `overlay-cli
@@ -81,21 +86,21 @@ is retained only for the older Milestone 18 localhost rehearsal.
 - restart recovery stays bounded to bootstrap-source state, last-known active
   bootstrap peers, and local service registration intent; presence, service
   sessions, relay tunnels, and path probes still reset
-- relay fallback proof remains bounded to the checked-in two-relay pilot pack
+- relay fallback proof remains bounded to the checked-in three-relay pilot pack
 - off-box evidence is still required on separate hosts for the exact release
   commit before claiming first-user-ready status
 
 ## Recommended first Codex task
 
-Use `prompts/codex-milestone-26.md` as the first task prompt for the current
-`milestone-26-bounded-operator-control-plane` stage. It assumes the repository already has a
+Use `prompts/codex-milestone-27.md` as the first task prompt for the current
+`milestone-27-relay-topology-generalization` stage. It assumes the repository already has a
 closed Milestone 1-12 baseline and does not need to restart from Milestone
 0/1/2.
 
 ## Recommended workflow
 
 1. Confirm from `README.md`, `AGENTS.md`, and `IMPLEMENT.md` that the current
-   stage is `milestone-26-bounded-operator-control-plane`.
+   stage is `milestone-27-relay-topology-generalization`.
 2. Do not restart from Milestone 0/1/2; treat Milestones 1-12 as
    regression-fix, vector-maintenance, validation-maintenance, and
    launch-maintenance territory only unless the task explicitly reopens them.

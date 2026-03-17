@@ -44,20 +44,26 @@ node_b_log="${tmpdir}/pilot-node-b.log"
 node_c_log="${tmpdir}/pilot-node-c.log"
 relay_a_log="${tmpdir}/pilot-relay-a.log"
 relay_b_log="${tmpdir}/pilot-relay-b.log"
+relay_c_log="${tmpdir}/pilot-relay-c.log"
 baseline_publish_log="${tmpdir}/baseline-publish.log"
 baseline_lookup_log="${tmpdir}/baseline-lookup.log"
 baseline_service_log="${tmpdir}/baseline-service.log"
 baseline_relay_a_log="${tmpdir}/baseline-relay-a.log"
 baseline_relay_b_log="${tmpdir}/baseline-relay-b.log"
+baseline_relay_c_log="${tmpdir}/baseline-relay-c.log"
 fresh_join_publish_log="${tmpdir}/fresh-join-publish.log"
 fresh_join_lookup_log="${tmpdir}/fresh-join-lookup.log"
 node_down_lookup_log="${tmpdir}/node-down-lookup.log"
 node_down_service_log="${tmpdir}/node-down-service.log"
 node_down_relay_a_log="${tmpdir}/node-down-relay-a.log"
 node_down_relay_b_log="${tmpdir}/node-down-relay-b.log"
+node_down_relay_c_log="${tmpdir}/node-down-relay-c.log"
 relay_fault_primary_log="${tmpdir}/relay-fault-primary.log"
 relay_fault_alternate_log="${tmpdir}/relay-fault-alternate.log"
 relay_fault_service_log="${tmpdir}/relay-fault-service.log"
+relay_recovery_primary_log="${tmpdir}/relay-recovery-primary.log"
+relay_recovery_secondary_log="${tmpdir}/relay-recovery-secondary.log"
+relay_recovery_tertiary_log="${tmpdir}/relay-recovery-tertiary.log"
 bootstrap_fault_restart_log="${tmpdir}/bootstrap-fault-restart.log"
 service_restart_log="${tmpdir}/service-restart.log"
 service_restart_relay_log="${tmpdir}/service-restart-relay.log"
@@ -74,6 +80,7 @@ empty_bootstrap_log="${tmpdir}/empty-bootstrap.log"
 empty_bootstrap_status="${tmpdir}/empty-bootstrap.status.json"
 relay_a_status="${tmpdir}/relay-a-status.json"
 relay_b_status="${tmpdir}/relay-b-status.json"
+relay_c_status="${tmpdir}/relay-c-status.json"
 bootstrap_a_pid=""
 bootstrap_b_pid=""
 bootstrap_relay_pid=""
@@ -82,6 +89,7 @@ node_b_pid=""
 node_c_pid=""
 relay_a_pid=""
 relay_b_pid=""
+relay_c_pid=""
 
 cleanup() {
   status=$?
@@ -92,15 +100,20 @@ cleanup() {
       "${baseline_service_log}" \
       "${baseline_relay_a_log}" \
       "${baseline_relay_b_log}" \
+      "${baseline_relay_c_log}" \
       "${fresh_join_publish_log}" \
       "${fresh_join_lookup_log}" \
       "${node_down_lookup_log}" \
       "${node_down_service_log}" \
       "${node_down_relay_a_log}" \
       "${node_down_relay_b_log}" \
+      "${node_down_relay_c_log}" \
       "${relay_fault_primary_log}" \
       "${relay_fault_alternate_log}" \
       "${relay_fault_service_log}" \
+      "${relay_recovery_primary_log}" \
+      "${relay_recovery_secondary_log}" \
+      "${relay_recovery_tertiary_log}" \
       "${bootstrap_fault_restart_log}" \
       "${service_restart_log}" \
       "${service_restart_relay_log}" \
@@ -120,18 +133,20 @@ cleanup() {
       "${node_c_log}" \
       "${relay_a_log}" \
       "${relay_b_log}" \
+      "${relay_c_log}" \
       "${bootstrap_a_log}" \
       "${bootstrap_b_log}" \
       "${bootstrap_relay_log}" \
       "${relay_a_status}" \
-      "${relay_b_status}"; do
+      "${relay_b_status}" \
+      "${relay_c_status}"; do
       if [[ -f "${log}" ]]; then
         echo "--- $(basename "${log}") ---" >&2
         cat "${log}" >&2
       fi
     done
   fi
-  for pid_var in node_a_pid node_b_pid node_c_pid relay_a_pid relay_b_pid bootstrap_a_pid bootstrap_b_pid bootstrap_relay_pid; do
+  for pid_var in node_a_pid node_b_pid node_c_pid relay_a_pid relay_b_pid relay_c_pid bootstrap_a_pid bootstrap_b_pid bootstrap_relay_pid; do
     pid="${!pid_var}"
     if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
       kill -TERM "${pid}" 2>/dev/null || true
@@ -402,11 +417,13 @@ start_full_topology() {
   node_b_pid="$(start_node "devnet/pilot/localhost/configs/node-b.json" "${node_b_log}" --service devnet:terminal)"
   relay_a_pid="$(start_node "devnet/pilot/localhost/configs/node-relay.json" "${relay_a_log}")"
   relay_b_pid="$(start_node "devnet/pilot/localhost/configs/node-relay-b.json" "${relay_b_log}")"
+  relay_c_pid="$(start_node "devnet/pilot/localhost/configs/node-relay-c.json" "${relay_c_log}")"
 
   wait_for_runtime "${node_a_pid}" "devnet/pilot/localhost/configs/node-a.json" "${node_a_log}" '"event":"listen","result":"ok"'
   wait_for_runtime "${node_b_pid}" "devnet/pilot/localhost/configs/node-b.json" "${node_b_log}" '"event":"listen","result":"ok"'
   wait_for_runtime "${relay_a_pid}" "devnet/pilot/localhost/configs/node-relay.json" "${relay_a_log}" '"event":"listen","result":"ok"'
   wait_for_runtime "${relay_b_pid}" "devnet/pilot/localhost/configs/node-relay-b.json" "${relay_b_log}" '"event":"listen","result":"ok"'
+  wait_for_runtime "${relay_c_pid}" "devnet/pilot/localhost/configs/node-relay-c.json" "${relay_c_log}" '"event":"listen","result":"ok"'
 }
 
 node_a_id=""
@@ -414,20 +431,24 @@ node_b_id=""
 node_c_id=""
 relay_a_id=""
 relay_b_id=""
+relay_c_id=""
 relay_a_bind_total=0
 relay_b_bind_total=0
+relay_c_bind_total=0
 
 run_baseline_flow() {
   node_a_id="$(extract_node_id "${node_a_pid}" "devnet/pilot/localhost/configs/node-a.json")"
   node_b_id="$(extract_node_id "${node_b_pid}" "devnet/pilot/localhost/configs/node-b.json")"
   relay_a_id="$(extract_node_id "${relay_a_pid}" "devnet/pilot/localhost/configs/node-relay.json")"
   relay_b_id="$(extract_node_id "${relay_b_pid}" "devnet/pilot/localhost/configs/node-relay-b.json")"
+  relay_c_id="$(extract_node_id "${relay_c_pid}" "devnet/pilot/localhost/configs/node-relay-c.json")"
 
   "${overlay_cli}" publish \
     --config devnet/pilot/localhost/configs/node-b.json \
     --target tcp://127.0.0.1:4111 \
     --relay-ref "${relay_a_id}" \
     --relay-ref "${relay_b_id}" \
+    --relay-ref "${relay_c_id}" \
     --capability service-host \
     >"${baseline_publish_log}"
 
@@ -461,6 +482,14 @@ run_baseline_flow() {
     --requester-node-id "${node_a_id}" \
     >"${baseline_relay_b_log}"
 
+  echo "{\"step\":\"relay_fallback_planned\",\"client_node\":\"node-a\",\"target_node\":\"node-b\",\"relay_node\":\"node-relay-c\",\"relay_node_id\":\"${relay_c_id}\",\"alternate_relay_node_id\":\"${relay_b_id}\"}"
+  "${overlay_cli}" relay-intro \
+    --config devnet/pilot/localhost/configs/node-b.json \
+    --target tcp://127.0.0.1:4196 \
+    --relay-node-id "${relay_c_id}" \
+    --requester-node-id "${node_a_id}" \
+    >"${baseline_relay_c_log}"
+
   wait_for_status_pattern \
     "${relay_a_pid}" \
     "devnet/pilot/localhost/configs/node-relay.json" \
@@ -473,8 +502,15 @@ run_baseline_flow() {
     "${relay_b_status}" \
     '"active_tunnels":1' \
     'alternate relay tunnel bind'
+  wait_for_status_pattern \
+    "${relay_c_pid}" \
+    "devnet/pilot/localhost/configs/node-relay-c.json" \
+    "${relay_c_status}" \
+    '"active_tunnels":1' \
+    'tertiary relay tunnel bind'
   relay_a_bind_total="$(extract_status_numeric_field "${relay_a_status}" "relay_bind_total")"
   relay_b_bind_total="$(extract_status_numeric_field "${relay_b_status}" "relay_bind_total")"
+  relay_c_bind_total="$(extract_status_numeric_field "${relay_c_status}" "relay_bind_total")"
 }
 
 run_fresh_join_scenario() {
@@ -487,6 +523,7 @@ run_fresh_join_scenario() {
     --target tcp://127.0.0.1:4111 \
     --relay-ref "${relay_a_id}" \
     --relay-ref "${relay_b_id}" \
+    --relay-ref "${relay_c_id}" \
     >"${fresh_join_publish_log}"
 
   "${overlay_cli}" lookup \
@@ -523,6 +560,12 @@ run_baseline_flow_with_node_c_down() {
     --relay-node-id "${relay_b_id}" \
     --requester-node-id "${node_a_id}" \
     >"${node_down_relay_b_log}"
+  "${overlay_cli}" relay-intro \
+    --config devnet/pilot/localhost/configs/node-b.json \
+    --target tcp://127.0.0.1:4196 \
+    --relay-node-id "${relay_c_id}" \
+    --requester-node-id "${node_a_id}" \
+    >"${node_down_relay_c_log}"
   wait_for_status_numeric_field_at_least \
     "${relay_a_pid}" \
     "devnet/pilot/localhost/configs/node-relay.json" \
@@ -539,6 +582,14 @@ run_baseline_flow_with_node_c_down() {
     "$(( ${relay_b_bind_total:-0} + 1 ))" \
     'node-c-down relay bind increment on alternate relay'
   relay_b_bind_total="$(extract_status_numeric_field "${relay_b_status}" "relay_bind_total")"
+  wait_for_status_numeric_field_at_least \
+    "${relay_c_pid}" \
+    "devnet/pilot/localhost/configs/node-relay-c.json" \
+    "${relay_c_status}" \
+    "relay_bind_total" \
+    "$(( ${relay_c_bind_total:-0} + 1 ))" \
+    'node-c-down relay bind increment on tertiary relay'
+  relay_c_bind_total="$(extract_status_numeric_field "${relay_c_status}" "relay_bind_total")"
 }
 
 run_relay_fault_scenario() {
@@ -574,6 +625,43 @@ run_relay_fault_scenario() {
     "$(( ${relay_b_bind_total:-0} + 1 ))" \
     'relay-unavailable alternate relay bind increment'
   relay_b_bind_total="$(extract_status_numeric_field "${relay_b_status}" "relay_bind_total")"
+}
+
+run_repeated_relay_failure_scenario() {
+  stop_process "${relay_b_pid}"
+  relay_b_pid=""
+  if "${overlay_cli}" relay-intro \
+    --config devnet/pilot/localhost/configs/node-b.json \
+    --target tcp://127.0.0.1:4198 \
+    --relay-node-id "${relay_a_id}" \
+    --requester-node-id "${node_a_id}" \
+    >"${relay_recovery_primary_log}" 2>&1; then
+    echo "distributed pilot checklist: primary relay intro unexpectedly succeeded during repeated-failure recovery" >&2
+    exit 1
+  fi
+  if "${overlay_cli}" relay-intro \
+    --config devnet/pilot/localhost/configs/node-b.json \
+    --target tcp://127.0.0.1:4197 \
+    --relay-node-id "${relay_b_id}" \
+    --requester-node-id "${node_a_id}" \
+    >"${relay_recovery_secondary_log}" 2>&1; then
+    echo "distributed pilot checklist: secondary relay intro unexpectedly succeeded during repeated-failure recovery" >&2
+    exit 1
+  fi
+  "${overlay_cli}" relay-intro \
+    --config devnet/pilot/localhost/configs/node-b.json \
+    --target tcp://127.0.0.1:4196 \
+    --relay-node-id "${relay_c_id}" \
+    --requester-node-id "${node_a_id}" \
+    >"${relay_recovery_tertiary_log}"
+  wait_for_status_numeric_field_at_least \
+    "${relay_c_pid}" \
+    "devnet/pilot/localhost/configs/node-relay-c.json" \
+    "${relay_c_status}" \
+    "relay_bind_total" \
+    "$(( ${relay_c_bind_total:-0} + 1 ))" \
+    'repeated-failure tertiary relay bind increment'
+  relay_c_bind_total="$(extract_status_numeric_field "${relay_c_status}" "relay_bind_total")"
 }
 
 run_bootstrap_seed_fault() {
@@ -746,8 +834,9 @@ run_baseline_flow
 run_fresh_join_scenario
 run_baseline_flow_with_node_c_down
 run_relay_fault_scenario
-run_bootstrap_seed_fault
 run_service_restart_scenario
+run_repeated_relay_failure_scenario
+run_bootstrap_seed_fault
 run_integrity_fallback_check
 run_trust_fallback_check
 run_stale_bootstrap_check
@@ -759,9 +848,11 @@ cat "${baseline_lookup_log}"
 cat "${baseline_service_log}"
 cat "${baseline_relay_a_log}"
 cat "${baseline_relay_b_log}"
+cat "${baseline_relay_c_log}"
 echo '{"step":"pilot_scenario","scenario":"service-publish","result":"ok"}'
 echo '{"step":"pilot_scenario","scenario":"service-discover-and-open","result":"ok"}'
 echo '{"step":"pilot_scenario","scenario":"direct-path-loss-relay-fallback","result":"ok"}'
+echo '{"step":"pilot_scenario","scenario":"three-relay-candidate-set","result":"ok"}'
 echo '{"step":"pilot_scenario","scenario":"fresh-node-join","result":"ok"}'
 cat "${fresh_join_publish_log}"
 cat "${fresh_join_lookup_log}"
@@ -769,11 +860,17 @@ cat "${node_down_lookup_log}"
 cat "${node_down_service_log}"
 cat "${node_down_relay_a_log}"
 cat "${node_down_relay_b_log}"
+cat "${node_down_relay_c_log}"
+echo '{"step":"pilot_scenario","scenario":"node-c-down","result":"ok"}'
 echo '{"step":"pilot_scenario","scenario":"relay-unavailable","result":"expected_degraded"}'
 cat "${relay_fault_primary_log}"
 cat "${relay_fault_alternate_log}"
 echo '{"step":"pilot_scenario","scenario":"relay-unavailable-service-open","result":"ok"}'
 cat "${relay_fault_service_log}"
+echo '{"step":"pilot_scenario","scenario":"repeated-relay-bind-failure-recovery","result":"ok"}'
+cat "${relay_recovery_primary_log}"
+cat "${relay_recovery_secondary_log}"
+cat "${relay_recovery_tertiary_log}"
 echo '{"step":"pilot_scenario","scenario":"bootstrap-seed-unavailable","result":"ok"}'
 cat "${bootstrap_fault_restart_log}"
 echo '{"step":"pilot_scenario","scenario":"service-host-restart","result":"ok"}'
@@ -795,9 +892,10 @@ fresh_join_lookup_latency_ms="$(extract_numeric_field "${fresh_join_lookup_log}"
 node_down_lookup_latency_ms="$(extract_numeric_field "${node_down_lookup_log}" "lookup_latency_ms")"
 relay_a_bytes_last_hour="$(extract_status_numeric_field "${relay_a_status}" "total_relayed_bytes_last_hour")"
 relay_b_bytes_last_hour="$(extract_status_numeric_field "${relay_b_status}" "total_relayed_bytes_last_hour")"
+relay_c_bytes_last_hour="$(extract_status_numeric_field "${relay_c_status}" "total_relayed_bytes_last_hour")"
 service_restart_startup_count="$(extract_status_numeric_field "${service_restart_status}" "startup_count")"
 
-echo "{\"step\":\"pilot_checklist_complete\",\"topology\":\"pilot-5-node\",\"fresh_node_join\":\"ok\",\"service_publish\":\"ok\",\"service_open\":\"ok\",\"direct_path_loss_relay_fallback\":\"ok\",\"baseline\":\"ok\",\"node_down\":\"ok\",\"relay_unavailable\":\"expected_degraded\",\"relay_unavailable_service_open\":\"ok\",\"bootstrap_seed_unavailable\":\"ok\",\"integrity_mismatch_fallback\":\"ok\",\"trust_verification_fallback\":\"ok\",\"stale_bootstrap_fallback\":\"ok\",\"empty_bootstrap_fallback\":\"ok\",\"service_restart\":\"ok\",\"tampered_bootstrap\":\"rejected\",\"baseline_lookup_latency_ms\":${baseline_lookup_latency_ms:-0},\"fresh_join_lookup_latency_ms\":${fresh_join_lookup_latency_ms:-0},\"node_down_lookup_latency_ms\":${node_down_lookup_latency_ms:-0},\"relay_a_bytes_last_hour\":${relay_a_bytes_last_hour:-0},\"relay_b_bytes_last_hour\":${relay_b_bytes_last_hour:-0},\"relay_a_bind_total\":${relay_a_bind_total:-0},\"relay_b_bind_total\":${relay_b_bind_total:-0},\"service_restart_startup_count\":${service_restart_startup_count:-0},\"relay_paths\":[\"node-a->node-relay->node-b\",\"node-a->node-relay-b->node-b\"]}"
+echo "{\"step\":\"pilot_checklist_complete\",\"topology\":\"pilot-6-node-3-relay\",\"relay_candidate_count\":3,\"fresh_node_join\":\"ok\",\"service_publish\":\"ok\",\"service_open\":\"ok\",\"direct_path_loss_relay_fallback\":\"ok\",\"three_relay_candidate_set\":\"ok\",\"baseline\":\"ok\",\"node_down\":\"ok\",\"relay_unavailable\":\"expected_degraded\",\"relay_unavailable_service_open\":\"ok\",\"repeated_relay_bind_failure_recovery\":\"ok\",\"bootstrap_seed_unavailable\":\"ok\",\"integrity_mismatch_fallback\":\"ok\",\"trust_verification_fallback\":\"ok\",\"stale_bootstrap_fallback\":\"ok\",\"empty_bootstrap_fallback\":\"ok\",\"service_restart\":\"ok\",\"tampered_bootstrap\":\"rejected\",\"baseline_lookup_latency_ms\":${baseline_lookup_latency_ms:-0},\"fresh_join_lookup_latency_ms\":${fresh_join_lookup_latency_ms:-0},\"node_down_lookup_latency_ms\":${node_down_lookup_latency_ms:-0},\"relay_a_bytes_last_hour\":${relay_a_bytes_last_hour:-0},\"relay_b_bytes_last_hour\":${relay_b_bytes_last_hour:-0},\"relay_c_bytes_last_hour\":${relay_c_bytes_last_hour:-0},\"relay_a_bind_total\":${relay_a_bind_total:-0},\"relay_b_bind_total\":${relay_b_bind_total:-0},\"relay_c_bind_total\":${relay_c_bind_total:-0},\"service_restart_startup_count\":${service_restart_startup_count:-0},\"relay_paths\":[\"node-a->node-relay->node-b\",\"node-a->node-relay-b->node-b\",\"node-a->node-relay-c->node-b\"]}"
 if [[ "${preserve_evidence}" == "yes" ]]; then
   echo "{\"step\":\"pilot_evidence_bundle\",\"path\":\"${tmpdir}\"}"
 fi

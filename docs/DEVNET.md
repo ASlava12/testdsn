@@ -16,6 +16,7 @@ and the carried-forward distributed pilot pack under
 - `node-c`: extra standard peer so bootstrap is not a two-node edge case
 - `node-relay`: primary relay-enabled node
 - `node-relay-b`: alternate relay-enabled node in the pilot pack
+- `node-relay-c`: tertiary relay-enabled node in the pilot pack
 
 ## Files
 
@@ -38,7 +39,7 @@ and the carried-forward distributed pilot pack under
 - [devnet/run-distributed-pilot-checklist.sh](../devnet/run-distributed-pilot-checklist.sh):
   wrapper for the current distributed pilot checklist
 - [devnet/run-first-user-acceptance.sh](../devnet/run-first-user-acceptance.sh):
-  wrapper for the current Milestone 26 first-user acceptance flow
+  wrapper for the current Milestone 27 first-user acceptance flow
 - [devnet/run-doctor-smoke.sh](../devnet/run-doctor-smoke.sh):
   wrapper for the landed Milestone 21 doctor/self-check surface
 - [devnet/run-pilot-checklist.sh](../devnet/run-pilot-checklist.sh):
@@ -126,9 +127,11 @@ This is the current distributed component proof path inside
 This uses the dedicated `devnet/pilot/localhost` topology pack and validates:
 
 - the baseline distributed operator flow
+- the three-relay candidate baseline proof
 - the fresh-node-join proof with late `node-c` startup
 - the `node-c-down` fault path
 - the primary-relay-down path with alternate relay fallback
+- the repeated-relay-bind-failure-recovery path with tertiary relay fallback
 - the one-relay-down service-open proof
 - the one-bootstrap-seed-unavailable path
 - the integrity-mismatch, trust-verification-fallback, stale-bootstrap, and

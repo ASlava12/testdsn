@@ -15,7 +15,7 @@ pub mod session;
 pub mod transport;
 pub mod wire;
 
-pub const REPOSITORY_STAGE: &str = "milestone-26-bounded-operator-control-plane";
+pub const REPOSITORY_STAGE: &str = "milestone-27-relay-topology-generalization";
 
 #[cfg(test)]
 mod tests {
