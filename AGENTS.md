@@ -85,7 +85,8 @@ Do not add by default:
 - Milestone 12 launch hardening is implemented with bounded cleanup,
   conservative bootstrap retry, runtime health snapshots, status dumps, and the
   logical soak path.
-- The current repository stage marker is `milestone-19-pilot-closure`.
+- The current repository stage marker is
+  `milestone-20-regular-distributed-use-closure`.
 - Milestone 14 launch gate and pilot tag remains part of the landed pilot
   baseline.
 - Milestone 16 network bootstrap and multi-host devnet is implemented with
@@ -100,19 +101,26 @@ Do not add by default:
 - Milestone 18 real pilot remains part of the landed baseline with the
   dedicated `devnet/pilot/` topology pack, `devnet/run-pilot-checklist.sh`,
   and the first separate-host rehearsal/reporting docs.
-- Milestone 19 pilot closure is the current stage with minimal distributed
+- Milestone 19 pilot closure is part of the landed baseline with minimal distributed
   operator commands for `publish`, `lookup`, `open-service`, and
   `relay-intro`, the two-relay `devnet/pilot/` topology, conservative
   `http://...#sha256=<pin>` bootstrap-artifact integrity checks,
   `devnet/run-distributed-pilot-checklist.sh`, and synchronized post-pilot
-  closure docs. This stage still does not claim hostile-environment or
-  public-production readiness and still requires operator-collected off-box
-  evidence for the real-host pilot report.
+  closure docs.
+- Milestone 20 regular distributed use closure is the current stage with
+  per-source bootstrap diagnostics on the runtime status surface, preferred
+  retry/fallback ordering across configured bootstrap sources, expanded
+  localhost checklist proof for unavailable/integrity/stale/empty bootstrap
+  cases, stronger relay-bind evidence across the checked-in two-relay pilot
+  topology, and reproducible `--evidence-dir` wrappers for the distributed
+  smoke and pilot checklist. This stage still does not claim
+  hostile-environment or public-production readiness.
 
 For normal work, touch Milestones 1-12 only for regression fixes, spec
 mismatches, vector maintenance, validation maintenance, or launch-maintenance
 updates unless the task explicitly reopens that stage. Treat current-stage work as narrow
-`milestone-19-pilot-closure` work, not as a restart from earlier milestones.
+`milestone-20-regular-distributed-use-closure` work, not as a restart from
+earlier milestones.
 
 ## 3. Change policy
 

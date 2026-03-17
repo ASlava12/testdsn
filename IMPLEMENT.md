@@ -7,10 +7,11 @@ This file is the execution plan for Codex.
 The repository has a closed Milestone 1-12 baseline, a landed Milestone 14
 pilot launch gate, a landed Milestone 16 network-bootstrap stage, a landed
 Milestone 17 operator-runtime stage, a landed Milestone 18 real-pilot stage,
-and the current Milestone 19 pilot-closure stage.
-The current repository stage marker is `milestone-19-pilot-closure`.
+and the current Milestone 20 regular-distributed-use-closure stage.
+The current repository stage marker is
+`milestone-20-regular-distributed-use-closure`.
 
-## Current pilot-closure green path
+## Current regular-distributed-use green path
 
 Treat the current stage as having one localhost sign-off flow:
 
@@ -158,6 +159,18 @@ rehearsal only. It is not the current sign-off path.
   bootstrap-artifact integrity checks, the expanded pilot fault matrix, and
   synchronized post-pilot-closure docs. The repository stage marker now
   advances to `milestone-19-pilot-closure`.
+- Milestone 20 regular-distributed-use-closure support is now implemented in
+  `crates/overlay-core/src/runtime.rs`, `crates/overlay-cli/src/main.rs`,
+  `devnet/run-multihost-smoke.sh`, `devnet/run-distributed-pilot-checklist.sh`,
+  `docs/PILOT_RUNBOOK.md`, `docs/LAUNCH_CHECKLIST.md`, and the current status
+  docs, with per-source bootstrap diagnostics on the runtime status surface,
+  preferred retry/fallback ordering across configured bootstrap sources,
+  localhost proof for unavailable/integrity/stale/empty bootstrap-source
+  outcomes, stronger relay-bind evidence across node-down, primary-relay-down,
+  and service-restart scenarios in the checked-in two-relay topology, and
+  reproducible `--evidence-dir` support for the distributed smoke and pilot
+  checklist. The repository stage marker now advances to
+  `milestone-20-regular-distributed-use-closure`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -165,9 +178,9 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Use `prompts/codex-milestone-19.md` as the recommended next-task prompt for the
-current `milestone-19-pilot-closure` stage and keep work conservative from the
-current pilot-closure boundary:
+Use `prompts/codex-milestone-20.md` as the recommended next-task prompt for the
+current `milestone-20-regular-distributed-use-closure` stage and keep work
+conservative from the current regular-distributed-use boundary:
 
 1. preserve the current launch surface documented in
    `docs/LAUNCH_CHECKLIST.md`, `docs/RUNBOOK.md`, `docs/DEVNET.md`,
@@ -645,3 +658,46 @@ scope into hostile-environment or public-Internet rollout work.
   `./devnet/run-distributed-pilot-checklist.sh`;
 - validation and status docs report the same Milestone 19 stage marker and
   current limitations.
+
+## Milestone 20 — regular distributed use closure
+
+Status: current repository stage.
+
+### Goal
+Reduce the remaining gap between the landed distributed pilot path and a
+network that can be used regularly by first users in the current trusted,
+pilot-only operating model.
+
+### Tasks
+1. Keep the current launch surface and distributed operator commands, but make
+   distributed bootstrap fallback and failure modes explicit on the runtime
+   status surface.
+2. Improve retry/fallback behavior between configured bootstrap sources
+   without redesigning bootstrap semantics.
+3. Expand the localhost distributed checklist and host-style smoke to preserve
+   reproducible evidence bundles and cover unavailable, integrity-mismatch,
+   stale-artifact, and empty-peer-set bootstrap cases.
+4. Strengthen relay-fallback proof for the checked-in two-relay pilot pack
+   across node-down, primary-relay-down, and service-host-restart scenarios.
+5. Synchronize launch, pilot, validation, and stage-marker docs to the new
+   regular-distributed-use closure stage.
+
+### Important constraints
+- Do not claim hostile-environment or public-production readiness.
+- Do not add public bootstrap infrastructure, new transports, or a general
+  distributed control plane.
+- Do not redesign the wire format, handshake semantics, relay quotas, or path
+  score constants.
+- Keep the operator surfaces explicit, bounded, and honest about their
+  point-to-point, operator-directed nature.
+
+### Done when
+- runtime status exposes per-source bootstrap outcomes and operators can
+  distinguish unavailable, integrity-mismatch, stale, empty-peer-set, and
+  accepted cases without reading source code;
+- the current distributed checklist proves fallback behavior for the checked-in
+  multi-source bootstrap configs and records the stronger relay-bind evidence;
+- docs and report templates explain the exact green path, evidence collection
+  order, and remaining limitations without source-code spelunking;
+- validation and status docs report the same Milestone 20 stage marker and
+  narrower remaining blockers.

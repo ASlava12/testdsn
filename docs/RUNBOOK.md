@@ -6,7 +6,7 @@ not for hostile-Internet or public-production deployment.
 Use [docs/LAUNCH_CHECKLIST.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/LAUNCH_CHECKLIST.md)
 as the release gate, this runbook as the operator flow behind that gate, and
 [docs/PILOT_RUNBOOK.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RUNBOOK.md)
-for the dedicated Milestone 19 off-box pilot-closure exercise.
+for the dedicated Milestone 20 off-box regular-distributed-use exercise.
 
 The current localhost sign-off path is `./devnet/run-launch-gate.sh` followed
 by `./devnet/run-distributed-pilot-checklist.sh`. The older
@@ -66,7 +66,10 @@ What does not exist today:
 8. Confirm `overlay-cli status --config <path>` returns a matching
    `runtime_status` payload with `lifecycle.clean_shutdown == false` while the
    process is still active.
-9. For cross-node behavior, use the distributed operator commands or the
+9. If bootstrap is degraded or unexpectedly slow, inspect
+   `health.bootstrap.last_attempt_summary` and `health.bootstrap.last_sources`
+   before changing configs.
+10. For cross-node behavior, use the distributed operator commands or the
    checked-in smoke/checklist wrappers after single-node startup looks healthy.
 
 ## Launch commands
@@ -118,8 +121,8 @@ Wrapper scripts:
 ```bash
 ./devnet/run-smoke.sh
 ./devnet/run-distributed-smoke.sh
-./devnet/run-multihost-smoke.sh
-./devnet/run-distributed-pilot-checklist.sh
+./devnet/run-multihost-smoke.sh [--evidence-dir <dir>]
+./devnet/run-distributed-pilot-checklist.sh [--evidence-dir <dir>]
 ./devnet/run-restart-smoke.sh
 ./devnet/run-launch-gate.sh
 ./devnet/run-soak.sh
@@ -156,7 +159,8 @@ Bring the lab up in this order:
 7. Use `./devnet/run-multihost-smoke.sh` for the repo-local host-style proof
    of bootstrap, publish, lookup, service open, and relay fallback.
 8. Use `./devnet/run-distributed-pilot-checklist.sh` for the localhost
-   pilot-closure checklist.
+   regular-distributed-use checklist. Add `--evidence-dir <dir>` when you want
+   the wrapper to preserve raw logs and status files automatically.
 9. Use [docs/PILOT_RUNBOOK.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RUNBOOK.md)
    for the actual off-box operator-command run and evidence collection order.
 
@@ -176,7 +180,8 @@ Structured log records are emitted as one JSON object per line, for example:
   counts
 - `health.metrics`: bounded counters and latest samples
 - `health.relay`: current relay tunnel and byte-usage snapshot
-- `health.bootstrap`: last bootstrap attempt and success counters
+- `health.bootstrap`: last bootstrap attempt and success counters, plus
+  `last_attempt_summary` and `last_sources` for per-source diagnostics
 - `health.cleanup_totals`: how many stale objects have been pruned
 - `health.resource_limits`: effective local limits after config projection
 
@@ -185,6 +190,8 @@ Important fields to watch first:
 - `health.runtime.state`
 - `health.runtime.active_peers`
 - `health.bootstrap.last_accepted_sources`
+- `health.bootstrap.last_attempt_summary`
+- `health.bootstrap.last_sources`
 - `health.metrics.lookup_total`
 - `health.metrics.relay_bind_total`
 - `health.relay.active_tunnels`

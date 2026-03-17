@@ -1,6 +1,7 @@
 # Pilot Runbook
 
-This runbook defines the Milestone 19 pilot-closure exercise.
+This runbook defines the Milestone 20 regular-distributed-use-closure
+exercise.
 
 It extends the landed Milestone 18 pilot pack with minimal distributed
 operator surfaces, two relay-capable fallback paths, conservative bootstrap
@@ -23,8 +24,11 @@ Use this runbook to prove:
 - two documented relay fallback paths:
   `node-a -> node-relay -> node-b` and
   `node-a -> node-relay-b -> node-b`;
-- the node-down, primary-relay-down, bootstrap-seed-down, service-restart, and
-  tampered-bootstrap fault scenarios;
+- the node-down, primary-relay-down, bootstrap-seed-down, integrity-mismatch,
+  stale-bootstrap, empty-peer-set, service-restart, and tampered-bootstrap
+  scenarios;
+- per-source bootstrap diagnostics through
+  `runtime_status.health.bootstrap.last_attempt_summary` and `last_sources`;
 - an operator-collected off-box report with exact hosts, date, and commit SHA.
 
 Current pilot limits remain in force:
@@ -147,7 +151,9 @@ Files:
    the host-style config pack.
 
 6. Use [devnet/run-distributed-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-pilot-checklist.sh)
-   as the localhost proof for the current Milestone 19 pilot-closure checklist.
+   as the localhost proof for the current Milestone 20
+   regular-distributed-use checklist. Use `--evidence-dir <dir>` when you want
+   the wrapper to preserve the raw logs and status files automatically.
 
 ## Distributed operator flow
 
@@ -218,7 +224,7 @@ Operational note:
 
 ## Fault scenarios
 
-Record all five scenarios in the pilot report:
+Record all eight scenarios in the pilot report:
 
 1. `node-c-down`
 
@@ -242,9 +248,31 @@ Record all five scenarios in the pilot report:
 
    - `node-b` is restarted after the baseline publish/lookup flow
    - expected outcome: the service host comes back cleanly, `startup_count`
-     increases, and `open-service` succeeds again after restart
+     increases, `open-service` succeeds again after restart, and the alternate
+     relay path binds again
 
-5. `tampered-bootstrap-artifact`
+5. `integrity-mismatch-fallback`
+
+   - one configured bootstrap source uses a deliberately bad SHA-256 pin
+   - expected outcome: startup still reaches `running` through the later
+     configured source, and `health.bootstrap.last_attempt_summary` reports one
+     `integrity_mismatch_sources`
+
+6. `stale-bootstrap-fallback`
+
+   - one configured bootstrap source is present but expired
+   - expected outcome: startup still reaches `running` through the later
+     configured source, and `health.bootstrap.last_attempt_summary` reports one
+     `stale_sources`
+
+7. `empty-bootstrap-fallback`
+
+   - one configured bootstrap source validates but contains an empty peer set
+   - expected outcome: startup still reaches `running` through the later
+     configured source, and `health.bootstrap.last_attempt_summary` reports one
+     `empty_peer_set_sources`
+
+8. `tampered-bootstrap-artifact`
 
    - a config is pointed at a deliberately pin-mismatched bootstrap artifact
    - expected outcome: `bootstrap_fetch` reports `rejected` and startup
@@ -257,10 +285,13 @@ Record all five scenarios in the pilot report:
 - exact hostnames and IPs used in the run
 - `./devnet/run-launch-gate.sh` result on the validated commit
 - `./devnet/run-multihost-smoke.sh` result on the validated commit
-- `./devnet/run-distributed-pilot-checklist.sh` result on the validated commit
+- `./devnet/run-distributed-pilot-checklist.sh --evidence-dir <dir>` result on
+  the validated commit
 - the raw off-box `publish`, `lookup`, `open-service`, and both `relay-intro`
   command outputs
 - per-host `overlay-cli status --config ...` JSON snapshots
+- bootstrap status excerpts showing `last_attempt_summary` and `last_sources`
+  for any degraded or fallback startup
 - lookup latency values from the `lookup` command
 - relay path evidence from both `relay-intro` commands and relay status output
 - service restart evidence from the persisted status JSON
@@ -268,16 +299,17 @@ Record all five scenarios in the pilot report:
 
 ## Remaining closure items for regular distributed use
 
-- The localhost checklist is the current Milestone 19 green path, but it still
-  does not replace the required off-box pilot evidence on separate hosts.
+- The localhost checklist is the current Milestone 20 green path, but it still
+  does not replace the required off-box pilot evidence on separate hosts for a
+  release note.
 - Bootstrap remains static pinned `http://` artifact delivery; operators must
   keep the artifacts and `#sha256=<hex>` URLs synchronized manually.
 - The distributed operator commands remain one-shot proof surfaces, not a
   general control plane or distributed discovery layer.
 - Runtime peers, presence, services, sessions, relay tunnels, and path probes
   still reset on restart.
-- Only the two documented relay fallback paths are proven for this pilot
-  closure stage.
+- Relay proof remains bounded to the checked-in two-relay topology rather than
+  arbitrary relay graphs or public-network conditions.
 
 Use [docs/PILOT_REPORT_TEMPLATE.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_REPORT_TEMPLATE.md)
 to write the final report.

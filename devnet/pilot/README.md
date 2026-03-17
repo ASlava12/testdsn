@@ -1,6 +1,6 @@
 # Pilot Devnet
 
-This directory contains the Milestone 19 pilot-closure assets.
+This directory contains the Milestone 20 regular-distributed-use assets.
 
 It keeps the landed pilot topology pack and extends it with:
 

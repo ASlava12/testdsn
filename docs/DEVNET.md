@@ -6,7 +6,7 @@ The repository ships a reproducible local and host-style devnet under
 It is the operator-facing proof path for the current runtime surface, including
 the Milestone 16 host-style network-bootstrap layout under
 [devnet/hosts](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/hosts)
-and the Milestone 19 pilot pack under
+and the Milestone 20 regular-distributed-use pack under
 [devnet/pilot](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot).
 
 ## Node roles
@@ -28,7 +28,7 @@ and the Milestone 19 pilot pack under
 - [devnet/hosts](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/hosts):
   host-style localhost and example multi-host layouts
 - [devnet/pilot](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot):
-  dedicated Milestone 19 pilot topology/config pack
+  dedicated Milestone 20 regular-distributed-use topology/config pack
 - [devnet/run-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-smoke.sh):
   wrapper for the repo-local smoke flow
 - [devnet/run-distributed-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-smoke.sh):
@@ -36,7 +36,7 @@ and the Milestone 19 pilot pack under
 - [devnet/run-multihost-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-multihost-smoke.sh):
   wrapper for the host-style network-bootstrap and operator-flow smoke
 - [devnet/run-distributed-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-pilot-checklist.sh):
-  wrapper for the current pilot-closure checklist
+  wrapper for the current regular-distributed-use checklist
 - [devnet/run-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-pilot-checklist.sh):
   retained Milestone 18 localhost rehearsal pack, not the current sign-off
   path
@@ -80,6 +80,12 @@ Run:
 ./devnet/run-multihost-smoke.sh
 ```
 
+Optional evidence-preserving form:
+
+```bash
+./devnet/run-multihost-smoke.sh --evidence-dir /tmp/overlay-multihost-evidence
+```
+
 This starts three static bootstrap seed servers with `overlay-cli
 bootstrap-serve`, then starts the host-style runtimes from
 `devnet/hosts/localhost` and drives networked operator commands across them.
@@ -100,7 +106,13 @@ Run:
 ./devnet/run-distributed-pilot-checklist.sh
 ```
 
-This is the current localhost pilot-closure sign-off path after
+Optional evidence-preserving form:
+
+```bash
+./devnet/run-distributed-pilot-checklist.sh --evidence-dir /tmp/overlay-pilot-evidence
+```
+
+This is the current localhost regular-distributed-use sign-off path after
 `./devnet/run-launch-gate.sh`.
 
 This uses the dedicated `devnet/pilot/localhost` topology pack and validates:
@@ -109,6 +121,7 @@ This uses the dedicated `devnet/pilot/localhost` topology pack and validates:
 - the `node-c-down` fault path
 - the primary-relay-down path with alternate relay fallback
 - the one-bootstrap-seed-unavailable path
+- the integrity-mismatch, stale-bootstrap, and empty-peer-set fallback paths
 - the service-host restart/status outcome
 - the tampered-bootstrap rejection path
 - the final `pilot_checklist_complete` summary with lookup latency and relay

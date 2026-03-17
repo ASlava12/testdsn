@@ -15,7 +15,9 @@ use sha2::{Digest as ShaDigest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    bootstrap::{BootstrapProvider, BootstrapProviderError, BootstrapResponse},
+    bootstrap::{
+        BootstrapProvider, BootstrapProviderError, BootstrapResponse, BootstrapValidationError,
+    },
     config::{ConfigError, OverlayConfig},
     crypto::{
         kex::X25519StaticSecret,
@@ -61,6 +63,7 @@ use crate::{
 const PRESENCE_REFRESH_DIVISOR: u64 = 2;
 const MIN_BOOTSTRAP_RETRY_INTERVAL_MS: u64 = 5_000;
 const DEFAULT_BOOTSTRAP_HTTP_TIMEOUT_MS: u64 = 1_000;
+const MAX_BOOTSTRAP_DIAGNOSTIC_DETAIL_CHARS: usize = 192;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -130,7 +133,76 @@ pub struct RuntimeCleanupTotals {
     pub managed_sessions_reaped: u64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BootstrapSourceResult {
+    Accepted,
+    Unavailable,
+    IntegrityMismatch,
+    Stale,
+    Rejected,
+    EmptyPeerSet,
+}
+
+impl BootstrapSourceResult {
+    const fn counts_as_success(self) -> bool {
+        matches!(self, Self::Accepted)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
+pub struct BootstrapAttemptSummary {
+    pub accepted_sources: usize,
+    pub unavailable_sources: usize,
+    pub integrity_mismatch_sources: usize,
+    pub stale_sources: usize,
+    pub rejected_sources: usize,
+    pub empty_peer_set_sources: usize,
+}
+
+impl BootstrapAttemptSummary {
+    fn record(&mut self, result: BootstrapSourceResult) {
+        match result {
+            BootstrapSourceResult::Accepted => {
+                self.accepted_sources = self.accepted_sources.saturating_add(1);
+            }
+            BootstrapSourceResult::Unavailable => {
+                self.unavailable_sources = self.unavailable_sources.saturating_add(1);
+            }
+            BootstrapSourceResult::IntegrityMismatch => {
+                self.integrity_mismatch_sources = self.integrity_mismatch_sources.saturating_add(1);
+            }
+            BootstrapSourceResult::Stale => {
+                self.stale_sources = self.stale_sources.saturating_add(1);
+            }
+            BootstrapSourceResult::Rejected => {
+                self.rejected_sources = self.rejected_sources.saturating_add(1);
+            }
+            BootstrapSourceResult::EmptyPeerSet => {
+                self.empty_peer_set_sources = self.empty_peer_set_sources.saturating_add(1);
+            }
+        }
+    }
+
+    const fn only_unavailable(&self) -> bool {
+        self.accepted_sources == 0
+            && self.integrity_mismatch_sources == 0
+            && self.stale_sources == 0
+            && self.rejected_sources == 0
+            && self.empty_peer_set_sources == 0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct BootstrapSourceStatus {
+    pub source_index: usize,
+    pub source: String,
+    pub provider: String,
+    pub result: BootstrapSourceResult,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct BootstrapRuntimeStatus {
     pub configured_sources: usize,
     pub last_attempt_unix_ms: Option<u64>,
@@ -138,6 +210,8 @@ pub struct BootstrapRuntimeStatus {
     pub last_accepted_sources: usize,
     pub total_attempts: u64,
     pub total_successes: u64,
+    pub last_attempt_summary: BootstrapAttemptSummary,
+    pub last_sources: Vec<BootstrapSourceStatus>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -383,10 +457,29 @@ struct BootstrapHttpSource {
     expected_sha256_hex: Option<String>,
 }
 
+impl BootstrapSource {
+    fn display(&self) -> String {
+        match self {
+            Self::File { path } => path.display().to_string(),
+            Self::Http { source } => source.url.clone(),
+            Self::Unsupported { source } => source.clone(),
+        }
+    }
+
+    const fn provider_name(&self) -> &'static str {
+        match self {
+            Self::File { .. } => "file",
+            Self::Http { .. } => "http",
+            Self::Unsupported { .. } => "unsupported",
+        }
+    }
+}
+
 pub struct NodeRuntime {
     state: NodeRuntimeState,
     context: NodeContext,
     bootstrap_sources: Vec<BootstrapSource>,
+    preferred_bootstrap_source_index: Option<usize>,
     tcp_listener: Option<TcpListenerHandle>,
     managed_sessions: BTreeMap<u64, ManagedSession>,
     max_managed_sessions: usize,
@@ -404,6 +497,7 @@ impl NodeRuntime {
             state: NodeRuntimeState::Init,
             context,
             bootstrap_sources: Vec::new(),
+            preferred_bootstrap_source_index: None,
             tcp_listener: None,
             managed_sessions: BTreeMap::new(),
             max_managed_sessions,
@@ -499,7 +593,7 @@ impl NodeRuntime {
             resource_limits: self.resource_limits(),
             maintenance_policy: self.maintenance_policy(),
             cleanup_totals: self.cleanup_totals,
-            bootstrap: self.bootstrap_status,
+            bootstrap: self.bootstrap_status.clone(),
         }
     }
 
@@ -1025,40 +1119,35 @@ impl NodeRuntime {
     ) -> Result<usize, NodeRuntimeError> {
         let node_id = self.context.node_id;
         let mut accepted_sources = 0usize;
+        let mut last_attempt_summary = BootstrapAttemptSummary::default();
+        let mut last_sources = Vec::with_capacity(self.bootstrap_sources.len());
+        let mut preferred_bootstrap_source_index = self.preferred_bootstrap_source_index;
         self.bootstrap_status.last_attempt_unix_ms = Some(timestamp_unix_ms);
         self.bootstrap_status.total_attempts =
             self.bootstrap_status.total_attempts.saturating_add(1);
 
-        for source in &self.bootstrap_sources {
-            let response = source.fetch_validated_response_with_observability(
-                now_unix_s,
-                &mut self.context.observability,
-                allocate_log_context(&mut self.next_correlation_id, node_id, timestamp_unix_ms),
-            );
-            let Ok(response) = response else {
-                continue;
-            };
-
-            if self
-                .context
-                .peer_store
-                .ingest_bootstrap_response_with_observability(
-                    response,
-                    now_unix_s,
-                    &mut self.context.observability,
-                    allocate_log_context(&mut self.next_correlation_id, node_id, timestamp_unix_ms),
-                )
-                .is_ok()
-            {
+        for source_index in self.bootstrap_source_attempt_order() {
+            let log_context =
+                allocate_log_context(&mut self.next_correlation_id, node_id, timestamp_unix_ms);
+            let status = self.attempt_bootstrap_source(source_index, now_unix_s, log_context);
+            last_attempt_summary.record(status.result);
+            if status.result.counts_as_success() {
                 accepted_sources = accepted_sources.saturating_add(1);
+                if preferred_bootstrap_source_index.is_none() {
+                    preferred_bootstrap_source_index = Some(source_index);
+                }
             }
+            last_sources.push(status);
         }
 
         self.bootstrap_status.last_accepted_sources = accepted_sources;
+        self.bootstrap_status.last_attempt_summary = last_attempt_summary;
+        self.bootstrap_status.last_sources = last_sources;
         if accepted_sources > 0 {
             self.bootstrap_status.last_success_unix_ms = Some(timestamp_unix_ms);
             self.bootstrap_status.total_successes =
                 self.bootstrap_status.total_successes.saturating_add(1);
+            self.preferred_bootstrap_source_index = preferred_bootstrap_source_index;
         }
 
         Ok(accepted_sources)
@@ -1096,11 +1185,102 @@ impl NodeRuntime {
             "bootstrap_retry",
             if accepted_sources > 0 {
                 "accepted"
-            } else {
+            } else if self
+                .bootstrap_status
+                .last_attempt_summary
+                .only_unavailable()
+            {
                 "unavailable"
+            } else {
+                "rejected"
             },
         );
         Ok(accepted_sources)
+    }
+
+    fn bootstrap_source_attempt_order(&self) -> Vec<usize> {
+        if self.bootstrap_sources.is_empty() {
+            return Vec::new();
+        }
+
+        let start = self
+            .preferred_bootstrap_source_index
+            .unwrap_or(0)
+            .min(self.bootstrap_sources.len() - 1);
+        (0..self.bootstrap_sources.len())
+            .map(|offset| (start + offset) % self.bootstrap_sources.len())
+            .collect()
+    }
+
+    fn attempt_bootstrap_source(
+        &mut self,
+        source_index: usize,
+        now_unix_s: u64,
+        log_context: LogContext,
+    ) -> BootstrapSourceStatus {
+        let source = &self.bootstrap_sources[source_index];
+        let source_name = source.display();
+        let provider_name = source.provider_name().to_string();
+        let fetch_context = log_context;
+        let response = match source.fetch_validated_response_with_observability(
+            now_unix_s,
+            &mut self.context.observability,
+            fetch_context,
+        ) {
+            Ok(response) => response,
+            Err(error) => {
+                return BootstrapSourceStatus {
+                    source_index,
+                    source: source_name,
+                    provider: provider_name,
+                    result: classify_bootstrap_provider_error(&error),
+                    detail: truncate_bootstrap_detail(error.to_string()),
+                };
+            }
+        };
+
+        if response.peers.is_empty() {
+            return BootstrapSourceStatus {
+                source_index,
+                source: source_name,
+                provider: provider_name,
+                result: BootstrapSourceResult::EmptyPeerSet,
+                detail: "validated bootstrap artifact contained zero peers".to_string(),
+            };
+        }
+
+        let peer_count = response.peers.len();
+        match self
+            .context
+            .peer_store
+            .ingest_bootstrap_response_with_observability(
+                response,
+                now_unix_s,
+                &mut self.context.observability,
+                allocate_log_context(
+                    &mut self.next_correlation_id,
+                    self.context.node_id,
+                    log_context.timestamp_unix_ms,
+                ),
+            ) {
+            Ok(active) => BootstrapSourceStatus {
+                source_index,
+                source: source_name,
+                provider: provider_name,
+                result: BootstrapSourceResult::Accepted,
+                detail: truncate_bootstrap_detail(format!(
+                    "accepted {peer_count} peers; active_peers={}",
+                    active.len()
+                )),
+            },
+            Err(error) => BootstrapSourceStatus {
+                source_index,
+                source: source_name,
+                provider: provider_name,
+                result: BootstrapSourceResult::Rejected,
+                detail: truncate_bootstrap_detail(error.to_string()),
+            },
+        }
     }
 
     fn sync_active_peer_gauge(&mut self) {
@@ -2237,6 +2417,41 @@ fn resolve_bootstrap_source(base_dir: &Path, source: &str) -> BootstrapSource {
     }
 }
 
+fn classify_bootstrap_provider_error(error: &BootstrapProviderError) -> BootstrapSourceResult {
+    match error {
+        BootstrapProviderError::Unavailable(_) => BootstrapSourceResult::Unavailable,
+        BootstrapProviderError::Integrity(_) => BootstrapSourceResult::IntegrityMismatch,
+        BootstrapProviderError::Validation(validation_error) => {
+            if bootstrap_validation_error_is_stale(validation_error) {
+                BootstrapSourceResult::Stale
+            } else {
+                BootstrapSourceResult::Rejected
+            }
+        }
+    }
+}
+
+fn bootstrap_validation_error_is_stale(error: &BootstrapValidationError) -> bool {
+    matches!(
+        error,
+        BootstrapValidationError::GeneratedAfterExpiry { .. }
+            | BootstrapValidationError::Expired { .. }
+            | BootstrapValidationError::ExpiredBridgeHint { .. }
+    )
+}
+
+fn truncate_bootstrap_detail(detail: impl Into<String>) -> String {
+    let detail = detail.into();
+    let mut truncated = detail
+        .chars()
+        .take(MAX_BOOTSTRAP_DIAGNOSTIC_DETAIL_CHARS)
+        .collect::<String>();
+    if detail.chars().count() > MAX_BOOTSTRAP_DIAGNOSTIC_DETAIL_CHARS {
+        truncated.push_str("...");
+    }
+    truncated
+}
+
 fn parse_http_bootstrap_source(source: &str) -> Option<BootstrapHttpSource> {
     let (base_source, expected_sha256_hex) = split_bootstrap_source_pin(source)?;
     let remainder = base_source.strip_prefix("http://")?;
@@ -2436,8 +2651,8 @@ mod tests {
     use serde::Serialize;
 
     use super::{
-        sha256_hex, unix_ms_to_s, NodeContext, NodeRuntime, NodeRuntimeError, NodeRuntimeState,
-        RuntimeTickSummary,
+        sha256_hex, unix_ms_to_s, BootstrapSourceResult, NodeContext, NodeRuntime,
+        NodeRuntimeError, NodeRuntimeState, RuntimeTickSummary,
     };
     use crate::{
         bootstrap::{
@@ -2482,7 +2697,10 @@ mod tests {
             .startup(START_UNIX_MS)
             .expect("startup should succeed");
 
-        assert_eq!(REPOSITORY_STAGE, "milestone-19-pilot-closure");
+        assert_eq!(
+            REPOSITORY_STAGE,
+            "milestone-20-regular-distributed-use-closure"
+        );
         assert_eq!(runtime.state(), NodeRuntimeState::Running);
         assert_eq!(
             runtime.context().node_id(),
@@ -2678,6 +2896,176 @@ mod tests {
         assert_eq!(bootstrap_status.configured_sources, 2);
         assert_eq!(bootstrap_status.last_accepted_sources, 1);
         assert_eq!(bootstrap_status.total_successes, 1);
+        assert_eq!(bootstrap_status.last_attempt_summary.unavailable_sources, 1);
+        assert_eq!(bootstrap_status.last_sources.len(), 2);
+        assert_eq!(
+            bootstrap_status.last_sources[0].result,
+            BootstrapSourceResult::Unavailable
+        );
+        assert_eq!(
+            bootstrap_status.last_sources[1].result,
+            BootstrapSourceResult::Accepted
+        );
+    }
+
+    #[test]
+    fn startup_reports_stale_bootstrap_source_when_later_source_recovers() {
+        let dir = unique_test_dir("runtime-startup-stale-fallback");
+        let key_path = dir.join("node.key");
+        let config_path = dir.join("overlay-config.json");
+        let stale_bootstrap_path = dir.join("stale-bootstrap.json");
+        let valid_bootstrap_path = dir.join("valid-bootstrap.json");
+        let signing_key = Ed25519SigningKey::from_seed([36_u8; 32]);
+
+        fs::write(&key_path, signing_key.as_bytes()).expect("key file should be written");
+        let mut stale_response = sample_bootstrap_response();
+        stale_response.generated_at_unix_s = 1_699_999_000;
+        stale_response.expires_at_unix_s = 1_699_999_999;
+        write_json(&stale_bootstrap_path, &stale_response)
+            .expect("stale bootstrap file should be written");
+        write_json(&valid_bootstrap_path, &sample_bootstrap_response())
+            .expect("valid bootstrap file should be written");
+        write_json(
+            &config_path,
+            &sample_config(
+                "node.key",
+                vec![
+                    "stale-bootstrap.json".to_string(),
+                    "valid-bootstrap.json".to_string(),
+                ],
+            ),
+        )
+        .expect("config file should be written");
+
+        let mut runtime =
+            NodeRuntime::from_config_path(&config_path).expect("runtime should load from config");
+        runtime
+            .startup(START_UNIX_MS)
+            .expect("startup should recover using a later valid bootstrap source");
+
+        let bootstrap_status = runtime.health_snapshot().bootstrap;
+        assert_eq!(runtime.state(), NodeRuntimeState::Running);
+        assert_eq!(bootstrap_status.last_accepted_sources, 1);
+        assert_eq!(bootstrap_status.last_attempt_summary.stale_sources, 1);
+        assert_eq!(bootstrap_status.last_attempt_summary.accepted_sources, 1);
+        assert_eq!(
+            bootstrap_status.last_sources[0].result,
+            BootstrapSourceResult::Stale
+        );
+        assert_eq!(
+            bootstrap_status.last_sources[1].result,
+            BootstrapSourceResult::Accepted
+        );
+    }
+
+    #[test]
+    fn startup_reports_empty_peer_set_when_later_source_recovers() {
+        let dir = unique_test_dir("runtime-startup-empty-peer-set");
+        let key_path = dir.join("node.key");
+        let config_path = dir.join("overlay-config.json");
+        let empty_bootstrap_path = dir.join("empty-bootstrap.json");
+        let valid_bootstrap_path = dir.join("valid-bootstrap.json");
+        let signing_key = Ed25519SigningKey::from_seed([37_u8; 32]);
+
+        fs::write(&key_path, signing_key.as_bytes()).expect("key file should be written");
+        let mut empty_response = sample_bootstrap_response();
+        empty_response.peers.clear();
+        write_json(&empty_bootstrap_path, &empty_response)
+            .expect("empty bootstrap file should be written");
+        write_json(&valid_bootstrap_path, &sample_bootstrap_response())
+            .expect("valid bootstrap file should be written");
+        write_json(
+            &config_path,
+            &sample_config(
+                "node.key",
+                vec![
+                    "empty-bootstrap.json".to_string(),
+                    "valid-bootstrap.json".to_string(),
+                ],
+            ),
+        )
+        .expect("config file should be written");
+
+        let mut runtime =
+            NodeRuntime::from_config_path(&config_path).expect("runtime should load from config");
+        runtime
+            .startup(START_UNIX_MS)
+            .expect("startup should recover using a later valid bootstrap source");
+
+        let bootstrap_status = runtime.health_snapshot().bootstrap;
+        assert_eq!(runtime.state(), NodeRuntimeState::Running);
+        assert_eq!(bootstrap_status.last_accepted_sources, 1);
+        assert_eq!(
+            bootstrap_status.last_attempt_summary.empty_peer_set_sources,
+            1
+        );
+        assert_eq!(bootstrap_status.last_attempt_summary.accepted_sources, 1);
+        assert_eq!(
+            bootstrap_status.last_sources[0].result,
+            BootstrapSourceResult::EmptyPeerSet
+        );
+        assert_eq!(
+            bootstrap_status.last_sources[1].result,
+            BootstrapSourceResult::Accepted
+        );
+    }
+
+    #[test]
+    fn bootstrap_refresh_prefers_last_successful_source_first_after_fallback() {
+        let dir = unique_test_dir("runtime-bootstrap-source-preference");
+        let key_path = dir.join("node.key");
+        let config_path = dir.join("overlay-config.json");
+        let valid_bootstrap_path = dir.join("valid-bootstrap.json");
+        let signing_key = Ed25519SigningKey::from_seed([38_u8; 32]);
+
+        fs::write(&key_path, signing_key.as_bytes()).expect("key file should be written");
+        write_json(&valid_bootstrap_path, &sample_bootstrap_response())
+            .expect("valid bootstrap file should be written");
+        write_json(
+            &config_path,
+            &sample_config(
+                "node.key",
+                vec![
+                    "missing-bootstrap.json".to_string(),
+                    "valid-bootstrap.json".to_string(),
+                ],
+            ),
+        )
+        .expect("config file should be written");
+
+        let mut runtime =
+            NodeRuntime::from_config_path(&config_path).expect("runtime should load from config");
+        runtime
+            .startup(START_UNIX_MS)
+            .expect("startup should recover using a later valid bootstrap source");
+        let initial_status = runtime.health_snapshot().bootstrap;
+        assert_eq!(
+            initial_status.last_sources[0].result,
+            BootstrapSourceResult::Unavailable
+        );
+        assert_eq!(
+            initial_status.last_sources[1].result,
+            BootstrapSourceResult::Accepted
+        );
+
+        runtime
+            .refresh_bootstrap_sources(START_UNIX_MS + 1_000, unix_ms_to_s(START_UNIX_MS + 1_000))
+            .expect("bootstrap refresh should succeed");
+
+        let refreshed_status = runtime.health_snapshot().bootstrap;
+        assert_eq!(refreshed_status.last_sources.len(), 2);
+        assert_eq!(
+            refreshed_status.last_sources[0].source,
+            valid_bootstrap_path.display().to_string()
+        );
+        assert_eq!(
+            refreshed_status.last_sources[0].result,
+            BootstrapSourceResult::Accepted
+        );
+        assert_eq!(
+            refreshed_status.last_sources[1].result,
+            BootstrapSourceResult::Unavailable
+        );
     }
 
     #[test]

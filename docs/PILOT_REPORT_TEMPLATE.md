@@ -1,6 +1,6 @@
 # Pilot Report Template
 
-Use this template for each Milestone 19 pilot-closure run.
+Use this template for each Milestone 20 regular-distributed-use run.
 
 Do not describe the result as GA, production-ready, or ready for hostile
 public deployment.
@@ -8,7 +8,7 @@ public deployment.
 ## Metadata
 
 - Date: `<YYYY-MM-DD>`
-- Repository stage: `milestone-19-pilot-closure`
+- Repository stage: `milestone-20-regular-distributed-use-closure`
 - Commit: `<git-sha>`
 - Operator: `<name>`
 - Topology: `pilot-5-host-two-relay`
@@ -63,6 +63,9 @@ public deployment.
 
 - Seed URLs used `#sha256=<pin>`: `<yes/no>`
 - One-seed-down startup outcome: `<pass/fail>`
+- Integrity-mismatch fallback outcome: `<pass/fail>`
+- Stale-bootstrap fallback outcome: `<pass/fail>`
+- Empty-peer-set fallback outcome: `<pass/fail>`
 - Tampered bootstrap artifact rejected: `<yes/no>`
 - Notes: `<notes>`
 
@@ -78,6 +81,9 @@ public deployment.
 - `node-c-down`: `<pass/fail>`; observed outcome: `<notes>`
 - `relay-unavailable`: `<pass/fail>`; observed outcome: `<notes>`
 - `bootstrap-seed-unavailable`: `<pass/fail>`; observed outcome: `<notes>`
+- `integrity-mismatch-fallback`: `<pass/fail>`; observed outcome: `<notes>`
+- `stale-bootstrap-fallback`: `<pass/fail>`; observed outcome: `<notes>`
+- `empty-bootstrap-fallback`: `<pass/fail>`; observed outcome: `<notes>`
 - `service-host-restart`: `<pass/fail>`; observed outcome: `<notes>`
 - `tampered-bootstrap-artifact`: `<pass/fail>`; observed outcome: `<notes>`
 
@@ -86,6 +92,7 @@ public deployment.
 - Launch gate output: `<path or notes>`
 - Host-style smoke output: `<path or notes>`
 - Distributed pilot checklist output: `<path or notes>`
+- Distributed pilot checklist evidence dir, if used: `<path or notes>`
 - Off-box command logs: `<path or notes>`
 - Per-host status JSON snapshots: `<path or notes>`
 - Additional operator notes: `<path or notes>`

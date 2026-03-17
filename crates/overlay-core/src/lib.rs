@@ -15,7 +15,7 @@ pub mod session;
 pub mod transport;
 pub mod wire;
 
-pub const REPOSITORY_STAGE: &str = "milestone-19-pilot-closure";
+pub const REPOSITORY_STAGE: &str = "milestone-20-regular-distributed-use-closure";
 
 #[cfg(test)]
 mod tests {
@@ -25,7 +25,10 @@ mod tests {
 
     #[test]
     fn reports_repository_stage() {
-        assert_eq!(REPOSITORY_STAGE, "milestone-19-pilot-closure");
+        assert_eq!(
+            REPOSITORY_STAGE,
+            "milestone-20-regular-distributed-use-closure"
+        );
     }
 
     #[test]

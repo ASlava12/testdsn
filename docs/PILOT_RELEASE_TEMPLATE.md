@@ -1,6 +1,6 @@
 # Pilot Release Template
 
-Use this template for each Milestone 19 pilot-closure candidate tag.
+Use this template for each Milestone 20 regular-distributed-use candidate tag.
 
 Do not describe the release as GA, production-ready, or ready for hostile
 public deployment.
@@ -8,7 +8,7 @@ public deployment.
 ## Release metadata
 
 - Tag: `pilot-v0.1.0-rcN`
-- Repository stage: `milestone-19-pilot-closure`
+- Repository stage: `milestone-20-regular-distributed-use-closure`
 - Commit: `<git-sha>`
 - Release date: `<YYYY-MM-DD>`
 - Operator: `<name>`

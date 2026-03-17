@@ -1,12 +1,13 @@
 # Launch Checklist
 
 This checklist defines the Milestone 17 operator-runtime gate that remains the
-prerequisite launch gate for the current Milestone 19 pilot-closure stage.
+prerequisite launch gate for the current Milestone 20
+regular-distributed-use-closure stage.
 
 It is a pilot gate, not a public-production or hostile-Internet readiness
 claim.
 
-For current Milestone 19 sign-off, the validation green path is
+For current Milestone 20 sign-off, the validation green path is
 `./devnet/run-launch-gate.sh` followed by
 `./devnet/run-distributed-pilot-checklist.sh` on the same commit.
 
@@ -32,7 +33,8 @@ The current launchable MVP surface is frozen to:
 - `overlay-cli publish`, `lookup`, `open-service`, and `relay-intro` as
   one-shot distributed operator surfaces;
 - `overlay-cli bootstrap-serve` for static devnet seed serving;
-- the checked-in devnet layouts, launch gate, and pilot-closure checklist.
+- the checked-in devnet layouts, launch gate, and regular-distributed-use
+  checklist.
 
 Anything outside that list is out of the Milestone 17 gate unless a later task
 explicitly reopens scope.
@@ -91,26 +93,39 @@ Pass criteria:
   `overlay-cli status` surface, and a second clean startup against the same
   config.
 
-## Current pilot-closure follow-on
+## Current regular-distributed-use follow-on
 
 After the launch gate stays green on the target commit, run the current
-pilot-closure checklist:
+regular-distributed-use checklist:
 
 ```bash
 ./devnet/run-distributed-pilot-checklist.sh
 ```
 
+Optional evidence-preserving form:
+
+```bash
+./devnet/run-distributed-pilot-checklist.sh --evidence-dir /tmp/overlay-pilot-evidence
+```
+
 Pass criteria:
 
 - the baseline distributed operator flow succeeds;
-- the `node-c-down` scenario still completes;
+- the `node-c-down` scenario still completes and both relay paths bind again;
 - the primary-relay-down scenario falls back to the alternate relay path;
 - the primary relay may emit one expected connection failure during the
   `relay-unavailable` scenario, but the checklist still passes only if the
   alternate relay path succeeds and the final summary reaches
   `pilot_checklist_complete`;
 - the bootstrap-seed-unavailable scenario still completes;
-- the service-host restart scenario reports a clean later startup;
+- the integrity-mismatch-fallback scenario reports one rejected source and one
+  accepted source while startup still reaches `running`;
+- the stale-bootstrap-fallback scenario reports one stale source and one
+  accepted source while startup still reaches `running`;
+- the empty-bootstrap-fallback scenario reports one empty-peer-set source and
+  one accepted source while startup still reaches `running`;
+- the service-host restart scenario reports a clean later startup and another
+  alternate-relay bind;
 - the tampered-bootstrap scenario is rejected by the new integrity check;
 - the final output reaches `pilot_checklist_complete`.
 
@@ -127,9 +142,12 @@ Pass criteria:
 - If any bootstrap JSON changes, every referencing
   `http://...#sha256=<pin>` config entry must be updated before the pilot
   checklist is honest again.
-- The current checklist proves only the documented relay paths
+- The current checklist may be run with `--evidence-dir <dir>` to preserve the
+  raw logs and status snapshots that back the final summary.
+- The current checklist proves the documented relay paths
   `node-a -> node-relay -> node-b` and
-  `node-a -> node-relay-b -> node-b`.
+  `node-a -> node-relay-b -> node-b` across the checked-in node-down,
+  primary-relay-down, and service-restart scenarios only.
 
 ## Green path launch sequence
 
@@ -154,7 +172,8 @@ Pass criteria:
    network bootstrap plus networked `publish`, `lookup`, `open-service`, and
    relay fallback on the host-style devnet layout.
 8. Run `./devnet/run-distributed-pilot-checklist.sh` and collect the resulting
-   pilot-closure scenario evidence plus summary fields.
+   scenario evidence plus summary fields. Use `--evidence-dir <dir>` when you
+   want the wrapper to preserve the raw logs and status files automatically.
 9. Run the actual off-box pilot on separate hosts and attach the collected
    operator-command logs and per-host status snapshots.
 10. Cut the pilot tag only after the gate stays green on the exact commit being
@@ -200,7 +219,7 @@ Workflow:
 - The multi-host smoke and the distributed pilot checklist prove point-to-point
   networked operator flows only; they do not imply autonomous routing of those
   control messages through arbitrary peers.
-- Relay fallback is now proven for two documented paths only:
+- Relay fallback is now proven for the checked-in two-relay topology only:
   `node-a -> node-relay -> node-b` and
   `node-a -> node-relay-b -> node-b`.
 - Lookup is exact-by-`node_id` only, and service resolution is exact-by-`app_id`
@@ -208,10 +227,11 @@ Workflow:
 - Relay quotas and most service-open policy are still code-level defaults rather
   than a rich operator-configurable surface.
 
-## Closure items before regular distributed use
+## Remaining blockers after Milestone 20
 
 - Run and attach the off-box pilot report for the exact commit being signed
-  off; the localhost checklist is necessary but not sufficient evidence.
+  off; the localhost checklist is necessary but not sufficient evidence for a
+  release note.
 - Keep bootstrap artifacts and their pinned `#sha256=<hex>` URLs synchronized
   manually; the current repo still has no HTTPS bootstrap or public trust root.
 - Keep the current localhost sign-off path anchored on
@@ -222,5 +242,5 @@ Workflow:
   discovery system.
 - Expect restart loss of peers, presence, service-open state, relay tunnels,
   and path probes until durable protocol-state persistence is explicitly added.
-- Treat the documented two-relay fallback paths as the only proven relay
-  closure paths for the current stage.
+- Treat the checked-in two-relay topology as the only proven relay closure
+  layout for the current stage.

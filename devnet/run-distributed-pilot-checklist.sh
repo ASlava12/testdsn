@@ -5,7 +5,37 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
 cd "${repo_root}"
 
-tmpdir="$(mktemp -d)"
+evidence_dir=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --evidence-dir)
+      if [[ $# -lt 2 ]]; then
+        echo "distributed pilot checklist: --evidence-dir requires a path" >&2
+        exit 2
+      fi
+      evidence_dir="$2"
+      shift 2
+      ;;
+    -h|--help)
+      echo "usage: ./devnet/run-distributed-pilot-checklist.sh [--evidence-dir <dir>]" >&2
+      exit 0
+      ;;
+    *)
+      echo "distributed pilot checklist: unknown argument '$1'" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -n "${evidence_dir}" ]]; then
+  mkdir -p "${evidence_dir}"
+  tmpdir="$(cd "${evidence_dir}" && pwd)"
+  preserve_evidence="yes"
+else
+  tmpdir="$(mktemp -d)"
+  preserve_evidence="no"
+fi
+
 bootstrap_a_log="${tmpdir}/pilot-bootstrap-a.log"
 bootstrap_b_log="${tmpdir}/pilot-bootstrap-b.log"
 bootstrap_relay_log="${tmpdir}/pilot-bootstrap-relay.log"
@@ -21,12 +51,22 @@ baseline_relay_a_log="${tmpdir}/baseline-relay-a.log"
 baseline_relay_b_log="${tmpdir}/baseline-relay-b.log"
 node_down_lookup_log="${tmpdir}/node-down-lookup.log"
 node_down_service_log="${tmpdir}/node-down-service.log"
+node_down_relay_a_log="${tmpdir}/node-down-relay-a.log"
+node_down_relay_b_log="${tmpdir}/node-down-relay-b.log"
 relay_fault_primary_log="${tmpdir}/relay-fault-primary.log"
 relay_fault_alternate_log="${tmpdir}/relay-fault-alternate.log"
 bootstrap_fault_restart_log="${tmpdir}/bootstrap-fault-restart.log"
 service_restart_log="${tmpdir}/service-restart.log"
+service_restart_relay_log="${tmpdir}/service-restart-relay.log"
 service_restart_status="${tmpdir}/service-restart-status.json"
 tampered_bootstrap_log="${tmpdir}/tampered-bootstrap.log"
+tampered_bootstrap_status="${tmpdir}/tampered-bootstrap.status.json"
+integrity_fallback_log="${tmpdir}/integrity-fallback.log"
+integrity_fallback_status="${tmpdir}/integrity-fallback.status.json"
+stale_bootstrap_log="${tmpdir}/stale-bootstrap.log"
+stale_bootstrap_status="${tmpdir}/stale-bootstrap.status.json"
+empty_bootstrap_log="${tmpdir}/empty-bootstrap.log"
+empty_bootstrap_status="${tmpdir}/empty-bootstrap.status.json"
 relay_a_status="${tmpdir}/relay-a-status.json"
 relay_b_status="${tmpdir}/relay-b-status.json"
 bootstrap_a_pid=""
@@ -49,12 +89,22 @@ cleanup() {
       "${baseline_relay_b_log}" \
       "${node_down_lookup_log}" \
       "${node_down_service_log}" \
+      "${node_down_relay_a_log}" \
+      "${node_down_relay_b_log}" \
       "${relay_fault_primary_log}" \
       "${relay_fault_alternate_log}" \
       "${bootstrap_fault_restart_log}" \
       "${service_restart_log}" \
+      "${service_restart_relay_log}" \
       "${service_restart_status}" \
       "${tampered_bootstrap_log}" \
+      "${tampered_bootstrap_status}" \
+      "${integrity_fallback_log}" \
+      "${integrity_fallback_status}" \
+      "${stale_bootstrap_log}" \
+      "${stale_bootstrap_status}" \
+      "${empty_bootstrap_log}" \
+      "${empty_bootstrap_status}" \
       "${node_a_log}" \
       "${node_b_log}" \
       "${node_c_log}" \
@@ -78,13 +128,19 @@ cleanup() {
       wait "${pid}" 2>/dev/null || true
     fi
   done
-  rm -rf "${tmpdir}"
+  if [[ "${preserve_evidence}" != "yes" ]]; then
+    rm -rf "${tmpdir}"
+  fi
   exit "${status}"
 }
 trap cleanup EXIT
 
 TMPDIR=/tmp cargo build -p overlay-cli >/dev/null
 overlay_cli="target/debug/overlay-cli"
+mapfile -t pilot_node_a_bootstrap_sources < <(grep -o 'http://[^"]*#sha256=[0-9a-f]\{64\}' devnet/pilot/localhost/configs/node-a.json)
+node_a_primary_bootstrap_source="${pilot_node_a_bootstrap_sources[0]}"
+node_a_secondary_bootstrap_source="${pilot_node_a_bootstrap_sources[1]}"
+absolute_node_a_key="${repo_root}/devnet/keys/node-a.key"
 
 start_bootstrap_server() {
   local bind_addr="$1"
@@ -236,6 +292,69 @@ extract_status_numeric_field() {
   sed -n "s/.*\"${field}\":\\([0-9][0-9]*\\).*/\\1/p" "${status_file}" | head -n 1
 }
 
+wait_for_status_numeric_field_at_least() {
+  local pid="$1"
+  local config_path="$2"
+  local status_file="$3"
+  local field="$4"
+  local minimum_value="$5"
+  local description="$6"
+  for _ in $(seq 1 240); do
+    if "${overlay_cli}" status --config "${config_path}" >"${status_file}" 2>/dev/null \
+      && status_matches_pid "${status_file}" "${pid}"; then
+      local observed_value
+      observed_value="$(extract_status_numeric_field "${status_file}" "${field}")"
+      if [[ -n "${observed_value}" ]] && [[ "${observed_value}" -ge "${minimum_value}" ]]; then
+        return 0
+      fi
+    fi
+    if ! kill -0 "${pid}" 2>/dev/null; then
+      echo "distributed pilot checklist: runtime ${config_path} exited before ${description}" >&2
+      exit 1
+    fi
+    sleep 0.05
+  done
+  echo "distributed pilot checklist: runtime ${config_path} did not reach ${description}" >&2
+  exit 1
+}
+
+write_temp_node_a_config() {
+  local config_path="$1"
+  local first_source="$2"
+  local second_source="$3"
+  cat >"${config_path}" <<EOF
+{
+  "node_key_path": "${absolute_node_a_key}",
+  "bootstrap_sources": [
+    "${first_source}",
+    "${second_source}"
+  ],
+  "tcp_listener_addr": "127.0.0.1:0",
+  "max_total_neighbors": 8,
+  "max_presence_records": 64,
+  "max_service_records": 16,
+  "presence_ttl_s": 120,
+  "epoch_duration_s": 60,
+  "path_probe_interval_ms": 5000,
+  "max_transport_buffer_bytes": 65536,
+  "relay_mode": false,
+  "log_level": "info"
+}
+EOF
+}
+
+run_bootstrap_diagnostic_config() {
+  local config_path="$1"
+  local log_file="$2"
+  local status_file="$3"
+  "${overlay_cli}" run \
+    --config "${config_path}" \
+    --max-ticks 0 \
+    --status-every 1 \
+    >"${log_file}" 2>&1
+  "${overlay_cli}" status --config "${config_path}" >"${status_file}"
+}
+
 wait_for_startup_count_increment() {
   local pid="$1"
   local config_path="$2"
@@ -285,6 +404,8 @@ node_a_id=""
 node_b_id=""
 relay_a_id=""
 relay_b_id=""
+relay_a_bind_total=0
+relay_b_bind_total=0
 
 run_baseline_flow() {
   node_a_id="$(extract_node_id "${node_a_pid}" "devnet/pilot/localhost/configs/node-a.json")"
@@ -342,6 +463,8 @@ run_baseline_flow() {
     "${relay_b_status}" \
     '"active_tunnels":1' \
     'alternate relay tunnel bind'
+  relay_a_bind_total="$(extract_status_numeric_field "${relay_a_status}" "relay_bind_total")"
+  relay_b_bind_total="$(extract_status_numeric_field "${relay_b_status}" "relay_bind_total")"
 }
 
 run_baseline_flow_with_node_c_down() {
@@ -359,6 +482,34 @@ run_baseline_flow_with_node_c_down() {
     --service-namespace devnet \
     --service-name terminal \
     >"${node_down_service_log}"
+  "${overlay_cli}" relay-intro \
+    --config devnet/pilot/localhost/configs/node-b.json \
+    --target tcp://127.0.0.1:4198 \
+    --relay-node-id "${relay_a_id}" \
+    --requester-node-id "${node_a_id}" \
+    >"${node_down_relay_a_log}"
+  "${overlay_cli}" relay-intro \
+    --config devnet/pilot/localhost/configs/node-b.json \
+    --target tcp://127.0.0.1:4197 \
+    --relay-node-id "${relay_b_id}" \
+    --requester-node-id "${node_a_id}" \
+    >"${node_down_relay_b_log}"
+  wait_for_status_numeric_field_at_least \
+    "${relay_a_pid}" \
+    "devnet/pilot/localhost/configs/node-relay.json" \
+    "${relay_a_status}" \
+    "relay_bind_total" \
+    "$(( ${relay_a_bind_total:-0} + 1 ))" \
+    'node-c-down relay bind increment on primary relay'
+  relay_a_bind_total="$(extract_status_numeric_field "${relay_a_status}" "relay_bind_total")"
+  wait_for_status_numeric_field_at_least \
+    "${relay_b_pid}" \
+    "devnet/pilot/localhost/configs/node-relay-b.json" \
+    "${relay_b_status}" \
+    "relay_bind_total" \
+    "$(( ${relay_b_bind_total:-0} + 1 ))" \
+    'node-c-down relay bind increment on alternate relay'
+  relay_b_bind_total="$(extract_status_numeric_field "${relay_b_status}" "relay_bind_total")"
 }
 
 run_relay_fault_scenario() {
@@ -379,6 +530,14 @@ run_relay_fault_scenario() {
     --relay-node-id "${relay_b_id}" \
     --requester-node-id "${node_a_id}" \
     >"${relay_fault_alternate_log}"
+  wait_for_status_numeric_field_at_least \
+    "${relay_b_pid}" \
+    "devnet/pilot/localhost/configs/node-relay-b.json" \
+    "${relay_b_status}" \
+    "relay_bind_total" \
+    "$(( ${relay_b_bind_total:-0} + 1 ))" \
+    'relay-unavailable alternate relay bind increment'
+  relay_b_bind_total="$(extract_status_numeric_field "${relay_b_status}" "relay_bind_total")"
 }
 
 run_bootstrap_seed_fault() {
@@ -418,6 +577,20 @@ run_service_restart_scenario() {
     --service-namespace devnet \
     --service-name terminal \
     >"${service_restart_log}"
+  "${overlay_cli}" relay-intro \
+    --config devnet/pilot/localhost/configs/node-b.json \
+    --target tcp://127.0.0.1:4197 \
+    --relay-node-id "${relay_b_id}" \
+    --requester-node-id "${node_a_id}" \
+    >"${service_restart_relay_log}"
+  wait_for_status_numeric_field_at_least \
+    "${relay_b_pid}" \
+    "devnet/pilot/localhost/configs/node-relay-b.json" \
+    "${relay_b_status}" \
+    "relay_bind_total" \
+    "$(( ${relay_b_bind_total:-0} + 1 ))" \
+    'service-host-restart alternate relay bind increment'
+  relay_b_bind_total="$(extract_status_numeric_field "${relay_b_status}" "relay_bind_total")"
   wait_for_startup_count_increment \
     "${node_b_pid}" \
     "devnet/pilot/localhost/configs/node-b.json" \
@@ -426,22 +599,94 @@ run_service_restart_scenario() {
     'service host restart status'
 }
 
+run_integrity_fallback_check() {
+  local config_path="${tmpdir}/integrity-fallback-node-a.json"
+  local bad_primary_source
+  bad_primary_source="$(printf '%s\n' "${node_a_primary_bootstrap_source}" | sed 's/sha256=[0-9a-f]\{64\}/sha256=0000000000000000000000000000000000000000000000000000000000000000/')"
+  write_temp_node_a_config "${config_path}" "${bad_primary_source}" "${node_a_secondary_bootstrap_source}"
+  run_bootstrap_diagnostic_config "${config_path}" "${integrity_fallback_log}" "${integrity_fallback_status}"
+  grep -q '"state":"running"' "${integrity_fallback_log}"
+  grep -q '"integrity_mismatch_sources":1' "${integrity_fallback_status}"
+  grep -q '"accepted_sources":1' "${integrity_fallback_status}"
+  grep -q '"result":"integrity_mismatch"' "${integrity_fallback_status}"
+  grep -q '"result":"accepted"' "${integrity_fallback_status}"
+}
+
+run_stale_bootstrap_check() {
+  local config_path="${tmpdir}/stale-bootstrap-node-a.json"
+  local stale_bootstrap_file="${tmpdir}/stale-bootstrap.json"
+  cat >"${stale_bootstrap_file}" <<'EOF'
+{
+  "version": 1,
+  "generated_at_unix_s": 1,
+  "expires_at_unix_s": 2,
+  "network_params": {
+    "network_id": "overlay-devnet"
+  },
+  "epoch_duration_s": 60,
+  "presence_ttl_s": 120,
+  "max_frame_body_len": 65519,
+  "handshake_version": 1,
+  "peers": [
+    {
+      "node_id": [30, 237, 41, 177, 101, 79, 188, 169, 70, 23, 0, 77, 121, 105, 223, 196, 101, 43, 31, 48, 167, 168, 183, 113, 195, 72, 0, 21, 84, 131, 56, 11],
+      "transport_classes": ["quic", "tcp"],
+      "capabilities": ["service-host"],
+      "dial_hints": ["tcp://127.0.0.1:4112"],
+      "observed_role": "standard"
+    }
+  ],
+  "bridge_hints": []
+}
+EOF
+  write_temp_node_a_config "${config_path}" "file:${stale_bootstrap_file}" "${node_a_secondary_bootstrap_source}"
+  run_bootstrap_diagnostic_config "${config_path}" "${stale_bootstrap_log}" "${stale_bootstrap_status}"
+  grep -q '"state":"running"' "${stale_bootstrap_log}"
+  grep -q '"stale_sources":1' "${stale_bootstrap_status}"
+  grep -q '"accepted_sources":1' "${stale_bootstrap_status}"
+  grep -q '"result":"stale"' "${stale_bootstrap_status}"
+  grep -q '"result":"accepted"' "${stale_bootstrap_status}"
+}
+
+run_empty_bootstrap_check() {
+  local config_path="${tmpdir}/empty-bootstrap-node-a.json"
+  local empty_bootstrap_file="${tmpdir}/empty-bootstrap.json"
+  cat >"${empty_bootstrap_file}" <<'EOF'
+{
+  "version": 1,
+  "generated_at_unix_s": 1900000000,
+  "expires_at_unix_s": 2000000000,
+  "network_params": {
+    "network_id": "overlay-devnet"
+  },
+  "epoch_duration_s": 60,
+  "presence_ttl_s": 120,
+  "max_frame_body_len": 65519,
+  "handshake_version": 1,
+  "peers": [],
+  "bridge_hints": []
+}
+EOF
+  write_temp_node_a_config "${config_path}" "file:${empty_bootstrap_file}" "${node_a_secondary_bootstrap_source}"
+  run_bootstrap_diagnostic_config "${config_path}" "${empty_bootstrap_log}" "${empty_bootstrap_status}"
+  grep -q '"state":"running"' "${empty_bootstrap_log}"
+  grep -q '"empty_peer_set_sources":1' "${empty_bootstrap_status}"
+  grep -q '"accepted_sources":1' "${empty_bootstrap_status}"
+  grep -q '"result":"empty_peer_set"' "${empty_bootstrap_status}"
+  grep -q '"result":"accepted"' "${empty_bootstrap_status}"
+}
+
 run_tampered_bootstrap_check() {
   local bad_config="${tmpdir}/tampered-bootstrap-node-a.json"
-  local absolute_node_key="${repo_root}/devnet/keys/node-a.key"
-  sed \
-    -e "s#\"node_key_path\": \"../../../keys/node-a.key\"#\"node_key_path\": \"${absolute_node_key}\"#g" \
-    -e 's/"tcp_listener_addr": "127\.0\.0\.1:4111"/"tcp_listener_addr": "127.0.0.1:0"/g' \
-    -e 's/sha256=[0-9a-f]\{64\}/sha256=0000000000000000000000000000000000000000000000000000000000000000/g' \
-    devnet/pilot/localhost/configs/node-a.json \
-    >"${bad_config}"
-  "${overlay_cli}" run \
-    --config "${bad_config}" \
-    --max-ticks 0 \
-    --status-every 1 \
-    >"${tampered_bootstrap_log}" 2>&1
+  local bad_primary_source
+  local bad_secondary_source
+  bad_primary_source="$(printf '%s\n' "${node_a_primary_bootstrap_source}" | sed 's/sha256=[0-9a-f]\{64\}/sha256=0000000000000000000000000000000000000000000000000000000000000000/')"
+  bad_secondary_source="$(printf '%s\n' "${node_a_secondary_bootstrap_source}" | sed 's/sha256=[0-9a-f]\{64\}/sha256=0000000000000000000000000000000000000000000000000000000000000000/')"
+  write_temp_node_a_config "${bad_config}" "${bad_primary_source}" "${bad_secondary_source}"
+  run_bootstrap_diagnostic_config "${bad_config}" "${tampered_bootstrap_log}" "${tampered_bootstrap_status}"
   grep -q '"event":"bootstrap_fetch","result":"rejected"' "${tampered_bootstrap_log}"
-  grep -q '"result":"degraded"' "${tampered_bootstrap_log}"
+  grep -q '"state":"degraded"' "${tampered_bootstrap_log}"
+  grep -q '"integrity_mismatch_sources":2' "${tampered_bootstrap_status}"
 }
 
 start_full_topology
@@ -450,6 +695,9 @@ run_baseline_flow_with_node_c_down
 run_relay_fault_scenario
 run_bootstrap_seed_fault
 run_service_restart_scenario
+run_integrity_fallback_check
+run_stale_bootstrap_check
+run_empty_bootstrap_check
 run_tampered_bootstrap_check
 
 cat "${baseline_publish_log}"
@@ -459,6 +707,8 @@ cat "${baseline_relay_a_log}"
 cat "${baseline_relay_b_log}"
 cat "${node_down_lookup_log}"
 cat "${node_down_service_log}"
+cat "${node_down_relay_a_log}"
+cat "${node_down_relay_b_log}"
 echo '{"step":"pilot_scenario","scenario":"relay-unavailable","result":"expected_degraded"}'
 cat "${relay_fault_primary_log}"
 cat "${relay_fault_alternate_log}"
@@ -466,6 +716,13 @@ echo '{"step":"pilot_scenario","scenario":"bootstrap-seed-unavailable","result":
 cat "${bootstrap_fault_restart_log}"
 echo '{"step":"pilot_scenario","scenario":"service-host-restart","result":"ok"}'
 cat "${service_restart_log}"
+cat "${service_restart_relay_log}"
+echo '{"step":"pilot_scenario","scenario":"integrity-mismatch-fallback","result":"ok"}'
+cat "${integrity_fallback_log}"
+echo '{"step":"pilot_scenario","scenario":"stale-bootstrap-fallback","result":"ok"}'
+cat "${stale_bootstrap_log}"
+echo '{"step":"pilot_scenario","scenario":"empty-bootstrap-fallback","result":"ok"}'
+cat "${empty_bootstrap_log}"
 echo '{"step":"pilot_scenario","scenario":"tampered-bootstrap-artifact","result":"rejected"}'
 cat "${tampered_bootstrap_log}"
 
@@ -475,4 +732,7 @@ relay_a_bytes_last_hour="$(extract_status_numeric_field "${relay_a_status}" "tot
 relay_b_bytes_last_hour="$(extract_status_numeric_field "${relay_b_status}" "total_relayed_bytes_last_hour")"
 service_restart_startup_count="$(extract_status_numeric_field "${service_restart_status}" "startup_count")"
 
-echo "{\"step\":\"pilot_checklist_complete\",\"topology\":\"pilot-5-node\",\"baseline\":\"ok\",\"node_down\":\"ok\",\"relay_unavailable\":\"expected_degraded\",\"bootstrap_seed_unavailable\":\"ok\",\"service_restart\":\"ok\",\"tampered_bootstrap\":\"rejected\",\"baseline_lookup_latency_ms\":${baseline_lookup_latency_ms:-0},\"node_down_lookup_latency_ms\":${node_down_lookup_latency_ms:-0},\"relay_a_bytes_last_hour\":${relay_a_bytes_last_hour:-0},\"relay_b_bytes_last_hour\":${relay_b_bytes_last_hour:-0},\"service_restart_startup_count\":${service_restart_startup_count:-0},\"relay_paths\":[\"node-a->node-relay->node-b\",\"node-a->node-relay-b->node-b\"]}"
+echo "{\"step\":\"pilot_checklist_complete\",\"topology\":\"pilot-5-node\",\"baseline\":\"ok\",\"node_down\":\"ok\",\"relay_unavailable\":\"expected_degraded\",\"bootstrap_seed_unavailable\":\"ok\",\"integrity_mismatch_fallback\":\"ok\",\"stale_bootstrap_fallback\":\"ok\",\"empty_bootstrap_fallback\":\"ok\",\"service_restart\":\"ok\",\"tampered_bootstrap\":\"rejected\",\"baseline_lookup_latency_ms\":${baseline_lookup_latency_ms:-0},\"node_down_lookup_latency_ms\":${node_down_lookup_latency_ms:-0},\"relay_a_bytes_last_hour\":${relay_a_bytes_last_hour:-0},\"relay_b_bytes_last_hour\":${relay_b_bytes_last_hour:-0},\"relay_a_bind_total\":${relay_a_bind_total:-0},\"relay_b_bind_total\":${relay_b_bind_total:-0},\"service_restart_startup_count\":${service_restart_startup_count:-0},\"relay_paths\":[\"node-a->node-relay->node-b\",\"node-a->node-relay-b->node-b\"]}"
+if [[ "${preserve_evidence}" == "yes" ]]; then
+  echo "{\"step\":\"pilot_evidence_bundle\",\"path\":\"${tmpdir}\"}"
+fi

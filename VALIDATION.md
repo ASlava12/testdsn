@@ -2,9 +2,10 @@
 
 Run the following commands when applicable.
 
-## Current Milestone 19 sign-off path
+## Current Milestone 20 sign-off path
 
-Use the current pilot-closure sign-off order on the commit you intend to
+Use the current regular-distributed-use sign-off order on the commit you
+intend to
 validate:
 
 ```bash
@@ -97,12 +98,18 @@ cargo test -p overlay-core --test integration_service_open
 ```
 
 Use this only when you need the older localhost rehearsal path for the landed
-Milestone 18 baseline. It is not part of current Milestone 19 sign-off.
+Milestone 18 baseline. It is not part of current Milestone 20 sign-off.
 
-## Milestone 19 pilot-closure checklist
+## Milestone 20 regular-distributed-use checklist
 
 ```bash
 ./devnet/run-distributed-pilot-checklist.sh
+```
+
+Optional evidence-preserving form:
+
+```bash
+./devnet/run-distributed-pilot-checklist.sh --evidence-dir /tmp/overlay-pilot-evidence
 ```
 
 Equivalent explicit command order:
@@ -214,9 +221,11 @@ cargo test -p overlay-core --test integration_service_open
 ## Notes
 
 - Milestones 1-12 are considered implemented baseline work, and the current
-  repository stage marker is `milestone-19-pilot-closure` (Milestone 19 pilot
-  closure support on top of the landed Milestone 18 real-pilot baseline).
-- The current sign-off path is the top-level Milestone 19 section above:
+  repository stage marker is
+  `milestone-20-regular-distributed-use-closure` (Milestone 20 regular
+  distributed use closure support on top of the landed Milestone 19 pilot
+  closure baseline).
+- The current sign-off path is the top-level Milestone 20 section above:
   workspace format/lint/build/test, then `./devnet/run-launch-gate.sh`, then
   `./devnet/run-distributed-pilot-checklist.sh`.
 - Use the Milestone 1-12 regression runs, stage-boundary smoke tests, the
@@ -272,11 +281,11 @@ cargo test -p overlay-core --test integration_service_open
   the required launch order.
 - `./devnet/run-pilot-checklist.sh` remains the Milestone 18 localhost
   rehearsal pack for the smoke-harness pilot boundary; it is retained for the
-  landed baseline but is not the current Milestone 19 sign-off path.
-- `./devnet/run-distributed-pilot-checklist.sh` is the current Milestone 19
-  pilot-closure proof path for the dedicated pilot topology pack, the expanded
-  fault matrix, the two relay-capable fallback paths, and the pinned-bootstrap
-  rejection path.
+  landed baseline but is not the current Milestone 20 sign-off path.
+- `./devnet/run-distributed-pilot-checklist.sh` is the current Milestone 20
+  regular-distributed-use proof path for the dedicated pilot topology pack,
+  the expanded fault matrix, the repeated relay-bind evidence, and the
+  unavailable/integrity/stale/empty pinned-bootstrap diagnostics.
 - The Milestone 12 soak path also stays in-process and advances logical time
   through repeated runtime ticks so stale-session/service/relay/probe cleanup,
   bootstrap retry, and health snapshots can be exercised without a separate

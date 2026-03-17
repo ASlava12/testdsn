@@ -4,11 +4,12 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `VALIDATION.md`, `docs/OPEN_QUESTIONS.md`,
 
 Goal:
 Synchronize on the current repository stage,
-`milestone-19-pilot-closure`, and use the dedicated Milestone 19 prompt
+`milestone-20-regular-distributed-use-closure`, and use the dedicated
+Milestone 20 prompt
 for the next concrete current-stage task.
 
 Current repository baseline:
-- The current repository stage is `milestone-19-pilot-closure`.
+- The current repository stage is `milestone-20-regular-distributed-use-closure`.
 - Milestone 0 is already complete.
 - Milestone 1 foundations are already implemented, vectorized, and validated in
   `overlay-core` (`identity`, `records`, `wire`).
@@ -51,9 +52,14 @@ Current repository baseline:
 - Milestone 18 real pilot remains part of the landed baseline with
   `docs/PILOT_RUNBOOK.md`, `docs/PILOT_REPORT_TEMPLATE.md`, `devnet/pilot/`,
   and `./devnet/run-pilot-checklist.sh`.
-- Milestone 19 pilot closure is now active with distributed operator commands,
-  pinned static bootstrap artifacts, the expanded pilot topology, and
-  `./devnet/run-distributed-pilot-checklist.sh`.
+- Milestone 19 pilot closure is part of the landed baseline with distributed
+  operator commands, pinned static bootstrap artifacts, the expanded pilot
+  topology, and `./devnet/run-distributed-pilot-checklist.sh`.
+- Milestone 20 regular distributed use closure is now active with per-source
+  bootstrap diagnostics on the runtime status surface, preferred retry/fallback
+  ordering across configured bootstrap sources, reproducible `--evidence-dir`
+  support for the distributed smoke and pilot checklist, and stronger relay
+  proof across the checked-in two-relay topology.
 
 Constraints:
 - do not restart the repository from Milestone 0;
@@ -63,8 +69,8 @@ Constraints:
 
 Tasks:
 - confirm the repository already sits at the closed Milestone 1-8 baseline;
-- use `prompts/codex-milestone-19.md` for the next concrete
-  `milestone-19-pilot-closure` task;
+- use `prompts/codex-milestone-20.md` for the next concrete
+  `milestone-20-regular-distributed-use-closure` task;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the repository baseline changes;
 - treat Milestones 1-12 as closed baseline work, touching them only for

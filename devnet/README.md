@@ -1,13 +1,13 @@
 # Devnet
 
 This directory contains the checked-in devnet and pilot assets for the current
-Milestone 19 stage:
+Milestone 20 stage:
 
 - the original four-node local-file devnet under `configs/` and `bootstrap/`
 - the host-style multi-host devnet layouts under `hosts/`
-- the dedicated Milestone 19 pilot pack under `pilot/`
+- the dedicated Milestone 20 regular-distributed-use pack under `pilot/`
 - wrapper scripts for the local, distributed, network-bootstrap, and
-  pilot-closure proof paths
+  regular-distributed-use proof paths
 
 Nodes:
 
@@ -23,11 +23,11 @@ Nodes:
 - `keys/*.key`: deterministic Ed25519 seed files in hex form
 - `bootstrap/*.json`: local bootstrap seed files used by runtime startup
 - `hosts/`: host-style config layouts for localhost proof and multi-host copy/edit use
-- `pilot/`: dedicated Milestone 19 pilot configs and pinned bootstrap artifacts
+- `pilot/`: dedicated Milestone 20 configs and pinned bootstrap artifacts
 - `run-smoke.sh`: wrapper around `overlay-cli smoke`
 - `run-distributed-smoke.sh`: wrapper around the minimal multi-process localhost TCP smoke
 - `run-multihost-smoke.sh`: wrapper around the host-style network-bootstrap smoke
-- `run-distributed-pilot-checklist.sh`: wrapper around the Milestone 19 pilot-closure checklist
+- `run-distributed-pilot-checklist.sh`: wrapper around the Milestone 20 regular-distributed-use checklist
 - `run-pilot-checklist.sh`: retained Milestone 18 localhost rehearsal pack,
   not the current sign-off path
 - `run-launch-gate.sh`: wrapper around the Milestone 17 launch gate
@@ -85,6 +85,12 @@ accept, and session-establishment logs.
 ./devnet/run-multihost-smoke.sh
 ```
 
+Optional evidence-preserving form:
+
+```bash
+./devnet/run-multihost-smoke.sh --evidence-dir /tmp/overlay-multihost-evidence
+```
+
 This starts the static seed servers, then starts the host-style runtimes and
 drives bounded `publish`, `lookup`, `open-service`, and `relay-intro` commands
 across them.
@@ -95,10 +101,18 @@ across them.
 ./devnet/run-distributed-pilot-checklist.sh
 ```
 
+Optional evidence-preserving form:
+
+```bash
+./devnet/run-distributed-pilot-checklist.sh --evidence-dir /tmp/overlay-pilot-evidence
+```
+
 This starts the dedicated pilot bootstrap servers, runs the current distributed
 operator flow against `pilot/localhost/`, exercises the documented fault
-scenarios, checks service-host restart/status behavior, validates tampered
-bootstrap rejection, and emits a final `pilot_checklist_complete` summary.
+scenarios including unavailable/integrity/stale/empty bootstrap cases, checks
+service-host restart/status behavior plus repeated relay binds, validates
+tampered bootstrap rejection, and emits a final `pilot_checklist_complete`
+summary.
 
 This is the current localhost sign-off path after `./devnet/run-launch-gate.sh`.
 

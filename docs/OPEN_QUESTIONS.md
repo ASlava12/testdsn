@@ -2,7 +2,7 @@
 
 This file exists so Codex does not silently invent protocol details.
 All currently known MVP ambiguities affecting the current
-`milestone-19-pilot-closure` baseline are resolved below and should be reused
+`milestone-20-regular-distributed-use-closure` baseline are resolved below and should be reused
 as the conservative defaults.
 
 ## Resolved conservative choices for MVP
@@ -264,7 +264,8 @@ For current work, treat the repository stage as:
   `crates/overlay-cli/src/devnet.rs`;
 - Milestone 12 launch hardening is implemented with bounded cleanup, degraded
   bootstrap retry, runtime health snapshots, and the logical soak path;
-- the current repository stage marker is `milestone-19-pilot-closure`;
+- the current repository stage marker is
+  `milestone-20-regular-distributed-use-closure`;
 - Milestone 17 operator-grade runtime hardening is part of the landed baseline,
   with `docs/LAUNCH_CHECKLIST.md`, the documented green-path validation and
   launch sequence, signal-aware `overlay-cli run`, config-local
@@ -273,9 +274,15 @@ For current work, treat the repository stage as:
 - Milestone 18 real pilot remains part of the landed baseline, with
   `docs/PILOT_RUNBOOK.md`, `docs/PILOT_REPORT_TEMPLATE.md`, `devnet/pilot/`,
   and the retained `devnet/run-pilot-checklist.sh` localhost rehearsal pack;
-- Milestone 19 pilot closure is now the current stage, with distributed
+- Milestone 19 pilot closure is part of the landed baseline, with distributed
   operator surfaces, pinned static bootstrap artifacts, the expanded pilot
   topology, and `devnet/run-distributed-pilot-checklist.sh`;
+- Milestone 20 regular distributed use closure is now the current stage, with
+  per-source bootstrap diagnostics on the runtime status surface, preferred
+  retry/fallback ordering across configured bootstrap sources, the expanded
+  localhost checklist proof for unavailable/integrity/stale/empty bootstrap
+  cases, and stronger relay-bind evidence across the checked-in two-relay
+  topology;
 
 That means:
 
@@ -293,10 +300,10 @@ That means:
   vectors, or spec mismatches;
 - Milestone 8 is closed and should be touched only for regressions,
   vectors, or spec mismatches;
-- Milestone 19 is the current stage and should stay limited to pilot-closure
-  support, network-bootstrap and operator-runtime maintenance, regression
-  fixes, validation maintenance, and documentation synchronization unless a
-  task explicitly reopens scope;
+- Milestone 20 is the current stage and should stay limited to
+  regular-distributed-use closure support, network-bootstrap and
+  operator-runtime maintenance, regression fixes, validation maintenance, and
+  documentation synchronization unless a task explicitly reopens scope;
 - the current localhost sign-off flow is `./devnet/run-launch-gate.sh`
   followed by `./devnet/run-distributed-pilot-checklist.sh` on the same
   commit;
@@ -352,7 +359,7 @@ Rules:
 
 ### 12. Conservative operator-state persistence for the current pilot runtime
 
-For the current Milestone 19 pilot runtime, persist only bounded operator
+For the current Milestone 20 pilot runtime, persist only bounded operator
 metadata, not protocol-layer state.
 
 Rules:
@@ -926,6 +933,22 @@ Rationale:
 - it reuses existing bounded config surfaces and subsystem limits;
 - it gives node operators enough local status to run the devnet without
   broadening protocol scope.
+
+### 37. Conservative bootstrap diagnostics defaults for Milestone 20
+
+For the current regular-distributed-use closure stage:
+
+- runtime status may summarize the last bootstrap attempt by configured source;
+- the smallest conservative per-source result classes are:
+  `accepted`, `unavailable`, `integrity_mismatch`, `stale`, `empty_peer_set`,
+  and `rejected`;
+- `stale` covers expired artifacts and other timing-invalid bootstrap inputs
+  that are unusable because their freshness window has elapsed;
+- `empty_peer_set` is a local diagnostic for a schema-valid bootstrap artifact
+  that contains zero peers and therefore does not improve reachability on its
+  own;
+- these diagnostics are operator-facing runtime status fields, not new protocol
+  messages or schema changes.
 
 ## Rule
 

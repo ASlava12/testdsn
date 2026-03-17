@@ -5,7 +5,37 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
 cd "${repo_root}"
 
-tmpdir="$(mktemp -d)"
+evidence_dir=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --evidence-dir)
+      if [[ $# -lt 2 ]]; then
+        echo "multihost smoke: --evidence-dir requires a path" >&2
+        exit 2
+      fi
+      evidence_dir="$2"
+      shift 2
+      ;;
+    -h|--help)
+      echo "usage: ./devnet/run-multihost-smoke.sh [--evidence-dir <dir>]" >&2
+      exit 0
+      ;;
+    *)
+      echo "multihost smoke: unknown argument '$1'" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -n "${evidence_dir}" ]]; then
+  mkdir -p "${evidence_dir}"
+  tmpdir="$(cd "${evidence_dir}" && pwd)"
+  preserve_evidence="yes"
+else
+  tmpdir="$(mktemp -d)"
+  preserve_evidence="no"
+fi
+
 bootstrap_a_log="${tmpdir}/bootstrap-a.log"
 bootstrap_b_log="${tmpdir}/bootstrap-b.log"
 bootstrap_relay_log="${tmpdir}/bootstrap-relay.log"
@@ -55,7 +85,9 @@ cleanup() {
       wait "${pid}" 2>/dev/null || true
     fi
   done
-  rm -rf "${tmpdir}"
+  if [[ "${preserve_evidence}" != "yes" ]]; then
+    rm -rf "${tmpdir}"
+  fi
   exit "${status}"
 }
 trap cleanup EXIT
@@ -237,3 +269,6 @@ cat "${service_log}"
 cat "${relay_intro_log}"
 
 echo "{\"step\":\"smoke_complete\",\"result\":\"ok\",\"node_a_id\":\"${node_a_id}\",\"node_b_id\":\"${node_b_id}\",\"relay_node_id\":\"${relay_node_id}\"}"
+if [[ "${preserve_evidence}" == "yes" ]]; then
+  echo "{\"step\":\"smoke_evidence_bundle\",\"path\":\"${tmpdir}\"}"
+fi
