@@ -15,7 +15,7 @@ pub mod session;
 pub mod transport;
 pub mod wire;
 
-pub const REPOSITORY_STAGE: &str = "milestone-22-first-user-acceptance-pack";
+pub const REPOSITORY_STAGE: &str = "milestone-24-bootstrap-trust-delivery-hardening";
 
 #[cfg(test)]
 mod tests {

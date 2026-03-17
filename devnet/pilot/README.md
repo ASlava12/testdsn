@@ -1,12 +1,12 @@
 # Pilot Devnet
 
 This directory contains the Milestone 20 regular-distributed-use assets carried
-into the current Milestone 22 first-user-acceptance-pack stage.
+into the current Milestone 24 bootstrap-trust-delivery-hardening stage.
 
 It keeps the landed pilot topology pack and extends it with:
 
-- `localhost/`: runnable localhost rehearsal configs and pinned bootstrap seeds
-  for `./devnet/run-distributed-pilot-checklist.sh`
+- `localhost/`: runnable localhost rehearsal configs and signed bootstrap seed
+  artifacts for `./devnet/run-distributed-pilot-checklist.sh`
 - `examples/`: copy-and-edit configs and bootstrap seeds for a real 5-node,
   5-host pilot with two relay-capable fallback paths
 

@@ -615,8 +615,11 @@ fn log_entry_is_recent_failure(entry: &StructuredLogEntry) -> bool {
     result == "degraded"
         || result == "rejected"
         || result == "unavailable"
+        || result == "integrity_mismatch"
+        || result == "trust_verification_failed"
         || result == "missing"
         || result == "empty"
+        || result == "empty_peer_set"
         || result == "stale"
         || result == "not_found"
         || result.starts_with("rejected_")
@@ -626,10 +629,15 @@ fn log_entry_is_recent_failure(entry: &StructuredLogEntry) -> bool {
 mod tests {
     use std::{fs, path::PathBuf};
 
+    use overlay_core::{
+        identity::NodeId,
+        metrics::{LogComponent, StructuredLogEntry},
+    };
     use serde_json::json;
 
     use super::{
-        parse_shutdown_reason, OperatorStateManager, RuntimeShutdownReason, STATUS_VERSION,
+        log_entry_is_recent_failure, parse_shutdown_reason, OperatorStateManager,
+        RuntimeShutdownReason, STATUS_VERSION,
     };
 
     fn unique_test_dir(name: &str) -> PathBuf {
@@ -665,6 +673,24 @@ mod tests {
         let error = OperatorStateManager::read_status_file(&config_path)
             .expect_err("missing status file should fail");
         assert!(error.contains("runtime-status.json"));
+    }
+
+    #[test]
+    fn recent_failure_filter_includes_bootstrap_integrity_and_trust_results() {
+        for result in [
+            "integrity_mismatch",
+            "trust_verification_failed",
+            "empty_peer_set",
+        ] {
+            assert!(log_entry_is_recent_failure(&StructuredLogEntry {
+                timestamp_unix_ms: 1,
+                node_id: NodeId::from_bytes([7_u8; 32]),
+                correlation_id: 2,
+                component: LogComponent::Bootstrap,
+                event: "bootstrap_fetch".to_string(),
+                result: result.to_string(),
+            }));
+        }
     }
 
     #[test]

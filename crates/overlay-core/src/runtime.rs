@@ -17,11 +17,14 @@ use thiserror::Error;
 use crate::{
     bootstrap::{
         BootstrapProvider, BootstrapProviderError, BootstrapResponse, BootstrapValidationError,
+        SignedBootstrapArtifact,
     },
     config::{ConfigError, OverlayConfig},
     crypto::{
         kex::X25519StaticSecret,
-        sign::{Ed25519SigningKey, ED25519_SECRET_KEY_LEN},
+        sign::{
+            Ed25519PublicKey, Ed25519SigningKey, ED25519_PUBLIC_KEY_LEN, ED25519_SECRET_KEY_LEN,
+        },
     },
     error::{PresenceVerificationError, RecordEncodingError, ServiceVerificationError},
     identity::{derive_app_id, derive_node_id, NodeId},
@@ -140,6 +143,7 @@ pub enum BootstrapSourceResult {
     Accepted,
     Unavailable,
     IntegrityMismatch,
+    TrustVerificationFailed,
     Stale,
     Rejected,
     EmptyPeerSet,
@@ -156,6 +160,7 @@ pub struct BootstrapAttemptSummary {
     pub accepted_sources: usize,
     pub unavailable_sources: usize,
     pub integrity_mismatch_sources: usize,
+    pub trust_verification_failed_sources: usize,
     pub stale_sources: usize,
     pub rejected_sources: usize,
     pub empty_peer_set_sources: usize,
@@ -173,6 +178,10 @@ impl BootstrapAttemptSummary {
             BootstrapSourceResult::IntegrityMismatch => {
                 self.integrity_mismatch_sources = self.integrity_mismatch_sources.saturating_add(1);
             }
+            BootstrapSourceResult::TrustVerificationFailed => {
+                self.trust_verification_failed_sources =
+                    self.trust_verification_failed_sources.saturating_add(1);
+            }
             BootstrapSourceResult::Stale => {
                 self.stale_sources = self.stale_sources.saturating_add(1);
             }
@@ -188,6 +197,7 @@ impl BootstrapAttemptSummary {
     const fn only_unavailable(&self) -> bool {
         self.accepted_sources == 0
             && self.integrity_mismatch_sources == 0
+            && self.trust_verification_failed_sources == 0
             && self.stale_sources == 0
             && self.rejected_sources == 0
             && self.empty_peer_set_sources == 0
@@ -477,9 +487,22 @@ struct ManagedApplicationFrame {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum BootstrapSource {
-    File { path: PathBuf },
-    Http { source: BootstrapHttpSource },
-    Unsupported { source: String },
+    File {
+        path: PathBuf,
+        trust_pins: BootstrapSourceTrustPins,
+    },
+    Http {
+        source: BootstrapHttpSource,
+    },
+    Unsupported {
+        source: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+struct BootstrapSourceTrustPins {
+    expected_sha256_hex: Option<String>,
+    trusted_ed25519_public_key: Option<Ed25519PublicKey>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -488,13 +511,13 @@ struct BootstrapHttpSource {
     endpoint: String,
     host_header: String,
     request_target: String,
-    expected_sha256_hex: Option<String>,
+    trust_pins: BootstrapSourceTrustPins,
 }
 
 impl BootstrapSource {
     fn display(&self) -> String {
         match self {
-            Self::File { path } => path.display().to_string(),
+            Self::File { path, .. } => path.display().to_string(),
             Self::Http { source } => source.url.clone(),
             Self::Unsupported { source } => source.clone(),
         }
@@ -2337,8 +2360,11 @@ impl BootstrapSource {
         context: LogContext,
     ) -> Result<BootstrapResponse, BootstrapProviderError> {
         match self {
-            Self::File { path } => BootstrapFileProvider { path: path.clone() }
-                .fetch_validated_response_with_observability(now_unix_s, observability, context),
+            Self::File { path, trust_pins } => BootstrapFileProvider {
+                path: path.clone(),
+                trust_pins: trust_pins.clone(),
+            }
+            .fetch_validated_response_with_observability(now_unix_s, observability, context),
             Self::Http { source } => BootstrapHttpProvider {
                 source: source.clone(),
             }
@@ -2358,6 +2384,7 @@ impl BootstrapSource {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct BootstrapFileProvider {
     path: PathBuf,
+    trust_pins: BootstrapSourceTrustPins,
 }
 
 impl BootstrapProvider for BootstrapFileProvider {
@@ -2372,12 +2399,7 @@ impl BootstrapProvider for BootstrapFileProvider {
                 self.path.display()
             ))
         })?;
-        serde_json::from_slice(&bytes).map_err(|error| {
-            BootstrapProviderError::Unavailable(format!(
-                "could not parse bootstrap source {}: {error}",
-                self.path.display()
-            ))
-        })
+        decode_bootstrap_response_bytes(&bytes, &self.path.display().to_string(), &self.trust_pins)
     }
 }
 
@@ -2457,22 +2479,7 @@ impl BootstrapProvider for BootstrapHttpProvider {
             )));
         }
 
-        if let Some(expected_sha256_hex) = &self.source.expected_sha256_hex {
-            let actual_sha256_hex = sha256_hex(body);
-            if &actual_sha256_hex != expected_sha256_hex {
-                return Err(BootstrapProviderError::Integrity(format!(
-                    "bootstrap source {} expected sha256 {} but got {}",
-                    self.source.url, expected_sha256_hex, actual_sha256_hex
-                )));
-            }
-        }
-
-        serde_json::from_slice(body).map_err(|error| {
-            BootstrapProviderError::Unavailable(format!(
-                "could not parse bootstrap source {}: {error}",
-                self.source.url
-            ))
-        })
+        decode_bootstrap_response_bytes(body, &self.source.url, &self.source.trust_pins)
     }
 }
 
@@ -2554,12 +2561,18 @@ fn ignore_unsupported_runner_op(result: Result<(), TransportRunnerError>) {
 
 fn resolve_bootstrap_source(base_dir: &Path, source: &str) -> BootstrapSource {
     let trimmed = source.trim();
+    let Some((trimmed, trust_pins)) = split_bootstrap_source_pins(trimmed) else {
+        return BootstrapSource::Unsupported {
+            source: trimmed.to_string(),
+        };
+    };
     if let Some(path) = trimmed.strip_prefix("file:") {
         return BootstrapSource::File {
             path: resolve_path(base_dir, Path::new(path.trim())),
+            trust_pins,
         };
     }
-    if let Some(source) = parse_http_bootstrap_source(trimmed) {
+    if let Some(source) = parse_http_bootstrap_source(trimmed, trust_pins.clone()) {
         return BootstrapSource::Http { source };
     }
 
@@ -2567,6 +2580,7 @@ fn resolve_bootstrap_source(base_dir: &Path, source: &str) -> BootstrapSource {
     if path.extension().and_then(|ext| ext.to_str()) == Some("json") && !trimmed.contains("://") {
         BootstrapSource::File {
             path: resolve_path(base_dir, path),
+            trust_pins,
         }
     } else {
         BootstrapSource::Unsupported {
@@ -2579,6 +2593,7 @@ fn classify_bootstrap_provider_error(error: &BootstrapProviderError) -> Bootstra
     match error {
         BootstrapProviderError::Unavailable(_) => BootstrapSourceResult::Unavailable,
         BootstrapProviderError::Integrity(_) => BootstrapSourceResult::IntegrityMismatch,
+        BootstrapProviderError::Trust(_) => BootstrapSourceResult::TrustVerificationFailed,
         BootstrapProviderError::Validation(validation_error) => {
             if bootstrap_validation_error_is_stale(validation_error) {
                 BootstrapSourceResult::Stale
@@ -2610,9 +2625,11 @@ fn truncate_bootstrap_detail(detail: impl Into<String>) -> String {
     truncated
 }
 
-fn parse_http_bootstrap_source(source: &str) -> Option<BootstrapHttpSource> {
-    let (base_source, expected_sha256_hex) = split_bootstrap_source_pin(source)?;
-    let remainder = base_source.strip_prefix("http://")?;
+fn parse_http_bootstrap_source(
+    source: &str,
+    trust_pins: BootstrapSourceTrustPins,
+) -> Option<BootstrapHttpSource> {
+    let remainder = source.strip_prefix("http://")?;
     if remainder.is_empty() {
         return None;
     }
@@ -2636,26 +2653,88 @@ fn parse_http_bootstrap_source(source: &str) -> Option<BootstrapHttpSource> {
         endpoint,
         host_header: authority.to_string(),
         request_target,
-        expected_sha256_hex,
+        trust_pins,
     })
 }
 
-fn split_bootstrap_source_pin(source: &str) -> Option<(&str, Option<String>)> {
+fn split_bootstrap_source_pins(source: &str) -> Option<(&str, BootstrapSourceTrustPins)> {
     let (base, fragment) = match source.split_once('#') {
-        Some((base, fragment)) => (base, Some(fragment)),
-        None => (source, None),
+        Some((base, fragment)) => (base.trim(), Some(fragment.trim())),
+        None => (source.trim(), None),
     };
-    let expected_sha256_hex = match fragment {
-        Some(fragment) => {
-            let hex = fragment.strip_prefix("sha256=")?;
-            if hex.len() != 64 || !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-                return None;
-            }
-            Some(hex.to_ascii_lowercase())
+    if base.is_empty() {
+        return None;
+    }
+
+    let mut trust_pins = BootstrapSourceTrustPins::default();
+    if let Some(fragment) = fragment {
+        if fragment.is_empty() {
+            return None;
         }
-        None => None,
-    };
-    Some((base, expected_sha256_hex))
+        for part in fragment.split('&') {
+            let (key, value) = part.split_once('=')?;
+            match key {
+                "sha256" => {
+                    if value.len() != 64
+                        || !value.bytes().all(|byte| byte.is_ascii_hexdigit())
+                        || trust_pins.expected_sha256_hex.is_some()
+                    {
+                        return None;
+                    }
+                    trust_pins.expected_sha256_hex = Some(value.to_ascii_lowercase());
+                }
+                "ed25519" => {
+                    if value.len() != ED25519_PUBLIC_KEY_LEN * 2
+                        || !value.bytes().all(|byte| byte.is_ascii_hexdigit())
+                        || trust_pins.trusted_ed25519_public_key.is_some()
+                    {
+                        return None;
+                    }
+                    trust_pins.trusted_ed25519_public_key = Some(decode_hex_public_key(value)?);
+                }
+                _ => return None,
+            }
+        }
+    }
+
+    Some((base, trust_pins))
+}
+
+fn decode_bootstrap_response_bytes(
+    bytes: &[u8],
+    source: &str,
+    trust_pins: &BootstrapSourceTrustPins,
+) -> Result<BootstrapResponse, BootstrapProviderError> {
+    if let Some(expected_sha256_hex) = &trust_pins.expected_sha256_hex {
+        let actual_sha256_hex = sha256_hex(bytes);
+        if &actual_sha256_hex != expected_sha256_hex {
+            return Err(BootstrapProviderError::Integrity(format!(
+                "bootstrap source {source} expected sha256 {expected_sha256_hex} but got {actual_sha256_hex}"
+            )));
+        }
+    }
+
+    if let Some(trusted_signer) = &trust_pins.trusted_ed25519_public_key {
+        let artifact =
+            serde_json::from_slice::<SignedBootstrapArtifact>(bytes).map_err(|error| {
+                BootstrapProviderError::Trust(format!(
+                "bootstrap source {source} did not contain a signed bootstrap artifact: {error}"
+            ))
+            })?;
+        return artifact
+            .verify_with_trusted_signer(trusted_signer)
+            .map_err(|error| {
+                BootstrapProviderError::Trust(format!(
+                    "bootstrap source {source} failed signed bootstrap verification: {error}"
+                ))
+            });
+    }
+
+    serde_json::from_slice(bytes).map_err(|error| {
+        BootstrapProviderError::Unavailable(format!(
+            "could not parse bootstrap source {source}: {error}"
+        ))
+    })
 }
 
 fn http_authority_to_endpoint(authority: &str) -> Option<String> {
@@ -2760,6 +2839,15 @@ fn hex_value(byte: u8) -> Option<u8> {
     }
 }
 
+fn decode_hex_public_key(input: &str) -> Option<Ed25519PublicKey> {
+    let mut decoded = [0_u8; ED25519_PUBLIC_KEY_LEN];
+    let bytes = input.as_bytes();
+    for (index, chunk) in bytes.chunks_exact(2).enumerate() {
+        decoded[index] = (hex_value(chunk[0])? << 4) | hex_value(chunk[1])?;
+    }
+    Some(Ed25519PublicKey::from_bytes(decoded))
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     let mut encoded = String::with_capacity(digest.len() * 2);
@@ -2815,7 +2903,7 @@ mod tests {
     use crate::{
         bootstrap::{
             BootstrapNetworkParams, BootstrapPeer, BootstrapPeerRole, BootstrapResponse,
-            BOOTSTRAP_SCHEMA_VERSION,
+            SignedBootstrapArtifact, BOOTSTRAP_SCHEMA_VERSION,
         },
         config::OverlayConfig,
         crypto::{aead::ChaCha20Poly1305Key, hash::Blake3Digest, sign::Ed25519SigningKey},
@@ -2962,6 +3050,52 @@ mod tests {
     }
 
     #[test]
+    fn startup_fetches_signed_bootstrap_over_http_with_trusted_ed25519_pin() {
+        let dir = unique_test_dir("runtime-startup-http-signed");
+        let key_path = dir.join("node.key");
+        let config_path = dir.join("overlay-config.json");
+        let signing_key = Ed25519SigningKey::from_seed([40_u8; 32]);
+        let bootstrap_signing_key = Ed25519SigningKey::from_seed([41_u8; 32]);
+        let bootstrap_body =
+            signed_bootstrap_body(&sample_bootstrap_response(), &bootstrap_signing_key);
+        let trusted_signer_hex = hex_bytes(bootstrap_signing_key.public_key().as_bytes());
+        let (bootstrap_url, server_handle) =
+            match start_test_http_server(http_ok_response(&bootstrap_body), 1) {
+                Ok(server) => server,
+                Err(error) if error.kind() == io::ErrorKind::PermissionDenied => return,
+                Err(error) => panic!("http server should bind: {error}"),
+            };
+
+        fs::write(&key_path, signing_key.as_bytes()).expect("key file should be written");
+        write_json(
+            &config_path,
+            &sample_config(
+                "node.key",
+                vec![format!("{bootstrap_url}#ed25519={trusted_signer_hex}")],
+            ),
+        )
+        .expect("config file should be written");
+
+        let mut runtime =
+            NodeRuntime::from_config_path(&config_path).expect("runtime should load from config");
+        runtime
+            .startup(START_UNIX_MS)
+            .expect("startup should accept a signed bootstrap artifact from a trusted signer");
+        server_handle
+            .join()
+            .expect("http server should exit cleanly");
+
+        let bootstrap_status = runtime.health_snapshot().bootstrap;
+        assert_eq!(runtime.state(), NodeRuntimeState::Running);
+        assert_eq!(runtime.snapshot().active_peers, 3);
+        assert_eq!(bootstrap_status.last_accepted_sources, 1);
+        assert_eq!(
+            bootstrap_status.last_sources[0].result,
+            BootstrapSourceResult::Accepted
+        );
+    }
+
+    #[test]
     fn startup_rejects_tampered_http_bootstrap_when_sha256_pin_mismatches() {
         let dir = unique_test_dir("runtime-startup-http-pin-mismatch");
         let key_path = dir.join("node.key");
@@ -2995,9 +3129,20 @@ mod tests {
             .join()
             .expect("http server should exit cleanly");
 
+        let bootstrap_status = runtime.health_snapshot().bootstrap;
         assert_eq!(runtime.state(), NodeRuntimeState::Degraded);
         assert_eq!(runtime.snapshot().active_peers, 0);
-        assert_eq!(runtime.health_snapshot().bootstrap.last_accepted_sources, 0);
+        assert_eq!(bootstrap_status.last_accepted_sources, 0);
+        assert_eq!(
+            bootstrap_status
+                .last_attempt_summary
+                .integrity_mismatch_sources,
+            1
+        );
+        assert_eq!(
+            bootstrap_status.last_sources[0].result,
+            BootstrapSourceResult::IntegrityMismatch
+        );
         assert!(runtime
             .context()
             .observability()
@@ -3006,7 +3151,7 @@ mod tests {
             .any(|entry| {
                 entry.component == crate::metrics::LogComponent::Bootstrap
                     && entry.event == "bootstrap_fetch"
-                    && entry.result == "rejected"
+                    && entry.result == "integrity_mismatch"
             }));
     }
 
@@ -3057,6 +3202,75 @@ mod tests {
         assert_eq!(
             bootstrap_status.last_sources[0].result,
             BootstrapSourceResult::Unavailable
+        );
+        assert_eq!(
+            bootstrap_status.last_sources[1].result,
+            BootstrapSourceResult::Accepted
+        );
+    }
+
+    #[test]
+    fn startup_reports_trust_verification_failure_when_later_source_recovers() {
+        let dir = unique_test_dir("runtime-startup-trust-fallback");
+        let key_path = dir.join("node.key");
+        let config_path = dir.join("overlay-config.json");
+        let node_signing_key = Ed25519SigningKey::from_seed([42_u8; 32]);
+        let bootstrap_signing_key = Ed25519SigningKey::from_seed([43_u8; 32]);
+        let bootstrap_body =
+            signed_bootstrap_body(&sample_bootstrap_response(), &bootstrap_signing_key);
+        let trusted_signer_hex = hex_bytes(bootstrap_signing_key.public_key().as_bytes());
+        let bad_signer_hex = "00".repeat(32);
+        let (bad_url, bad_handle) =
+            match start_test_http_server(http_ok_response(&bootstrap_body), 1) {
+                Ok(server) => server,
+                Err(error) if error.kind() == io::ErrorKind::PermissionDenied => return,
+                Err(error) => panic!("http server should bind: {error}"),
+            };
+        let (good_url, good_handle) =
+            match start_test_http_server(http_ok_response(&bootstrap_body), 1) {
+                Ok(server) => server,
+                Err(error) if error.kind() == io::ErrorKind::PermissionDenied => return,
+                Err(error) => panic!("http server should bind: {error}"),
+            };
+
+        fs::write(&key_path, node_signing_key.as_bytes()).expect("key file should be written");
+        write_json(
+            &config_path,
+            &sample_config(
+                "node.key",
+                vec![
+                    format!("{bad_url}#ed25519={bad_signer_hex}"),
+                    format!("{good_url}#ed25519={trusted_signer_hex}"),
+                ],
+            ),
+        )
+        .expect("config file should be written");
+
+        let mut runtime =
+            NodeRuntime::from_config_path(&config_path).expect("runtime should load from config");
+        runtime
+            .startup(START_UNIX_MS)
+            .expect("startup should recover using the later trusted bootstrap source");
+        bad_handle
+            .join()
+            .expect("bad source server should exit cleanly");
+        good_handle
+            .join()
+            .expect("good source server should exit cleanly");
+
+        let bootstrap_status = runtime.health_snapshot().bootstrap;
+        assert_eq!(runtime.state(), NodeRuntimeState::Running);
+        assert_eq!(bootstrap_status.last_accepted_sources, 1);
+        assert_eq!(
+            bootstrap_status
+                .last_attempt_summary
+                .trust_verification_failed_sources,
+            1
+        );
+        assert_eq!(bootstrap_status.last_attempt_summary.accepted_sources, 1);
+        assert_eq!(
+            bootstrap_status.last_sources[0].result,
+            BootstrapSourceResult::TrustVerificationFailed
         );
         assert_eq!(
             bootstrap_status.last_sources[1].result,
@@ -3929,6 +4143,24 @@ mod tests {
         .into_bytes();
         response.extend_from_slice(body);
         response
+    }
+
+    fn signed_bootstrap_body(
+        response: &BootstrapResponse,
+        signing_key: &Ed25519SigningKey,
+    ) -> Vec<u8> {
+        let artifact = SignedBootstrapArtifact::sign(response.clone(), signing_key)
+            .expect("signed bootstrap artifact should encode");
+        serde_json::to_vec(&artifact).expect("signed bootstrap artifact should serialize")
+    }
+
+    fn hex_bytes(bytes: &[u8]) -> String {
+        let mut encoded = String::with_capacity(bytes.len() * 2);
+        for byte in bytes {
+            use std::fmt::Write as _;
+            write!(&mut encoded, "{byte:02x}").expect("hex encoding should succeed");
+        }
+        encoded
     }
 
     fn bootstrap_peer(

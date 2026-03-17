@@ -8,7 +8,7 @@ public deployment.
 ## Metadata
 
 - Date: `<YYYY-MM-DD>`
-- Repository stage: `milestone-22-first-user-acceptance-pack`
+- Repository stage: `milestone-24-bootstrap-trust-delivery-hardening`
 - Commit: `<git-sha>`
 - Operator: `<name>`
 - Topology: `pilot-5-host-two-relay`
@@ -62,9 +62,11 @@ public deployment.
 
 ## Bootstrap Integrity
 
-- Seed URLs used `#sha256=<pin>`: `<yes/no>`
+- Seed URLs used `#ed25519=<pin>` and, where configured, `#sha256=<pin>`:
+  `<yes/no>`
 - One-seed-down startup outcome: `<pass/fail>`
 - Integrity-mismatch fallback outcome: `<pass/fail>`
+- Trust-verification fallback outcome: `<pass/fail>`
 - Stale-bootstrap fallback outcome: `<pass/fail>`
 - Empty-peer-set fallback outcome: `<pass/fail>`
 - Tampered bootstrap artifact rejected: `<yes/no>`
@@ -85,6 +87,7 @@ public deployment.
 - `relay-unavailable-service-open`: `<pass/fail>`; observed outcome: `<notes>`
 - `bootstrap-seed-unavailable`: `<pass/fail>`; observed outcome: `<notes>`
 - `integrity-mismatch-fallback`: `<pass/fail>`; observed outcome: `<notes>`
+- `trust-verification-fallback`: `<pass/fail>`; observed outcome: `<notes>`
 - `stale-bootstrap-fallback`: `<pass/fail>`; observed outcome: `<notes>`
 - `empty-bootstrap-fallback`: `<pass/fail>`; observed outcome: `<notes>`
 - `service-host-restart`: `<pass/fail>`; observed outcome: `<notes>`
@@ -102,8 +105,9 @@ public deployment.
 
 ## Known Limitations
 
-- bootstrap remains static JSON served over `http://`; integrity comes from
-  pinned SHA-256 artifact URLs rather than HTTPS or a public trust root
+- bootstrap remains static signed JSON served over `http://`; trust comes from
+  pinned `ed25519=<hex>` URLs with optional SHA-256 artifact pins rather than
+  HTTPS or a public trust root
 - the distributed operator commands are one-shot and operator-directed rather
   than a general distributed control plane
 - lookup is still exact-by-`node_id` only, and service resolution is still

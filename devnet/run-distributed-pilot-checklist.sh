@@ -62,6 +62,8 @@ bootstrap_fault_restart_log="${tmpdir}/bootstrap-fault-restart.log"
 service_restart_log="${tmpdir}/service-restart.log"
 service_restart_relay_log="${tmpdir}/service-restart-relay.log"
 service_restart_status="${tmpdir}/service-restart-status.json"
+trust_fallback_log="${tmpdir}/trust-fallback.log"
+trust_fallback_status="${tmpdir}/trust-fallback.status.json"
 tampered_bootstrap_log="${tmpdir}/tampered-bootstrap.log"
 tampered_bootstrap_status="${tmpdir}/tampered-bootstrap.status.json"
 integrity_fallback_log="${tmpdir}/integrity-fallback.log"
@@ -103,6 +105,8 @@ cleanup() {
       "${service_restart_log}" \
       "${service_restart_relay_log}" \
       "${service_restart_status}" \
+      "${trust_fallback_log}" \
+      "${trust_fallback_status}" \
       "${tampered_bootstrap_log}" \
       "${tampered_bootstrap_status}" \
       "${integrity_fallback_log}" \
@@ -143,7 +147,7 @@ trap cleanup EXIT
 
 TMPDIR=/tmp cargo build -p overlay-cli >/dev/null
 overlay_cli="target/debug/overlay-cli"
-mapfile -t pilot_node_a_bootstrap_sources < <(grep -o 'http://[^"]*#sha256=[0-9a-f]\{64\}' devnet/pilot/localhost/configs/node-a.json)
+mapfile -t pilot_node_a_bootstrap_sources < <(grep -o 'http://[^"]*' devnet/pilot/localhost/configs/node-a.json)
 node_a_primary_bootstrap_source="${pilot_node_a_bootstrap_sources[0]}"
 node_a_secondary_bootstrap_source="${pilot_node_a_bootstrap_sources[1]}"
 absolute_node_a_key="${repo_root}/devnet/keys/node-a.key"
@@ -155,6 +159,7 @@ start_bootstrap_server() {
   "${overlay_cli}" bootstrap-serve \
     --bind "${bind_addr}" \
     --bootstrap-file "${bootstrap_file}" \
+    --signing-key-file devnet/keys/bootstrap-signer.key \
     >"${log_file}" 2>&1 &
   local pid="$!"
   for _ in $(seq 1 200); do
@@ -643,6 +648,19 @@ run_integrity_fallback_check() {
   grep -q '"result":"accepted"' "${integrity_fallback_status}"
 }
 
+run_trust_fallback_check() {
+  local config_path="${tmpdir}/trust-fallback-node-a.json"
+  local bad_primary_source
+  bad_primary_source="$(printf '%s\n' "${node_a_primary_bootstrap_source}" | sed 's/ed25519=[0-9a-f]\{64\}/ed25519=0000000000000000000000000000000000000000000000000000000000000000/')"
+  write_temp_node_a_config "${config_path}" "${bad_primary_source}" "${node_a_secondary_bootstrap_source}"
+  run_bootstrap_diagnostic_config "${config_path}" "${trust_fallback_log}" "${trust_fallback_status}"
+  grep -q '"state":"running"' "${trust_fallback_log}"
+  grep -q '"trust_verification_failed_sources":1' "${trust_fallback_status}"
+  grep -q '"accepted_sources":1' "${trust_fallback_status}"
+  grep -q '"result":"trust_verification_failed"' "${trust_fallback_status}"
+  grep -q '"result":"accepted"' "${trust_fallback_status}"
+}
+
 run_stale_bootstrap_check() {
   local config_path="${tmpdir}/stale-bootstrap-node-a.json"
   local stale_bootstrap_file="${tmpdir}/stale-bootstrap.json"
@@ -715,7 +733,7 @@ run_tampered_bootstrap_check() {
   bad_secondary_source="$(printf '%s\n' "${node_a_secondary_bootstrap_source}" | sed 's/sha256=[0-9a-f]\{64\}/sha256=0000000000000000000000000000000000000000000000000000000000000000/')"
   write_temp_node_a_config "${bad_config}" "${bad_primary_source}" "${bad_secondary_source}"
   run_bootstrap_diagnostic_config "${bad_config}" "${tampered_bootstrap_log}" "${tampered_bootstrap_status}"
-  grep -q '"event":"bootstrap_fetch","result":"rejected"' "${tampered_bootstrap_log}"
+  grep -q '"event":"bootstrap_fetch","result":"integrity_mismatch"' "${tampered_bootstrap_log}"
   grep -q '"state":"degraded"' "${tampered_bootstrap_log}"
   grep -q '"integrity_mismatch_sources":2' "${tampered_bootstrap_status}"
 }
@@ -728,6 +746,7 @@ run_relay_fault_scenario
 run_bootstrap_seed_fault
 run_service_restart_scenario
 run_integrity_fallback_check
+run_trust_fallback_check
 run_stale_bootstrap_check
 run_empty_bootstrap_check
 run_tampered_bootstrap_check
@@ -759,6 +778,8 @@ cat "${service_restart_log}"
 cat "${service_restart_relay_log}"
 echo '{"step":"pilot_scenario","scenario":"integrity-mismatch-fallback","result":"ok"}'
 cat "${integrity_fallback_log}"
+echo '{"step":"pilot_scenario","scenario":"trust-verification-fallback","result":"ok"}'
+cat "${trust_fallback_log}"
 echo '{"step":"pilot_scenario","scenario":"stale-bootstrap-fallback","result":"ok"}'
 cat "${stale_bootstrap_log}"
 echo '{"step":"pilot_scenario","scenario":"empty-bootstrap-fallback","result":"ok"}'
@@ -773,7 +794,7 @@ relay_a_bytes_last_hour="$(extract_status_numeric_field "${relay_a_status}" "tot
 relay_b_bytes_last_hour="$(extract_status_numeric_field "${relay_b_status}" "total_relayed_bytes_last_hour")"
 service_restart_startup_count="$(extract_status_numeric_field "${service_restart_status}" "startup_count")"
 
-echo "{\"step\":\"pilot_checklist_complete\",\"topology\":\"pilot-5-node\",\"fresh_node_join\":\"ok\",\"service_publish\":\"ok\",\"service_open\":\"ok\",\"direct_path_loss_relay_fallback\":\"ok\",\"baseline\":\"ok\",\"node_down\":\"ok\",\"relay_unavailable\":\"expected_degraded\",\"relay_unavailable_service_open\":\"ok\",\"bootstrap_seed_unavailable\":\"ok\",\"integrity_mismatch_fallback\":\"ok\",\"stale_bootstrap_fallback\":\"ok\",\"empty_bootstrap_fallback\":\"ok\",\"service_restart\":\"ok\",\"tampered_bootstrap\":\"rejected\",\"baseline_lookup_latency_ms\":${baseline_lookup_latency_ms:-0},\"fresh_join_lookup_latency_ms\":${fresh_join_lookup_latency_ms:-0},\"node_down_lookup_latency_ms\":${node_down_lookup_latency_ms:-0},\"relay_a_bytes_last_hour\":${relay_a_bytes_last_hour:-0},\"relay_b_bytes_last_hour\":${relay_b_bytes_last_hour:-0},\"relay_a_bind_total\":${relay_a_bind_total:-0},\"relay_b_bind_total\":${relay_b_bind_total:-0},\"service_restart_startup_count\":${service_restart_startup_count:-0},\"relay_paths\":[\"node-a->node-relay->node-b\",\"node-a->node-relay-b->node-b\"]}"
+echo "{\"step\":\"pilot_checklist_complete\",\"topology\":\"pilot-5-node\",\"fresh_node_join\":\"ok\",\"service_publish\":\"ok\",\"service_open\":\"ok\",\"direct_path_loss_relay_fallback\":\"ok\",\"baseline\":\"ok\",\"node_down\":\"ok\",\"relay_unavailable\":\"expected_degraded\",\"relay_unavailable_service_open\":\"ok\",\"bootstrap_seed_unavailable\":\"ok\",\"integrity_mismatch_fallback\":\"ok\",\"trust_verification_fallback\":\"ok\",\"stale_bootstrap_fallback\":\"ok\",\"empty_bootstrap_fallback\":\"ok\",\"service_restart\":\"ok\",\"tampered_bootstrap\":\"rejected\",\"baseline_lookup_latency_ms\":${baseline_lookup_latency_ms:-0},\"fresh_join_lookup_latency_ms\":${fresh_join_lookup_latency_ms:-0},\"node_down_lookup_latency_ms\":${node_down_lookup_latency_ms:-0},\"relay_a_bytes_last_hour\":${relay_a_bytes_last_hour:-0},\"relay_b_bytes_last_hour\":${relay_b_bytes_last_hour:-0},\"relay_a_bind_total\":${relay_a_bind_total:-0},\"relay_b_bind_total\":${relay_b_bind_total:-0},\"service_restart_startup_count\":${service_restart_startup_count:-0},\"relay_paths\":[\"node-a->node-relay->node-b\",\"node-a->node-relay-b->node-b\"]}"
 if [[ "${preserve_evidence}" == "yes" ]]; then
   echo "{\"step\":\"pilot_evidence_bundle\",\"path\":\"${tmpdir}\"}"
 fi

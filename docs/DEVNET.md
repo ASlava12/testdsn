@@ -38,7 +38,7 @@ and the carried-forward distributed pilot pack under
 - [devnet/run-distributed-pilot-checklist.sh](../devnet/run-distributed-pilot-checklist.sh):
   wrapper for the current distributed pilot checklist
 - [devnet/run-first-user-acceptance.sh](../devnet/run-first-user-acceptance.sh):
-  wrapper for the current Milestone 22 first-user acceptance flow
+  wrapper for the current Milestone 24 first-user acceptance flow
 - [devnet/run-doctor-smoke.sh](../devnet/run-doctor-smoke.sh):
   wrapper for the landed Milestone 21 doctor/self-check surface
 - [devnet/run-pilot-checklist.sh](../devnet/run-pilot-checklist.sh):
@@ -90,14 +90,14 @@ Optional evidence-preserving form:
 ./devnet/run-multihost-smoke.sh --evidence-dir /tmp/overlay-multihost-evidence
 ```
 
-This starts three static bootstrap seed servers with `overlay-cli
-bootstrap-serve`, then starts the host-style runtimes from
+This starts three static bootstrap seed servers with signed `overlay-cli
+bootstrap-serve --signing-key-file ...`, then starts the host-style runtimes from
 `devnet/hosts/localhost` and drives networked operator commands across them.
 
 Expected additions beyond the local smoke:
 
-1. startup succeeds from pinned `http://...#sha256=<pin>` bootstrap sources
-   rather than local files;
+1. startup succeeds from signed `http://...#ed25519=<pin>` bootstrap sources
+   with optional `#sha256=<pin>` integrity checks rather than local files;
 2. the session step uses the configured TCP listeners;
 3. `publish`, `lookup`, `open-service`, and `relay-intro` all complete over
    real runtime sessions instead of local in-process injection.
@@ -127,7 +127,8 @@ This uses the dedicated `devnet/pilot/localhost` topology pack and validates:
 - the primary-relay-down path with alternate relay fallback
 - the one-relay-down service-open proof
 - the one-bootstrap-seed-unavailable path
-- the integrity-mismatch, stale-bootstrap, and empty-peer-set fallback paths
+- the integrity-mismatch, trust-verification-fallback, stale-bootstrap, and
+  empty-peer-set fallback paths
 - the service-host restart/status outcome
 - the tampered-bootstrap rejection path
 - the final `pilot_checklist_complete` summary with lookup latency and relay
@@ -184,8 +185,9 @@ TMPDIR=/tmp cargo run -p overlay-cli -- doctor --config devnet/configs/node-a.js
 
 ## Devnet limits
 
-- Bootstrap remains static JSON served over `http://`; integrity comes from
-  pinned SHA-256 artifact URLs rather than HTTPS or a public trust root.
+- Bootstrap remains static signed JSON served over `http://`; trust comes from
+  pinned signer-key URLs with optional SHA-256 artifact pins rather than HTTPS
+  or a public trust root.
 - The local `run-smoke.sh` path remains repo-local and still uses the checked-in
   harness for publish/lookup/service/relay orchestration.
 - The distributed operator commands are explicit point-to-point CLI calls, not

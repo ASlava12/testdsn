@@ -30,7 +30,7 @@ Current repository baseline:
   enforcement, deterministic message vectors, and
   `integration_service_open` coverage.
 - The current repository stage is
-  `milestone-22-first-user-acceptance-pack`.
+  `milestone-24-bootstrap-trust-delivery-hardening`.
 
 Requirements:
 - keep exact `app_id` service resolution aligned with `spec/service-layer.md`,

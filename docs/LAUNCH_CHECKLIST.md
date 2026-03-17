@@ -1,13 +1,13 @@
 # Launch Checklist
 
 This checklist defines the landed Milestone 17 operator-runtime gate that
-remains the first component of the current Milestone 22
-first-user-acceptance-pack stage.
+remains the first component of the current Milestone 24
+bootstrap-trust-delivery-hardening stage.
 
 It is a pilot gate, not a public-production or hostile-Internet readiness
 claim.
 
-For current Milestone 22 sign-off, the bounded acceptance flow is
+For current Milestone 24 sign-off, the bounded acceptance flow is
 `./devnet/run-first-user-acceptance.sh` on the same commit after the
 applicable workspace validation commands.
 
@@ -27,8 +27,9 @@ The current launchable MVP surface is frozen to:
 - node identity and key handling;
 - canonical wire framing and the current message catalog;
 - session handshake and real TCP session establishment;
-- local bootstrap-file startup plus minimal static `http://` bootstrap fetch
-  with optional `#sha256=<pin>` integrity checks;
+- local bootstrap-file startup plus static signed `http://` bootstrap fetch
+  with pinned `#ed25519=<pin>` trust roots and optional `#sha256=<pin>`
+  integrity checks;
 - exact presence publish and exact lookup by `node_id`;
 - direct-first reachability planning with relay fallback;
 - bounded path metrics, deterministic scoring, and hysteresis;
@@ -129,8 +130,10 @@ Pass criteria:
   alternate relay path succeeds and the final summary reaches
   `pilot_checklist_complete`;
 - the bootstrap-seed-unavailable scenario still completes;
-- the integrity-mismatch-fallback scenario reports one rejected source and one
-  accepted source while startup still reaches `running`;
+- the integrity-mismatch-fallback scenario reports one integrity mismatch and
+  one accepted source while startup still reaches `running`;
+- the trust-verification-fallback scenario reports one trust verification
+  failure and one accepted source while startup still reaches `running`;
 - the stale-bootstrap-fallback scenario reports one stale source and one
   accepted source while startup still reaches `running`;
 - the empty-bootstrap-fallback scenario reports one empty-peer-set source and
@@ -151,7 +154,8 @@ Pass criteria:
   chosen runtime listener; they do not auto-discover targets or route a
   control plane through the overlay.
 - If any bootstrap JSON changes, every referencing
-  `http://...#sha256=<pin>` config entry must be updated before the pilot
+  `http://...#ed25519=<pin>` config entry must still trust the intended
+  signer, and every `#sha256=<pin>` value must be recomputed before the pilot
   checklist is honest again.
 - The current checklist may be run with `--evidence-dir <dir>` to preserve the
   raw logs and status snapshots that back the final summary.
@@ -225,8 +229,9 @@ Workflow:
 - The current on-disk state is bounded to operator lock/status metadata and
   the embedded peer-cache recovery payload under `.overlay-runtime/`; it is not
   broad protocol-state persistence.
-- Bootstrap remains static JSON served over `http://`; integrity comes from
-  SHA-256-pinned artifact URLs rather than HTTPS or a public trust root.
+- Bootstrap remains static signed JSON served over `http://`; trust comes from
+  pinned signer keys with optional SHA-256 artifact pins rather than HTTPS or
+  a public trust root.
 - `overlay-cli bootstrap-serve` is a devnet seed server, not a public bootstrap
   service or trust framework.
 - The distributed operator commands are bounded one-shot CLI surfaces, not a
@@ -242,13 +247,14 @@ Workflow:
 - Relay quotas and most service-open policy are still code-level defaults rather
   than a rich operator-configurable surface.
 
-## Remaining limitations after Milestone 22
+## Remaining limitations after Milestone 24
 
 - Run and attach the off-box pilot report for the exact commit being signed
   off; the localhost checklist is necessary but not sufficient evidence for a
   release note.
-- Keep bootstrap artifacts and their pinned `#sha256=<hex>` URLs synchronized
-  manually; the current repo still has no HTTPS bootstrap or public trust root.
+- Keep bootstrap artifacts, signer pins, and any `#sha256=<hex>` URLs
+  synchronized manually; the current repo still has no HTTPS bootstrap or
+  public trust root.
 - Keep the current localhost sign-off path anchored on
   `./devnet/run-distributed-pilot-checklist.sh`; the older
   `./devnet/run-pilot-checklist.sh` remains a historical rehearsal only.

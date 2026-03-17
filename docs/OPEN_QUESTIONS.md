@@ -2,7 +2,7 @@
 
 This file exists so Codex does not silently invent protocol details.
 All currently known MVP ambiguities affecting the current
-`milestone-22-first-user-acceptance-pack` baseline are resolved below and should be reused
+`milestone-24-bootstrap-trust-delivery-hardening` baseline are resolved below and should be reused
 as the conservative defaults.
 
 ## Resolved conservative choices for MVP
@@ -265,7 +265,7 @@ For current work, treat the repository stage as:
 - Milestone 12 launch hardening is implemented with bounded cleanup, degraded
   bootstrap retry, runtime health snapshots, and the logical soak path;
 - the current repository stage marker is
-  `milestone-22-first-user-acceptance-pack`;
+  `milestone-24-bootstrap-trust-delivery-hardening`;
 - Milestone 17 operator-grade runtime hardening is part of the landed baseline,
   with `docs/LAUNCH_CHECKLIST.md`, the documented green-path validation and
   launch sequence, signal-aware `overlay-cli run`, config-local
@@ -288,10 +288,14 @@ For current work, treat the repository stage as:
   restart recovery from the last-known active bootstrap peers, continued
   bootstrap retry after peer-cache recovery, persisted status summaries,
   `overlay-cli doctor`, and stable first-user example profiles;
-- Milestone 22 first-user acceptance pack is now the current stage, with the
-  bounded `./devnet/run-first-user-acceptance.sh` wrapper, explicit
+- Milestone 22 first-user acceptance pack remains part of the landed baseline,
+  with the bounded `./devnet/run-first-user-acceptance.sh` wrapper, explicit
   first-user-ready acceptance scenarios, and the synchronized acceptance
   boundary docs;
+- Milestone 24 bootstrap trust and delivery hardening is now the current
+  stage, with signed bootstrap artifacts, pinned signer-key verification with
+  optional SHA-256 integrity pins, trust-failure diagnostics, and the
+  synchronized operator/bootstrap runbooks;
 
 That means:
 
@@ -309,10 +313,10 @@ That means:
   vectors, or spec mismatches;
 - Milestone 8 is closed and should be touched only for regressions,
   vectors, or spec mismatches;
-- Milestone 22 is the current stage and should stay limited to first-user
-  acceptance coverage, network-bootstrap and operator-runtime maintenance,
-  regression fixes, validation maintenance, and documentation synchronization
-  unless a task explicitly reopens scope;
+- Milestone 24 is the current stage and should stay limited to bootstrap trust
+  hardening, network-bootstrap and operator-runtime maintenance, regression
+  fixes, validation maintenance, and documentation synchronization unless a
+  task explicitly reopens scope;
 - the current localhost sign-off flow is `./devnet/run-first-user-acceptance.sh`
   on the same commit after the applicable workspace validation commands;
 - `./devnet/run-pilot-checklist.sh` is retained only as the older Milestone 18
@@ -956,8 +960,8 @@ For the current regular-distributed-use closure stage:
 
 - runtime status may summarize the last bootstrap attempt by configured source;
 - the smallest conservative per-source result classes are:
-  `accepted`, `unavailable`, `integrity_mismatch`, `stale`, `empty_peer_set`,
-  and `rejected`;
+  `accepted`, `unavailable`, `integrity_mismatch`,
+  `trust_verification_failed`, `stale`, `empty_peer_set`, and `rejected`;
 - `stale` covers expired artifacts and other timing-invalid bootstrap inputs
   that are unusable because their freshness window has elapsed;
 - `empty_peer_set` is a local diagnostic for a schema-valid bootstrap artifact
@@ -982,25 +986,46 @@ For the landed first-user-runtime baseline:
 - these are local operator surfaces only, not protocol messages or distributed
   orchestration features.
 
-### 39. Conservative first-user acceptance defaults for Milestone 22
+### 39. Conservative first-user acceptance defaults for the current stage
 
-For the current first-user-acceptance-pack stage:
+For the current bootstrap-trust-delivery-hardening stage:
 
 - the bounded local acceptance wrapper may be
   `./devnet/run-first-user-acceptance.sh`;
 - the smallest conservative local acceptance scenarios are:
   `fresh-node-join`, `service-publish`, `service-discover-and-open`,
   `direct-path-loss-relay-fallback`, `bootstrap-source-unavailable`,
+  `trust-verification-fallback`,
   `relay-unavailable-service-open`, `ordinary-restart-recovery`, and
   `stale-presence-and-expired-state-recovery`;
 - expected degraded local acceptance outcomes may include one failed primary
-  relay-intro during the relay-unavailable rehearsal and rejected tampered
-  bootstrap artifacts;
+  relay-intro during the relay-unavailable rehearsal, trust-verification
+  failures that recover through a later source, and tampered bootstrap
+  artifacts rejected for integrity mismatch;
 - the first-user-ready claim remains bounded to the checked-in topology,
-  static pinned bootstrap artifacts, explicit operator commands, and the
+  static signed bootstrap artifacts, explicit operator commands, and the
   separately collected off-box evidence on the same validated commit;
 - these are acceptance-boundary defaults only, not new protocol messages,
   transport classes, or production-readiness guarantees.
+
+### 40. Conservative bootstrap trust defaults for Milestone 24
+
+For the current bootstrap-trust-delivery-hardening stage:
+
+- the smallest conservative network-bootstrap trust model is a signed
+  bootstrap artifact wrapper around the existing `BootstrapResponse`;
+- a network bootstrap source may pin a trusted signer with
+  `#ed25519=<hex>` and may also pin the signed body with `#sha256=<hex>`;
+- if a signer pin is present, the fetched body must decode as a signed
+  bootstrap artifact and verify against that trusted signer before bootstrap
+  schema validation continues;
+- if both signer and SHA-256 pins are present, the SHA-256 pin applies to the
+  fetched signed artifact bytes before signature verification;
+- local file bootstrap and legacy SHA-256-only pinned `http://` sources remain
+  valid for compatibility, but the current operator runbooks should prefer
+  signed artifacts with signer pins;
+- trust-verification outcomes are operator-facing runtime diagnostics only and
+  do not change bootstrap wire semantics or peer-ingest semantics.
 
 ## Rule
 

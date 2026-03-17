@@ -8,11 +8,11 @@ The repository has a closed Milestone 1-12 baseline, a landed Milestone 14
 pilot launch gate, a landed Milestone 16 network-bootstrap stage, a landed
 Milestone 17 operator-runtime stage, a landed Milestone 18 real-pilot stage,
 the landed Milestone 20 regular-distributed-use-closure stage, and the current
-Milestone 22 first-user-acceptance-pack stage.
+Milestone 24 bootstrap-trust-delivery-hardening stage.
 The current repository stage marker is
-`milestone-22-first-user-acceptance-pack`.
+`milestone-24-bootstrap-trust-delivery-hardening`.
 
-## Current first-user-acceptance-pack green path
+## Current bootstrap-hardening green path
 
 Treat the current stage as having one localhost sign-off flow:
 
@@ -193,6 +193,19 @@ remains a retained Milestone 18 localhost rehearsal only.
   fresh-node-join and relay-unavailable-service-open proof in the distributed
   checklist, and the explicit first-user-ready boundary. The repository stage
   marker now advances to `milestone-22-first-user-acceptance-pack`.
+- Milestone 24 bootstrap-trust-delivery-hardening support is now implemented in
+  `crates/overlay-core/src/bootstrap/mod.rs`,
+  `crates/overlay-core/src/runtime.rs`,
+  `crates/overlay-core/src/config.rs`,
+  `crates/overlay-cli/src/bootstrap_server.rs`,
+  `crates/overlay-cli/src/main.rs`,
+  `crates/overlay-cli/src/operator_state.rs`,
+  the host/pilot configs under `devnet/hosts/` and `devnet/pilot/`, and the
+  synchronized operator/bootstrap docs, with signed bootstrap artifacts,
+  pinned signer-key verification plus optional SHA-256 integrity pins,
+  `overlay-cli bootstrap-sign`, signed `bootstrap-serve`, trust-verification
+  diagnostics, and expanded distributed checklist proof. The repository stage
+  marker now advances to `milestone-24-bootstrap-trust-delivery-hardening`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -200,8 +213,8 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Use `prompts/codex-milestone-22.md` as the recommended next-task prompt for the
-current `milestone-22-first-user-acceptance-pack` stage and keep work
+Use `prompts/codex-milestone-24.md` as the recommended next-task prompt for the
+current `milestone-24-bootstrap-trust-delivery-hardening` stage and keep work
 conservative from the current first-user-ready boundary:
 
 1. preserve the current launch surface documented in

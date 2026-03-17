@@ -30,7 +30,7 @@ Current repository baseline:
   resolution, `reachability_ref` binding checks, and `integration_service_open`
   coverage.
 - The current repository stage is
-  `milestone-22-first-user-acceptance-pack`.
+  `milestone-24-bootstrap-trust-delivery-hardening`.
 
 Requirements:
 - keep explicit layering between routing, relay, transport/session,

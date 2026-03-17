@@ -1,11 +1,11 @@
 # Pilot Runbook
 
-This runbook defines the Milestone 22 first-user-acceptance-pack distributed
-exercise.
+This runbook defines the current Milestone 24
+bootstrap-trust-delivery-hardening distributed exercise.
 
 It extends the landed Milestone 18 pilot pack with minimal distributed
 operator surfaces, two relay-capable fallback paths, conservative bootstrap
-artifact integrity pins, and the evidence expected from the first real off-box
+artifact trust pins, and the evidence expected from the first real off-box
 pilot closure run.
 
 It is still a pilot-only document. It does not claim public-production or
@@ -16,8 +16,9 @@ hostile-environment readiness.
 Use this runbook to prove:
 
 - 5 overlay nodes on 3-5 separate hosts;
-- 3 static bootstrap seeds served over `http://` with SHA-256-pinned artifact
-  URLs;
+- 3 static bootstrap seeds served over `http://` as signed artifacts with
+  pinned `ed25519=<hex>` trust roots and optional `sha256=<hex>` integrity
+  pins;
 - real TCP session establishment across hosts;
 - networked `publish`, `lookup`, `open-service`, and `relay-intro` flows over
   established runtime sessions;
@@ -27,8 +28,9 @@ Use this runbook to prove:
   `node-a -> node-relay -> node-b` and
   `node-a -> node-relay-b -> node-b`;
 - the node-down, primary-relay-down, relay-unavailable-service-open,
-  bootstrap-seed-down, integrity-mismatch, stale-bootstrap, empty-peer-set,
-  service-restart, and tampered-bootstrap scenarios;
+  bootstrap-seed-down, integrity-mismatch, trust-verification-fallback,
+  stale-bootstrap, empty-peer-set, service-restart, and tampered-bootstrap
+  scenarios;
 - per-source bootstrap diagnostics through
   `runtime_status.health.bootstrap.last_attempt_summary` and `last_sources`;
 - persisted status summaries through `overlay-cli status --summary`;
@@ -37,8 +39,9 @@ Use this runbook to prove:
 
 Current pilot limits remain in force:
 
-- bootstrap remains static JSON served over `http://`; integrity comes from
-  pinned `#sha256=<hex>` URL fragments, not from HTTPS or a public trust root;
+- bootstrap remains static signed JSON served over `http://`; trust comes from
+  pinned `#ed25519=<hex>` URL fragments with optional `#sha256=<hex>` defense
+  in depth, not from HTTPS or a public trust root;
 - the distributed operator commands are one-shot, point-to-point, and
   operator-directed, not a general distributed control plane or discovery
   system;
@@ -103,11 +106,12 @@ Files:
 - Keep the same validated commit on all pilot hosts.
 - Copy one config and one key file to each node host.
 - Copy the three bootstrap JSON files to the designated seed hosts.
-- If you edit any bootstrap artifact, recompute and update the `#sha256=<hex>`
-  pin in every config that references it:
+- Copy the bootstrap signer key file to each designated seed host.
+- If you edit any bootstrap artifact, keep the signer key fixed and recompute
+  the signed-artifact `#sha256=<hex>` pin in every config that references it:
 
   ```bash
-  sha256sum devnet/pilot/examples/bootstrap/node-foundation.json
+  TMPDIR=/tmp cargo run -p overlay-cli -- bootstrap-sign --bootstrap-file devnet/pilot/examples/bootstrap/node-foundation.json --signing-key-file devnet/keys/bootstrap-signer.key --output /tmp/node-foundation.signed.json
   ```
 
 - Keep `TMPDIR=/tmp` available if your environment needs an explicit temp
@@ -118,15 +122,15 @@ Files:
 1. Start the three seed servers:
 
    ```bash
-   TMPDIR=/tmp cargo run -p overlay-cli -- bootstrap-serve --bind 0.0.0.0:4301 --bootstrap-file devnet/pilot/examples/bootstrap/node-foundation.json
+   TMPDIR=/tmp cargo run -p overlay-cli -- bootstrap-serve --bind 0.0.0.0:4301 --bootstrap-file devnet/pilot/examples/bootstrap/node-foundation.json --signing-key-file devnet/keys/bootstrap-signer.key
    ```
 
    ```bash
-   TMPDIR=/tmp cargo run -p overlay-cli -- bootstrap-serve --bind 0.0.0.0:4302 --bootstrap-file devnet/pilot/examples/bootstrap/node-a-seed.json
+   TMPDIR=/tmp cargo run -p overlay-cli -- bootstrap-serve --bind 0.0.0.0:4302 --bootstrap-file devnet/pilot/examples/bootstrap/node-a-seed.json --signing-key-file devnet/keys/bootstrap-signer.key
    ```
 
    ```bash
-   TMPDIR=/tmp cargo run -p overlay-cli -- bootstrap-serve --bind 0.0.0.0:4303 --bootstrap-file devnet/pilot/examples/bootstrap/node-ab-seed.json
+   TMPDIR=/tmp cargo run -p overlay-cli -- bootstrap-serve --bind 0.0.0.0:4303 --bootstrap-file devnet/pilot/examples/bootstrap/node-ab-seed.json --signing-key-file devnet/keys/bootstrap-signer.key
    ```
 
 2. Start the four always-on runtimes on their matching hosts:
@@ -230,7 +234,9 @@ This script:
   paths over real runtime sessions
 - exercises the fresh-node-join, node-down, primary-relay-down,
   relay-unavailable-service-open, bootstrap-seed-down,
-  service-host-restart, and tampered-bootstrap-artifact scenarios
+  integrity-mismatch, trust-verification-fallback, stale-bootstrap,
+  empty-peer-set, service-host-restart, and tampered-bootstrap-artifact
+  scenarios
 - emits JSON lines for each scenario plus a final `pilot_checklist_complete`
   summary
 
@@ -243,7 +249,7 @@ Operational note:
 
 ## Fault scenarios
 
-Record all ten scenarios in the pilot report:
+Record all eleven scenarios in the pilot report:
 
 1. `fresh-node-join`
 
@@ -289,25 +295,32 @@ Record all ten scenarios in the pilot report:
      configured source, and `health.bootstrap.last_attempt_summary` reports one
      `integrity_mismatch_sources`
 
-8. `stale-bootstrap-fallback`
+8. `trust-verification-fallback`
+
+   - one configured bootstrap source uses a deliberately bad signer pin
+   - expected outcome: startup still reaches `running` through the later
+     configured source, and `health.bootstrap.last_attempt_summary` reports one
+     `trust_verification_failed_sources`
+
+9. `stale-bootstrap-fallback`
 
    - one configured bootstrap source is present but expired
    - expected outcome: startup still reaches `running` through the later
      configured source, and `health.bootstrap.last_attempt_summary` reports one
      `stale_sources`
 
-9. `empty-bootstrap-fallback`
+10. `empty-bootstrap-fallback`
 
    - one configured bootstrap source validates but contains an empty peer set
    - expected outcome: startup still reaches `running` through the later
      configured source, and `health.bootstrap.last_attempt_summary` reports one
      `empty_peer_set_sources`
 
-10. `tampered-bootstrap-artifact`
+11. `tampered-bootstrap-artifact`
 
    - a config is pointed at a deliberately pin-mismatched bootstrap artifact
-   - expected outcome: `bootstrap_fetch` reports `rejected` and startup
-     degrades instead of accepting the artifact
+   - expected outcome: `bootstrap_fetch` reports `integrity_mismatch` and
+     startup degrades instead of accepting the artifact
 
 ## Evidence to collect
 
@@ -328,15 +341,15 @@ Record all ten scenarios in the pilot report:
 - lookup latency values from the `lookup` command
 - relay path evidence from both `relay-intro` commands and relay status output
 - service restart evidence from the persisted status JSON
-- tampered-bootstrap rejection logs
+- tampered-bootstrap integrity-mismatch logs
 
-## Remaining limitations after Milestone 22
+## Remaining limitations after Milestone 24
 
-- The localhost acceptance pack is the current Milestone 22 green path, but it still
+- The localhost acceptance pack is the current Milestone 24 green path, but it still
   does not replace the required off-box pilot evidence on separate hosts for a
   release note.
-- Bootstrap remains static pinned `http://` artifact delivery; operators must
-  keep the artifacts and `#sha256=<hex>` URLs synchronized manually.
+- Bootstrap remains static signed artifact delivery over `http://`; operators
+  must keep the signer pin and any `#sha256=<hex>` URLs synchronized manually.
 - The distributed operator commands remain one-shot proof surfaces, not a
   general control plane or distributed discovery layer.
 - Runtime peers, presence, services, sessions, relay tunnels, and path probes

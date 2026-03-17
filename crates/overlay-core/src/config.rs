@@ -209,9 +209,9 @@ impl OverlayConfig {
 pub enum ConfigError {
     #[error("config field {field} must not be empty; start from `overlay-cli config-template --profile user-node` or see docs/CONFIG_EXAMPLES.md")]
     EmptyField { field: &'static str },
-    #[error("config bootstrap_sources[{index}] must not be empty; use a local .json path, file:<path>, or pinned http://host[:port]/path#sha256=<hex> source")]
+    #[error("config bootstrap_sources[{index}] must not be empty; use a local .json path, file:<path>, or http://host[:port]/path with optional #sha256=<hex> and/or #ed25519=<hex> pins")]
     EmptyBootstrapSource { index: usize },
-    #[error("config bootstrap_sources[{index}] is not a supported source: {value}; accepted forms are local .json paths, file:<path>, or http://host[:port]/path#sha256=<hex>")]
+    #[error("config bootstrap_sources[{index}] is not a supported source: {value}; accepted forms are local .json paths, file:<path>, or http://host[:port]/path with optional #sha256=<hex> and/or #ed25519=<hex> pins")]
     UnsupportedBootstrapSource { index: usize, value: String },
     #[error("config tcp_listener_addr must be a host:port socket address such as 127.0.0.1:4101: {detail}")]
     InvalidTcpListenerAddr { detail: String },
@@ -237,6 +237,9 @@ fn path_is_empty(path: &Path) -> bool {
 
 fn bootstrap_source_supported(source: &str) -> bool {
     let trimmed = source.trim();
+    let Some((trimmed, _pins)) = split_bootstrap_source_pins(trimmed) else {
+        return false;
+    };
     if let Some(path) = trimmed.strip_prefix("file:") {
         return !Path::new(path.trim()).as_os_str().is_empty();
     }
@@ -250,17 +253,7 @@ fn bootstrap_source_supported(source: &str) -> bool {
 }
 
 fn parse_http_bootstrap_source(source: &str) -> Option<()> {
-    let (source, fragment) = match source.split_once('#') {
-        Some((source, fragment)) => (source, Some(fragment)),
-        None => (source, None),
-    };
-    if let Some(fragment) = fragment {
-        let hex = fragment.strip_prefix("sha256=")?;
-        if hex.len() != 64 || !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return None;
-        }
-    }
-
+    let (source, _pins) = split_bootstrap_source_pins(source)?;
     let remainder = source.strip_prefix("http://")?;
     if remainder.is_empty() {
         return None;
@@ -296,6 +289,52 @@ fn http_authority_to_socket_addr(authority: &str) -> Option<()> {
     }
 
     Some(())
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct BootstrapSourcePins {
+    expected_sha256_hex: Option<String>,
+    trusted_ed25519_public_key_hex: Option<String>,
+}
+
+fn split_bootstrap_source_pins(source: &str) -> Option<(&str, BootstrapSourcePins)> {
+    let (base, fragment) = match source.split_once('#') {
+        Some((base, fragment)) => (base.trim(), Some(fragment.trim())),
+        None => (source.trim(), None),
+    };
+    if base.is_empty() {
+        return None;
+    }
+
+    let mut pins = BootstrapSourcePins::default();
+    if let Some(fragment) = fragment {
+        if fragment.is_empty() {
+            return None;
+        }
+        for part in fragment.split('&') {
+            let (key, value) = part.split_once('=')?;
+            if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                return None;
+            }
+            match key {
+                "sha256" => {
+                    if value.len() != 64 || pins.expected_sha256_hex.is_some() {
+                        return None;
+                    }
+                    pins.expected_sha256_hex = Some(value.to_ascii_lowercase());
+                }
+                "ed25519" => {
+                    if value.len() != 64 || pins.trusted_ed25519_public_key_hex.is_some() {
+                        return None;
+                    }
+                    pins.trusted_ed25519_public_key_hex = Some(value.to_ascii_lowercase());
+                }
+                _ => return None,
+            }
+        }
+    }
+
+    Some((base, pins))
 }
 
 #[cfg(test)]
@@ -474,6 +513,29 @@ mod tests {
             invalid_pinned_http_source.validate(),
             Err(ConfigError::UnsupportedBootstrapSource { index: 1, .. })
         ));
+
+        let mut invalid_ed25519_source = sample_config();
+        invalid_ed25519_source.bootstrap_sources[1] =
+            "http://127.0.0.1:4201/bootstrap.json#ed25519=xyz".to_string();
+        assert!(matches!(
+            invalid_ed25519_source.validate(),
+            Err(ConfigError::UnsupportedBootstrapSource { index: 1, .. })
+        ));
+
+        let mut duplicate_fragment_key = sample_config();
+        duplicate_fragment_key.bootstrap_sources[1] = "http://127.0.0.1:4201/bootstrap.json#sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef&sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
+        assert!(matches!(
+            duplicate_fragment_key.validate(),
+            Err(ConfigError::UnsupportedBootstrapSource { index: 1, .. })
+        ));
+
+        let mut unknown_fragment_key = sample_config();
+        unknown_fragment_key.bootstrap_sources[1] =
+            "http://127.0.0.1:4201/bootstrap.json#trust=on".to_string();
+        assert!(matches!(
+            unknown_fragment_key.validate(),
+            Err(ConfigError::UnsupportedBootstrapSource { index: 1, .. })
+        ));
     }
 
     #[test]
@@ -532,6 +594,34 @@ mod tests {
         assert_eq!(
             validated.bootstrap_sources[1],
             "http://127.0.0.1:4201/bootstrap.json#sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        );
+    }
+
+    #[test]
+    fn overlay_config_accepts_http_bootstrap_with_ed25519_pin() {
+        let mut config = sample_config();
+        config.bootstrap_sources[1] = "http://127.0.0.1:4201/bootstrap.json#ed25519=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string();
+
+        let validated = config
+            .validate()
+            .expect("signed http source should validate");
+        assert_eq!(
+            validated.bootstrap_sources[1],
+            "http://127.0.0.1:4201/bootstrap.json#ed25519=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        );
+    }
+
+    #[test]
+    fn overlay_config_accepts_http_bootstrap_with_sha256_and_ed25519_pins() {
+        let mut config = sample_config();
+        config.bootstrap_sources[1] = "http://127.0.0.1:4201/bootstrap.json#sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef&ed25519=abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789".to_string();
+
+        let validated = config
+            .validate()
+            .expect("combined pinned http source should validate");
+        assert_eq!(
+            validated.bootstrap_sources[1],
+            "http://127.0.0.1:4201/bootstrap.json#sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef&ed25519=abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
         );
     }
 

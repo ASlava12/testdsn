@@ -4,12 +4,12 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `VALIDATION.md`, `docs/OPEN_QUESTIONS.md`,
 
 Goal:
 Synchronize on the current repository stage,
-`milestone-22-first-user-acceptance-pack`, and use the dedicated
+`milestone-24-bootstrap-trust-delivery-hardening`, and use the dedicated
 Milestone 22 prompt
 for the next concrete current-stage task.
 
 Current repository baseline:
-- The current repository stage is `milestone-22-first-user-acceptance-pack`.
+- The current repository stage is `milestone-24-bootstrap-trust-delivery-hardening`.
 - Milestone 0 is already complete.
 - Milestone 1 foundations are already implemented, vectorized, and validated in
   `overlay-core` (`identity`, `records`, `wire`).
@@ -72,7 +72,7 @@ Constraints:
 Tasks:
 - confirm the repository already sits at the closed Milestone 1-8 baseline;
 - use `prompts/codex-milestone-22.md` for the next concrete
-  `milestone-22-first-user-acceptance-pack` task;
+  `milestone-24-bootstrap-trust-delivery-hardening` task;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the repository baseline changes;
 - treat Milestones 1-12 as closed baseline work, touching them only for

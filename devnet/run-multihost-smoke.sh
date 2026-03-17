@@ -102,6 +102,7 @@ start_bootstrap_server() {
   "${overlay_cli}" bootstrap-serve \
     --bind "${bind_addr}" \
     --bootstrap-file "${bootstrap_file}" \
+    --signing-key-file devnet/keys/bootstrap-signer.key \
     >"${log_file}" 2>&1 &
   local pid="$!"
   for _ in $(seq 1 200); do

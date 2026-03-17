@@ -24,7 +24,7 @@ Current repository baseline:
 - Milestone 7 routing work is closed.
 - Milestone 8 service-layer work is closed.
 - The current repository stage is
-  `milestone-22-first-user-acceptance-pack`.
+  `milestone-24-bootstrap-trust-delivery-hardening`.
 
 Requirements:
 - keep the current `publish_verified` contract intact: signature verification

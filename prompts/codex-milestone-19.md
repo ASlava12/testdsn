@@ -7,13 +7,13 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `README.md`, `HANDOFF.md`, `VALIDATION.md`,
 
 Goal:
 Audit or repair the closed Milestone 19 pilot-closure surface from the current
-`milestone-22-first-user-acceptance-pack` repository stage and keep Milestone
+`milestone-24-bootstrap-trust-delivery-hardening` repository stage and keep Milestone
 19 work focused on closing the real-pilot blockers without widening scope into
 public-Internet rollout.
 
 Current repository baseline:
 - The current repository stage marker is
-  `milestone-22-first-user-acceptance-pack`.
+  `milestone-24-bootstrap-trust-delivery-hardening`.
 - Milestones 0-12 are implemented, validated, and considered closed.
 - Milestone 14 launch gate and pilot tag remain part of the landed baseline.
 - Milestone 16 network bootstrap and multi-host devnet remain part of the

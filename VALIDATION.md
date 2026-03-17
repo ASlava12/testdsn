@@ -2,7 +2,7 @@
 
 Run the following commands when applicable.
 
-## Current Milestone 22 sign-off path
+## Current Milestone 24 sign-off path
 
 Use the current first-user acceptance-pack sign-off order on the commit you intend to
 validate:
@@ -99,9 +99,9 @@ cargo test -p overlay-core --test integration_service_open
 ```
 
 Use this only when you need the older localhost rehearsal path for the landed
-Milestone 18 baseline. It is not part of current Milestone 22 sign-off.
+Milestone 18 baseline. It is not part of current Milestone 24 sign-off.
 
-## Milestone 22 first-user acceptance flow
+## Current first-user acceptance flow
 
 ```bash
 ./devnet/run-first-user-acceptance.sh
@@ -249,10 +249,10 @@ cargo test -p overlay-core --test integration_service_open
 
 - Milestones 1-12 are considered implemented baseline work, and the current
   repository stage marker is
-  `milestone-22-first-user-acceptance-pack` (Milestone 22 first-user
-  acceptance-pack support on top of the landed Milestone 21 first-user
-  runtime baseline).
-- The current sign-off path is the top-level Milestone 22 section above:
+  `milestone-24-bootstrap-trust-delivery-hardening` (Milestone 24 bootstrap
+  trust/delivery hardening on top of the landed Milestone 22 first-user
+  acceptance baseline).
+- The current sign-off path is the top-level Milestone 24 section above:
   workspace format/lint/build/test, then
   `./devnet/run-first-user-acceptance.sh`.
 - Use the Milestone 1-12 regression runs, stage-boundary smoke tests, the
@@ -270,7 +270,8 @@ cargo test -p overlay-core --test integration_service_open
   `rendezvous::tests`, `relay::tests`, `routing::tests`, `service::tests`,
   `session::manager::tests`, and `transport::tests`.
 - `bootstrap::tests` now also covers bootstrap provider fetch/validation
-  observability for accepted, rejected, and unavailable provider outcomes.
+  observability for accepted, integrity-mismatch, trust-verification-failed,
+  rejected, and unavailable provider outcomes.
 - `transport::tests` now also covers bounded transport-buffer config
   validation and oversized received-frame rejection.
 - `session::manager::tests` now also covers converting bounded
@@ -300,26 +301,26 @@ cargo test -p overlay-core --test integration_service_open
   listeners enabled and uses a real TCP session path for the session-establish
   step instead of the earlier placeholder-only path.
 - `./devnet/run-multihost-smoke.sh` is the current network-bootstrap and
-  host-style devnet proof path. It starts static bootstrap seed servers over
-  `http://`, then uses the bounded distributed operator commands to validate
-  bootstrap, session establishment, publish, lookup, service open, and relay
-  fallback against the multi-host config layout.
+  host-style devnet proof path. It starts static signed bootstrap seed servers
+  over `http://`, then uses the bounded distributed operator commands to
+  validate bootstrap, session establishment, publish, lookup, service open,
+  and relay fallback against the multi-host config layout.
 - The Milestone 17 gate keeps the distributed and multi-host network-bootstrap
   smoke commands, upgrades the restart smoke to validate signal-driven clean
   shutdown plus `overlay-cli status`, and folds the bounded logical soak into
   the required launch order.
 - `./devnet/run-pilot-checklist.sh` remains the Milestone 18 localhost
   rehearsal pack for the smoke-harness pilot boundary; it is retained for the
-  landed baseline but is not the current Milestone 22 sign-off path.
+  landed baseline but is not the current Milestone 24 sign-off path.
 - `./devnet/run-distributed-pilot-checklist.sh` remains the current
   distributed component proof path for the dedicated pilot topology pack, the
   expanded fault matrix, the repeated relay-bind evidence, the fresh-node-join
   proof, the relay-unavailable service-open proof, and the
-  unavailable/integrity/stale/empty pinned-bootstrap diagnostics.
+  unavailable/integrity/trust/stale/empty signed-bootstrap diagnostics.
 - `./devnet/run-doctor-smoke.sh` remains the landed operator-surface proof for
   `overlay-cli doctor` against a live runtime and is exercised through
   `./devnet/run-launch-gate.sh`.
-- `./devnet/run-first-user-acceptance.sh` is the current Milestone 22 wrapper
+- `./devnet/run-first-user-acceptance.sh` is the current Milestone 24 wrapper
   that combines the landed launch gate and the distributed acceptance
   scenarios into one bounded first-user-ready proof.
 - The Milestone 12 soak path also stays in-process and advances logical time

@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
+    crypto::sign::{Ed25519PublicKey, Ed25519Signature, Ed25519SigningKey},
+    error::CryptoError,
     identity::NodeId,
     metrics::{LogComponent, LogContext, Observability},
     session::HANDSHAKE_VERSION,
@@ -11,6 +13,8 @@ use crate::{
 };
 
 pub const BOOTSTRAP_SCHEMA_VERSION: u8 = 1;
+pub const SIGNED_BOOTSTRAP_ARTIFACT_VERSION: u8 = 1;
+const SIGNED_BOOTSTRAP_ARTIFACT_CONTEXT: &[u8] = b"overlay-bootstrap-artifact-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BootstrapNetworkParams {
@@ -162,6 +166,76 @@ impl BootstrapResponse {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignedBootstrapArtifact {
+    pub version: u8,
+    pub signer_public_key: Ed25519PublicKey,
+    pub bootstrap_response: BootstrapResponse,
+    pub signature: Ed25519Signature,
+}
+
+impl SignedBootstrapArtifact {
+    pub fn sign(
+        bootstrap_response: BootstrapResponse,
+        signing_key: &Ed25519SigningKey,
+    ) -> Result<Self, SignedBootstrapArtifactError> {
+        let signer_public_key = signing_key.public_key();
+        let signature_input = signed_bootstrap_artifact_signature_input(
+            SIGNED_BOOTSTRAP_ARTIFACT_VERSION,
+            signer_public_key,
+            &bootstrap_response,
+        )?;
+        Ok(Self {
+            version: SIGNED_BOOTSTRAP_ARTIFACT_VERSION,
+            signer_public_key,
+            bootstrap_response,
+            signature: signing_key.sign(&signature_input),
+        })
+    }
+
+    pub fn verify_with_trusted_signer(
+        &self,
+        trusted_signer: &Ed25519PublicKey,
+    ) -> Result<BootstrapResponse, SignedBootstrapArtifactError> {
+        if self.version != SIGNED_BOOTSTRAP_ARTIFACT_VERSION {
+            return Err(SignedBootstrapArtifactError::UnsupportedVersion {
+                expected: SIGNED_BOOTSTRAP_ARTIFACT_VERSION,
+                actual: self.version,
+            });
+        }
+        if &self.signer_public_key != trusted_signer {
+            return Err(SignedBootstrapArtifactError::TrustedSignerMismatch {
+                expected: *trusted_signer,
+                actual: self.signer_public_key,
+            });
+        }
+
+        let signature_input = signed_bootstrap_artifact_signature_input(
+            self.version,
+            self.signer_public_key,
+            &self.bootstrap_response,
+        )?;
+        self.signer_public_key
+            .verify(&signature_input, &self.signature)?;
+        Ok(self.bootstrap_response.clone())
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum SignedBootstrapArtifactError {
+    #[error("unsupported signed bootstrap artifact version: expected {expected}, got {actual}")]
+    UnsupportedVersion { expected: u8, actual: u8 },
+    #[error("signed bootstrap artifact signer mismatch between trusted and artifact key")]
+    TrustedSignerMismatch {
+        expected: Ed25519PublicKey,
+        actual: Ed25519PublicKey,
+    },
+    #[error("failed to encode signed bootstrap artifact signature input: {0}")]
+    Encoding(#[from] serde_json::Error),
+    #[error(transparent)]
+    Crypto(#[from] CryptoError),
+}
+
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum BootstrapValidationError {
     #[error("unsupported bootstrap schema version: expected {expected}, got {actual}")]
@@ -223,6 +297,8 @@ pub enum BootstrapProviderError {
     Unavailable(String),
     #[error("bootstrap provider artifact integrity check failed: {0}")]
     Integrity(String),
+    #[error("bootstrap provider trust verification failed: {0}")]
+    Trust(String),
     #[error(transparent)]
     Validation(#[from] BootstrapValidationError),
 }
@@ -262,11 +338,7 @@ pub trait BootstrapProvider {
                     context,
                     LogComponent::Bootstrap,
                     "bootstrap_fetch",
-                    if matches!(&error, BootstrapProviderError::Unavailable(_)) {
-                        "unavailable"
-                    } else {
-                        "rejected"
-                    },
+                    bootstrap_provider_error_log_result(&error),
                 );
                 Err(error)
             }
@@ -365,14 +437,65 @@ fn canonicalize_single_dial_hint(
     Ok(())
 }
 
+fn bootstrap_provider_error_log_result(error: &BootstrapProviderError) -> &'static str {
+    match error {
+        BootstrapProviderError::Unavailable(_) => "unavailable",
+        BootstrapProviderError::Integrity(_) => "integrity_mismatch",
+        BootstrapProviderError::Trust(_) => "trust_verification_failed",
+        BootstrapProviderError::Validation(validation_error) => {
+            if bootstrap_validation_error_is_stale(validation_error) {
+                "stale"
+            } else {
+                "rejected"
+            }
+        }
+    }
+}
+
+fn bootstrap_validation_error_is_stale(error: &BootstrapValidationError) -> bool {
+    matches!(
+        error,
+        BootstrapValidationError::GeneratedAfterExpiry { .. }
+            | BootstrapValidationError::Expired { .. }
+            | BootstrapValidationError::ExpiredBridgeHint { .. }
+    )
+}
+
+fn signed_bootstrap_artifact_signature_input(
+    version: u8,
+    signer_public_key: Ed25519PublicKey,
+    bootstrap_response: &BootstrapResponse,
+) -> Result<Vec<u8>, serde_json::Error> {
+    #[derive(Serialize)]
+    struct UnsignedSignedBootstrapArtifact<'a> {
+        version: u8,
+        signer_public_key: Ed25519PublicKey,
+        bootstrap_response: &'a BootstrapResponse,
+    }
+
+    let unsigned = UnsignedSignedBootstrapArtifact {
+        version,
+        signer_public_key,
+        bootstrap_response,
+    };
+    let unsigned_bytes = serde_json::to_vec(&unsigned)?;
+    let mut signature_input =
+        Vec::with_capacity(SIGNED_BOOTSTRAP_ARTIFACT_CONTEXT.len() + unsigned_bytes.len());
+    signature_input.extend_from_slice(SIGNED_BOOTSTRAP_ARTIFACT_CONTEXT);
+    signature_input.extend_from_slice(&unsigned_bytes);
+    Ok(signature_input)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         BootstrapNetworkParams, BootstrapPeer, BootstrapPeerRole, BootstrapProvider,
         BootstrapProviderError, BootstrapResponse, BootstrapValidationError, BridgeHint,
-        StaticBootstrapProvider, BOOTSTRAP_SCHEMA_VERSION,
+        SignedBootstrapArtifact, SignedBootstrapArtifactError, StaticBootstrapProvider,
+        BOOTSTRAP_SCHEMA_VERSION, SIGNED_BOOTSTRAP_ARTIFACT_VERSION,
     };
     use crate::{
+        crypto::sign::{Ed25519PublicKey, Ed25519SigningKey},
         identity::NodeId,
         metrics::{LogComponent, LogContext, Observability},
         session::HANDSHAKE_VERSION,
@@ -764,6 +887,52 @@ mod tests {
     }
 
     #[test]
+    fn signed_bootstrap_artifact_verifies_with_trusted_signer() {
+        let signing_key = Ed25519SigningKey::from_seed([17_u8; 32]);
+        let artifact = SignedBootstrapArtifact::sign(sample_response(), &signing_key)
+            .expect("artifact should sign");
+
+        let response = artifact
+            .verify_with_trusted_signer(&signing_key.public_key())
+            .expect("artifact should verify");
+
+        assert_eq!(artifact.version, SIGNED_BOOTSTRAP_ARTIFACT_VERSION);
+        assert_eq!(artifact.signer_public_key, signing_key.public_key());
+        assert_eq!(response, sample_response());
+    }
+
+    #[test]
+    fn signed_bootstrap_artifact_rejects_trusted_signer_mismatch() {
+        let signing_key = Ed25519SigningKey::from_seed([18_u8; 32]);
+        let artifact = SignedBootstrapArtifact::sign(sample_response(), &signing_key)
+            .expect("artifact should sign");
+        let wrong_signer = Ed25519PublicKey::from_bytes([19_u8; 32]);
+
+        let error = artifact
+            .verify_with_trusted_signer(&wrong_signer)
+            .expect_err("wrong signer should be rejected");
+
+        assert!(matches!(
+            error,
+            SignedBootstrapArtifactError::TrustedSignerMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn signed_bootstrap_artifact_rejects_tampered_signature() {
+        let signing_key = Ed25519SigningKey::from_seed([20_u8; 32]);
+        let mut artifact = SignedBootstrapArtifact::sign(sample_response(), &signing_key)
+            .expect("artifact should sign");
+        artifact.signature = crate::crypto::sign::Ed25519Signature::from_bytes([0_u8; 64]);
+
+        let error = artifact
+            .verify_with_trusted_signer(&signing_key.public_key())
+            .expect_err("tampered signature should be rejected");
+
+        assert!(matches!(error, SignedBootstrapArtifactError::Crypto(_)));
+    }
+
+    #[test]
     fn bootstrap_provider_observability_logs_accepted_fetch() {
         let provider = StaticBootstrapProvider::new(sample_response());
         let node_id = NodeId::from_bytes([9_u8; 32]);
@@ -818,6 +987,104 @@ mod tests {
         assert_eq!(log.component, LogComponent::Bootstrap);
         assert_eq!(log.event, "bootstrap_fetch");
         assert_eq!(log.result, "rejected");
+    }
+
+    #[test]
+    fn bootstrap_provider_observability_logs_stale_validation_error() {
+        let mut response = sample_response();
+        response.expires_at_unix_s = 1_700_000_000;
+        let provider = StaticBootstrapProvider::new(response);
+        let node_id = NodeId::from_bytes([12_u8; 32]);
+        let mut observability = Observability::default();
+
+        let error = provider
+            .fetch_validated_response_with_observability(
+                1_700_000_100,
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_700_000_100_000,
+                    node_id,
+                    correlation_id: 54,
+                },
+            )
+            .expect_err("stale bootstrap response must be rejected");
+
+        assert!(matches!(
+            error,
+            BootstrapProviderError::Validation(BootstrapValidationError::Expired { .. })
+        ));
+        let log = observability.latest_log().expect("log should be present");
+        assert_eq!(log.result, "stale");
+    }
+
+    #[test]
+    fn bootstrap_provider_observability_logs_integrity_failure() {
+        struct IntegrityBootstrapProvider;
+
+        impl BootstrapProvider for IntegrityBootstrapProvider {
+            fn provider_name(&self) -> &'static str {
+                "integrity"
+            }
+
+            fn fetch_response(&self) -> Result<BootstrapResponse, BootstrapProviderError> {
+                Err(BootstrapProviderError::Integrity(
+                    "pin mismatch".to_string(),
+                ))
+            }
+        }
+
+        let provider = IntegrityBootstrapProvider;
+        let node_id = NodeId::from_bytes([13_u8; 32]);
+        let mut observability = Observability::default();
+
+        provider
+            .fetch_validated_response_with_observability(
+                1_700_000_100,
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_700_000_100_000,
+                    node_id,
+                    correlation_id: 55,
+                },
+            )
+            .expect_err("integrity failure should surface");
+
+        let log = observability.latest_log().expect("log should be present");
+        assert_eq!(log.result, "integrity_mismatch");
+    }
+
+    #[test]
+    fn bootstrap_provider_observability_logs_trust_failure() {
+        struct TrustBootstrapProvider;
+
+        impl BootstrapProvider for TrustBootstrapProvider {
+            fn provider_name(&self) -> &'static str {
+                "trust"
+            }
+
+            fn fetch_response(&self) -> Result<BootstrapResponse, BootstrapProviderError> {
+                Err(BootstrapProviderError::Trust("signer mismatch".to_string()))
+            }
+        }
+
+        let provider = TrustBootstrapProvider;
+        let node_id = NodeId::from_bytes([14_u8; 32]);
+        let mut observability = Observability::default();
+
+        provider
+            .fetch_validated_response_with_observability(
+                1_700_000_100,
+                &mut observability,
+                LogContext {
+                    timestamp_unix_ms: 1_700_000_100_000,
+                    node_id,
+                    correlation_id: 56,
+                },
+            )
+            .expect_err("trust failure should surface");
+
+        let log = observability.latest_log().expect("log should be present");
+        assert_eq!(log.result, "trust_verification_failed");
     }
 
     #[test]

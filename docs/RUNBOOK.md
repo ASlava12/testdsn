@@ -19,7 +19,8 @@ The current localhost sign-off path is
 What exists today:
 
 - `overlay-cli run` loads one JSON node config, reads one Ed25519 seed file,
-  ingests bootstrap seed files from local paths or pinned `http://` URLs,
+  ingests bootstrap seed files from local paths or signed pinned `http://`
+  URLs,
   ticks the in-memory runtime, prints structured JSON logs, and handles
   `SIGINT` / `SIGTERM` through the runtime shutdown path
 - `overlay-cli run --service <namespace:name[:version]>` registers a bounded
@@ -36,8 +37,12 @@ What exists today:
   bounded one-shot operator flows over established runtime sessions
 - `overlay-cli smoke --devnet-dir <path>` still starts the local four-node
   devnet in-process for the checked-in repo-local proof path
-- `overlay-cli bootstrap-serve --bind <addr> --bootstrap-file <path>` serves
-  one static bootstrap response over minimal `http://` for devnet or lab use
+- `overlay-cli bootstrap-serve --bind <addr> --bootstrap-file <path> [--signing-key-file <path>]`
+  serves one static bootstrap response over minimal `http://` for devnet or
+  lab use, optionally wrapped as a signed bootstrap artifact
+- `overlay-cli bootstrap-sign --bootstrap-file <path> --signing-key-file <path> --output <path>`
+  emits a signed bootstrap artifact and prints the signer key plus SHA-256 of
+  the signed body
 - `./devnet/run-first-user-acceptance.sh` wraps the landed launch gate and the
   distributed checklist into the current bounded first-user-ready proof
 
@@ -68,8 +73,9 @@ What does not exist today:
 2. Verify the config only uses supported top-level fields.
 3. Verify `node_key_path` points to an existing seed file.
 4. Verify every `bootstrap_sources[]` entry points to a local `.json` file,
-   uses `file:<path>`, or uses a static `http://host:port/path#sha256=<hex>`
-   seed URL.
+   uses `file:<path>`, or uses a static
+   `http://host:port/path#ed25519=<hex>` seed URL with an optional
+   `#sha256=<hex>` integrity pin.
 5. Start the node with a bounded run first.
 6. Confirm the first stdout records include `bootstrap_fetch`,
    `bootstrap_ingest`, and a runtime `state_transition`.
@@ -171,7 +177,8 @@ Bring the lab up in this order:
 
 1. Copy the example configs and bootstrap JSON from `devnet/hosts/examples/`
    or `devnet/pilot/examples/`.
-2. Start one static seed server on each designated bootstrap host.
+2. Start one static seed server on each designated bootstrap host with
+   `overlay-cli bootstrap-serve --signing-key-file <path>`.
 3. Start each node with its host-local config; start service hosts with
    `overlay-cli run --service ...`.
 4. Confirm each node logs `bootstrap_fetch`, `bootstrap_ingest`, and

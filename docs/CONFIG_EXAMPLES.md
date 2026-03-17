@@ -77,8 +77,9 @@ Unknown operator knobs are not available yet. In particular:
   - a local `.json` path; or
   - a `file:<path>` URI.
 - `bootstrap_sources`: `http://host[:port]/path` URLs are also supported for
-  the current static bootstrap flow; unsupported schemes such as `https://`
-  fail config validation.
+  the current static bootstrap flow; add optional `#sha256=<hex>` and/or
+  `#ed25519=<hex>` pins for integrity and signer trust. Unsupported schemes
+  such as `https://` still fail config validation.
 - `tcp_listener_addr`: optional local bind address for the real TCP listener in
   `host:port` form. Invalid socket-address strings fail config validation. If
   omitted, `overlay-cli run` stays single-node unless you pass explicit
@@ -170,6 +171,11 @@ Each `peers[]` entry carries:
 The runtime validates schema version, freshness, handshake version, frame-size
 limits, duplicate peer IDs, duplicate bridge hints, and blank or unsupported
 transport and capability values before peer ingest.
+
+For signed bootstrap delivery, `overlay-cli bootstrap-serve --signing-key-file`
+serves the same logical `BootstrapResponse` wrapped inside a signed artifact,
+and `overlay-cli bootstrap-sign` can be used to precompute the signed-body
+SHA-256 pin that matches what the server will emit.
 
 ## Current limitations documented by these examples
 

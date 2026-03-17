@@ -7,7 +7,7 @@ mod signal;
 use std::{
     env,
     ffi::OsString,
-    fs::OpenOptions,
+    fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
     process::ExitCode,
@@ -32,6 +32,7 @@ use overlay_core::{
 };
 use serde::Serialize;
 use serde_json::Value;
+use sha2::{Digest as ShaDigest, Sha256};
 use signal::{install_shutdown_handlers, pending_shutdown_signal, process_exists, ShutdownSignal};
 
 fn main() -> ExitCode {
@@ -115,7 +116,18 @@ fn execute_command(command: Command) -> Result<(), String> {
             bind_addr,
             bootstrap_file,
             max_requests,
-        } => bootstrap_server::run(&bind_addr, &bootstrap_file, max_requests),
+            signing_key_file,
+        } => bootstrap_server::run(
+            &bind_addr,
+            &bootstrap_file,
+            max_requests,
+            signing_key_file.as_deref(),
+        ),
+        Command::BootstrapSign {
+            bootstrap_file,
+            signing_key_file,
+            output_path,
+        } => bootstrap_sign_command(&bootstrap_file, &signing_key_file, &output_path),
         Command::Publish {
             config_path,
             target,
@@ -203,6 +215,12 @@ enum Command {
         bind_addr: String,
         bootstrap_file: PathBuf,
         max_requests: Option<usize>,
+        signing_key_file: Option<PathBuf>,
+    },
+    BootstrapSign {
+        bootstrap_file: PathBuf,
+        signing_key_file: PathBuf,
+        output_path: PathBuf,
     },
     Publish {
         config_path: PathBuf,
@@ -251,6 +269,7 @@ fn parse_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, St
         "run" => parse_run_command(args),
         "smoke" => parse_smoke_command(args),
         "bootstrap-serve" => parse_bootstrap_serve_command(args),
+        "bootstrap-sign" => parse_bootstrap_sign_command(args),
         "publish" => parse_publish_command(args),
         "lookup" => parse_lookup_command(args),
         "open-service" => parse_open_service_command(args),
@@ -477,6 +496,7 @@ fn parse_bootstrap_serve_command(
     let mut bind_addr = None;
     let mut bootstrap_file = None;
     let mut max_requests = None;
+    let mut signing_key_file = None;
     let mut args = args.into_iter();
 
     while let Some(arg) = args.next() {
@@ -499,6 +519,12 @@ fn parse_bootstrap_serve_command(
                 };
                 max_requests = Some(parse_usize_flag("--max-requests", &value)?);
             }
+            "--signing-key-file" => {
+                let Some(value) = args.next() else {
+                    return Err("--signing-key-file requires a path".to_string());
+                };
+                signing_key_file = Some(PathBuf::from(value));
+            }
             "-h" | "--help" => return Ok(Command::Help),
             other => return Err(format!("unknown bootstrap-serve flag '{other}'")),
         }
@@ -515,6 +541,7 @@ fn parse_bootstrap_serve_command(
         bind_addr,
         bootstrap_file,
         max_requests,
+        signing_key_file,
     })
 }
 
@@ -577,6 +604,56 @@ fn parse_publish_command(args: impl IntoIterator<Item = OsString>) -> Result<Com
         capability_requirements,
         transport_classes,
         expires_in_s,
+    })
+}
+
+fn parse_bootstrap_sign_command(
+    args: impl IntoIterator<Item = OsString>,
+) -> Result<Command, String> {
+    let mut bootstrap_file = None;
+    let mut signing_key_file = None;
+    let mut output_path = None;
+    let mut args = args.into_iter();
+
+    while let Some(arg) = args.next() {
+        match arg.to_string_lossy().as_ref() {
+            "--bootstrap-file" => {
+                let Some(value) = args.next() else {
+                    return Err("--bootstrap-file requires a path".to_string());
+                };
+                bootstrap_file = Some(PathBuf::from(value));
+            }
+            "--signing-key-file" => {
+                let Some(value) = args.next() else {
+                    return Err("--signing-key-file requires a path".to_string());
+                };
+                signing_key_file = Some(PathBuf::from(value));
+            }
+            "--output" => {
+                let Some(value) = args.next() else {
+                    return Err("--output requires a path".to_string());
+                };
+                output_path = Some(PathBuf::from(value));
+            }
+            "-h" | "--help" => return Ok(Command::Help),
+            other => return Err(format!("unknown bootstrap-sign flag '{other}'")),
+        }
+    }
+
+    let Some(bootstrap_file) = bootstrap_file else {
+        return Err("bootstrap-sign requires --bootstrap-file <path>".to_string());
+    };
+    let Some(signing_key_file) = signing_key_file else {
+        return Err("bootstrap-sign requires --signing-key-file <path>".to_string());
+    };
+    let Some(output_path) = output_path else {
+        return Err("bootstrap-sign requires --output <path>".to_string());
+    };
+
+    Ok(Command::BootstrapSign {
+        bootstrap_file,
+        signing_key_file,
+        output_path,
     })
 }
 
@@ -832,6 +909,57 @@ fn write_config_template_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
         )
     })?;
     Ok(())
+}
+
+fn bootstrap_sign_command(
+    bootstrap_file: &Path,
+    signing_key_file: &Path,
+    output_path: &Path,
+) -> Result<(), String> {
+    let signing_key = bootstrap_server::load_signing_key(signing_key_file)?;
+    let raw_body = fs::read(bootstrap_file).map_err(|error| {
+        format!(
+            "failed to read bootstrap file {}: {error}",
+            bootstrap_file.display()
+        )
+    })?;
+    let signed_body =
+        bootstrap_server::build_signed_bootstrap_body(raw_body, bootstrap_file, &signing_key)?;
+    let output_dir = output_path.parent().unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(output_dir).map_err(|error| {
+        format!(
+            "failed to create bootstrap artifact output directory {}: {error}",
+            output_dir.display()
+        )
+    })?;
+    fs::write(output_path, &signed_body).map_err(|error| {
+        format!(
+            "failed to write signed bootstrap artifact {}: {error}",
+            output_path.display()
+        )
+    })?;
+
+    println!(
+        "{}",
+        serde_json::json!({
+            "step": "bootstrap_sign",
+            "bootstrap_file": bootstrap_file.display().to_string(),
+            "output": output_path.display().to_string(),
+            "signer_public_key": bootstrap_server::encode_hex(signing_key.public_key().as_bytes()),
+            "sha256": sha256_hex(&signed_body),
+        })
+    );
+    Ok(())
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut encoded = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        use std::fmt::Write as _;
+        write!(&mut encoded, "{byte:02x}").expect("hex encoding should succeed");
+    }
+    encoded
 }
 
 fn publish_command(
@@ -1525,14 +1653,24 @@ fn build_doctor_report(config_path: &Path) -> (DoctorReport, u8) {
             DoctorCheck {
                 name: "bootstrap",
                 result: DoctorResult::Warn,
-                detail: "live bootstrap is currently unavailable; runtime recovered from the persisted peer cache and will keep retrying bootstrap".to_string(),
+                detail: format!(
+                    "live bootstrap is currently unavailable; runtime recovered from the persisted peer cache and will keep retrying bootstrap{}",
+                    bootstrap_failure_detail(status)
+                        .map(|detail| format!(" ({detail})"))
+                        .unwrap_or_default()
+                ),
             }
         } else {
             result.escalate(DoctorResult::Fail);
             DoctorCheck {
                 name: "bootstrap",
                 result: DoctorResult::Fail,
-                detail: "no bootstrap source was accepted and no recoverable active peers were available".to_string(),
+                detail: format!(
+                    "no bootstrap source was accepted and no recoverable active peers were available{}",
+                    bootstrap_failure_detail(status)
+                        .map(|detail| format!(" ({detail})"))
+                        .unwrap_or_default()
+                ),
             }
         };
         checks.push(bootstrap_check);
@@ -1579,6 +1717,49 @@ fn build_doctor_report(config_path: &Path) -> (DoctorReport, u8) {
         },
         exit_code,
     )
+}
+
+fn bootstrap_failure_detail(status: &Value) -> Option<String> {
+    let summary = status.pointer("/health/bootstrap/last_attempt_summary")?;
+    let mut parts = Vec::new();
+    append_bootstrap_failure_count(&mut parts, summary, "unavailable_sources", "unavailable");
+    append_bootstrap_failure_count(
+        &mut parts,
+        summary,
+        "integrity_mismatch_sources",
+        "integrity_mismatch",
+    );
+    append_bootstrap_failure_count(
+        &mut parts,
+        summary,
+        "trust_verification_failed_sources",
+        "trust_verification_failed",
+    );
+    append_bootstrap_failure_count(&mut parts, summary, "stale_sources", "stale");
+    append_bootstrap_failure_count(
+        &mut parts,
+        summary,
+        "empty_peer_set_sources",
+        "empty_peer_set",
+    );
+    append_bootstrap_failure_count(&mut parts, summary, "rejected_sources", "rejected");
+    if parts.is_empty() {
+        None
+    } else {
+        Some(format!("last bootstrap attempt: {}", parts.join(", ")))
+    }
+}
+
+fn append_bootstrap_failure_count(
+    parts: &mut Vec<String>,
+    summary: &Value,
+    field: &str,
+    label: &str,
+) {
+    let count = summary.get(field).and_then(Value::as_u64).unwrap_or(0);
+    if count > 0 {
+        parts.push(format!("{label}={count}"));
+    }
 }
 
 fn current_unix_ms() -> Result<u64, String> {
@@ -1630,7 +1811,10 @@ fn print_usage() {
         "  overlay-cli smoke [--devnet-dir <path>] [--soak-seconds <seconds>] [--status-interval-seconds <seconds>] [--fault <none|node-c-down|relay-unavailable>]"
     );
     println!(
-        "  overlay-cli bootstrap-serve --bind <addr> --bootstrap-file <path> [--max-requests <count>]"
+        "  overlay-cli bootstrap-serve --bind <addr> --bootstrap-file <path> [--max-requests <count>] [--signing-key-file <path>]"
+    );
+    println!(
+        "  overlay-cli bootstrap-sign --bootstrap-file <path> --signing-key-file <path> --output <path>"
     );
     println!(
         "  overlay-cli publish --config <path> --target <tcp://host:port> [--relay-ref <node-id-hex> ...] [--capability <value> ...] [--transport-class <value> ...] [--expires-in <seconds>]"
@@ -2049,6 +2233,52 @@ mod tests {
                 bind_addr: "127.0.0.1:4201".to_string(),
                 bootstrap_file: PathBuf::from("devnet/bootstrap/node-foundation.json"),
                 max_requests: Some(2),
+                signing_key_file: None,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_command_parses_bootstrap_serve_signing_key_flag() {
+        assert_eq!(
+            parse_command([
+                OsString::from("overlay-cli"),
+                OsString::from("bootstrap-serve"),
+                OsString::from("--bind"),
+                OsString::from("127.0.0.1:4201"),
+                OsString::from("--bootstrap-file"),
+                OsString::from("devnet/bootstrap/node-foundation.json"),
+                OsString::from("--signing-key-file"),
+                OsString::from("devnet/keys/bootstrap-signer.key"),
+            ])
+            .unwrap(),
+            Command::BootstrapServe {
+                bind_addr: "127.0.0.1:4201".to_string(),
+                bootstrap_file: PathBuf::from("devnet/bootstrap/node-foundation.json"),
+                max_requests: None,
+                signing_key_file: Some(PathBuf::from("devnet/keys/bootstrap-signer.key")),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_command_parses_bootstrap_sign_flags() {
+        assert_eq!(
+            parse_command([
+                OsString::from("overlay-cli"),
+                OsString::from("bootstrap-sign"),
+                OsString::from("--bootstrap-file"),
+                OsString::from("devnet/bootstrap/node-foundation.json"),
+                OsString::from("--signing-key-file"),
+                OsString::from("devnet/keys/bootstrap-signer.key"),
+                OsString::from("--output"),
+                OsString::from("/tmp/node-foundation.signed.json"),
+            ])
+            .unwrap(),
+            Command::BootstrapSign {
+                bootstrap_file: PathBuf::from("devnet/bootstrap/node-foundation.json"),
+                signing_key_file: PathBuf::from("devnet/keys/bootstrap-signer.key"),
+                output_path: PathBuf::from("/tmp/node-foundation.signed.json"),
             }
         );
     }

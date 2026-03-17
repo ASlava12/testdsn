@@ -25,7 +25,7 @@ Current repository baseline:
 - Milestone 7 routing work is closed in `overlay-core` (`routing`).
 - Milestone 8 service-layer work is closed in `overlay-core` (`service`).
 - The current repository stage is
-  `milestone-22-first-user-acceptance-pack`.
+  `milestone-24-bootstrap-trust-delivery-hardening`.
 
 Requirements:
 - keep direct transport attempts first and use relay only as bounded fallback;

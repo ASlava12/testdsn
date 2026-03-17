@@ -5,11 +5,11 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `README.md`, `HANDOFF.md`, `VALIDATION.md`,
 
 Goal:
 Audit or repair the closed Milestone 14 launch-gate surface from the current
-`milestone-22-first-user-acceptance-pack` repository stage.
+`milestone-24-bootstrap-trust-delivery-hardening` repository stage.
 
 Current repository baseline:
 - The current repository stage marker is
-  `milestone-22-first-user-acceptance-pack`.
+  `milestone-24-bootstrap-trust-delivery-hardening`.
 - Milestones 0-8 are implemented, vectorized where applicable, validated, and
   considered closed.
 - Milestone 9 hardening is implemented and part of the frozen baseline.

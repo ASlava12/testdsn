@@ -8,7 +8,7 @@ public deployment.
 ## Release metadata
 
 - Tag: `pilot-v0.1.0-rcN`
-- Repository stage: `milestone-22-first-user-acceptance-pack`
+- Repository stage: `milestone-24-bootstrap-trust-delivery-hardening`
 - Commit: `<git-sha>`
 - Release date: `<YYYY-MM-DD>`
 - Operator: `<name>`
@@ -63,7 +63,8 @@ Short statement of what this pilot candidate is intended to prove.
 
 - only the last-known active bootstrap peers are recovered across restart;
   presence, services, sessions, relay tunnels, and path probes still rebuild
-- static bootstrap over pinned `http://...#sha256=<pin>` artifacts only
+- static signed bootstrap over `http://...#ed25519=<pin>` with optional
+  `#sha256=<pin>` integrity checks only
 - distributed operator commands are one-shot and operator-directed
 - off-box evidence must still be collected manually from separate hosts
 - relay fallback validated only on the documented

@@ -7,10 +7,10 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `README.md`, `HANDOFF.md`, `VALIDATION.md`,
 
 Goal:
 Work within the current repository stage,
-`milestone-24-bootstrap-trust-delivery-hardening`, from the landed Milestone 1-21
-baseline and keep Milestone 22 focused on the bounded first-user acceptance
-pack, acceptance evidence, and honest stage docs without widening protocol
-scope.
+`milestone-24-bootstrap-trust-delivery-hardening`, from the landed
+Milestone 1-22 baseline and keep Milestone 24 focused on bounded bootstrap
+trust hardening, operator diagnostics, acceptance evidence, and honest stage
+docs without widening protocol scope.
 
 Current repository baseline:
 - The current repository stage marker is
@@ -18,16 +18,17 @@ Current repository baseline:
 - Milestones 0-12 are implemented, validated, and considered closed.
 - Milestone 14 launch gate, Milestone 16 network bootstrap, Milestone 17
   operator runtime hardening, Milestone 18 real pilot, Milestone 19 pilot
-  closure, Milestone 20 regular distributed use closure, and Milestone 21
-  first-user runtime are landed baseline work.
-- Milestone 22 first-user acceptance pack adds the bounded
-  `./devnet/run-first-user-acceptance.sh` wrapper, explicit first-user-ready
-  scenarios, fresh-node-join and relay-unavailable-service-open proof in the
-  distributed checklist, and synchronized first-user-ready boundary docs.
+  closure, Milestone 20 regular distributed use closure, Milestone 21
+  first-user runtime, and Milestone 22 first-user acceptance pack are landed
+  baseline work.
+- Milestone 24 bootstrap trust and delivery hardening adds signed bootstrap
+  artifacts, pinned signer-key verification with optional SHA-256 integrity
+  pins, `overlay-cli bootstrap-sign`, signed `bootstrap-serve`,
+  trust-verification diagnostics, and synchronized bootstrap/operator docs.
 
 Requirements:
 - preserve the current launch surface and distributed pilot proof path;
-- prefer reproducible acceptance coverage, checklist clarity, and runbook
+- prefer reproducible bootstrap trust coverage, checklist clarity, and runbook
   honesty over new features;
 - keep Milestones 1-12 limited to regression fixes, validation maintenance,
   vector maintenance, or conservative spec-conformance fixes;
