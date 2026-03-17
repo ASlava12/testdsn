@@ -11,14 +11,20 @@ seed files so they can be loaded and validated directly in this repository.
 To generate a valid starting config with the current conservative defaults:
 
 ```bash
-TMPDIR=/tmp cargo run -p overlay-cli -- config-template
+TMPDIR=/tmp cargo run -p overlay-cli -- config-template --profile user-node
 ```
 
 To write the same template directly into a new file:
 
 ```bash
-TMPDIR=/tmp cargo run -p overlay-cli -- config-template --output /path/to/node.json
+TMPDIR=/tmp cargo run -p overlay-cli -- config-template --profile user-node --output /path/to/node.json
 ```
+
+Available template profiles:
+
+- `user-node`
+- `relay-capable`
+- `bootstrap-seed`
 
 The generated JSON uses the current baseline defaults:
 
@@ -96,7 +102,16 @@ Unknown operator knobs are not available yet. In particular:
 - `overlay-cli run` now derives a config-local `.overlay-runtime/<config-stem>/`
   directory for the operator lock file and persisted `runtime_status` snapshot.
 
-## Role examples
+## Stable first-user profiles
+
+- User node:
+  [user-node.json](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/config-examples/user-node.json)
+- Relay-capable node:
+  [relay-capable.json](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/config-examples/relay-capable.json)
+- Bootstrap-seed node:
+  [bootstrap-seed.json](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/config-examples/bootstrap-seed.json)
+
+Retained repository-role examples:
 
 - Bootstrap anchor:
   [bootstrap-node.json](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/config-examples/bootstrap-node.json)
@@ -107,7 +122,7 @@ Unknown operator knobs are not available yet. In particular:
 - Service-host node:
   [service-host-node.json](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/config-examples/service-host-node.json)
 
-All four are loadable with:
+All profile examples are loadable with:
 
 ```bash
 TMPDIR=/tmp cargo run -p overlay-cli -- run --config <example-path> --max-ticks 0 --status-every 1
@@ -117,6 +132,12 @@ The last-known persisted status for any example can be read with:
 
 ```bash
 TMPDIR=/tmp cargo run -p overlay-cli -- status --config <example-path>
+```
+
+The concise operator summary can be read with:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- status --config <example-path> --summary
 ```
 
 ## Bootstrap seed files
@@ -155,6 +176,9 @@ transport and capability values before peer ingest.
 - The examples are local and repository-relative on purpose.
 - A bootstrap anchor is still just a node plus a seed file, not a bootstrap
   service process.
+- Only the last-known active bootstrap peers are recovered across restart; the
+  examples do not imply full durable presence, service, session, relay, or
+  path state.
 - Service-host behavior in the stock repo comes from
   `overlay-cli run --service ...` or caller-side service registration, not from
   extra JSON fields.

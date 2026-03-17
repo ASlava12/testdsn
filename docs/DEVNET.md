@@ -6,7 +6,7 @@ The repository ships a reproducible local and host-style devnet under
 It is the operator-facing proof path for the current runtime surface, including
 the Milestone 16 host-style network-bootstrap layout under
 [devnet/hosts](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/hosts)
-and the Milestone 20 regular-distributed-use pack under
+and the carried-forward distributed pilot pack under
 [devnet/pilot](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot).
 
 ## Node roles
@@ -28,7 +28,7 @@ and the Milestone 20 regular-distributed-use pack under
 - [devnet/hosts](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/hosts):
   host-style localhost and example multi-host layouts
 - [devnet/pilot](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/pilot):
-  dedicated Milestone 20 regular-distributed-use topology/config pack
+  dedicated distributed pilot topology/config pack
 - [devnet/run-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-smoke.sh):
   wrapper for the repo-local smoke flow
 - [devnet/run-distributed-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-smoke.sh):
@@ -36,7 +36,9 @@ and the Milestone 20 regular-distributed-use pack under
 - [devnet/run-multihost-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-multihost-smoke.sh):
   wrapper for the host-style network-bootstrap and operator-flow smoke
 - [devnet/run-distributed-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-pilot-checklist.sh):
-  wrapper for the current regular-distributed-use checklist
+  wrapper for the current distributed pilot checklist
+- [devnet/run-doctor-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-doctor-smoke.sh):
+  wrapper for the Milestone 21 doctor/self-check surface
 - [devnet/run-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-pilot-checklist.sh):
   retained Milestone 18 localhost rehearsal pack, not the current sign-off
   path
@@ -148,6 +150,13 @@ health and lifecycle state:
 TMPDIR=/tmp cargo run -p overlay-cli -- status --config devnet/configs/node-a.json
 ```
 
+Use `overlay-cli doctor` when you want a machine-readable self-check against
+that node's persisted state:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- doctor --config devnet/configs/node-a.json
+```
+
 ## Devnet limits
 
 - Bootstrap remains static JSON served over `http://`; integrity comes from
@@ -156,6 +165,8 @@ TMPDIR=/tmp cargo run -p overlay-cli -- status --config devnet/configs/node-a.js
   harness for publish/lookup/service/relay orchestration.
 - The distributed operator commands are explicit point-to-point CLI calls, not
   a persistent control plane or discovery system.
+- Restart recovery is bounded to the last-known active bootstrap peers only;
+  the devnet does not imply full durable protocol-state persistence.
 - Lookup is still exact-by-`node_id` only, and service resolution is still
   exact-by-`app_id` only.
 - The checked-in `tcp://127.0.0.1:*` dial hints in `hosts/localhost/` and

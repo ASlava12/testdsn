@@ -15,7 +15,7 @@ pub mod session;
 pub mod transport;
 pub mod wire;
 
-pub const REPOSITORY_STAGE: &str = "milestone-20-regular-distributed-use-closure";
+pub const REPOSITORY_STAGE: &str = "milestone-21-first-user-runtime";
 
 #[cfg(test)]
 mod tests {
@@ -25,10 +25,7 @@ mod tests {
 
     #[test]
     fn reports_repository_stage() {
-        assert_eq!(
-            REPOSITORY_STAGE,
-            "milestone-20-regular-distributed-use-closure"
-        );
+        assert_eq!(REPOSITORY_STAGE, "milestone-21-first-user-runtime");
     }
 
     #[test]

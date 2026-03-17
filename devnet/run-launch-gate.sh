@@ -19,4 +19,5 @@ TMPDIR=/tmp cargo test -p overlay-core --test integration_service_open
 "${script_dir}/run-distributed-smoke.sh"
 "${script_dir}/run-multihost-smoke.sh"
 "${script_dir}/run-soak.sh"
+"${script_dir}/run-doctor-smoke.sh"
 "${script_dir}/run-restart-smoke.sh"

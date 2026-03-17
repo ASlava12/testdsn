@@ -1,6 +1,6 @@
 # Pilot Release Template
 
-Use this template for each Milestone 20 regular-distributed-use candidate tag.
+Use this template for each current-stage distributed pilot candidate tag.
 
 Do not describe the release as GA, production-ready, or ready for hostile
 public deployment.
@@ -8,7 +8,7 @@ public deployment.
 ## Release metadata
 
 - Tag: `pilot-v0.1.0-rcN`
-- Repository stage: `milestone-20-regular-distributed-use-closure`
+- Repository stage: `milestone-21-first-user-runtime`
 - Commit: `<git-sha>`
 - Release date: `<YYYY-MM-DD>`
 - Operator: `<name>`
@@ -44,6 +44,7 @@ Short statement of what this pilot candidate is intended to prove.
 - `./devnet/run-distributed-smoke.sh`: `<pass/fail>`
 - `./devnet/run-multihost-smoke.sh`: `<pass/fail>`
 - `./devnet/run-soak.sh`: `<pass/fail>`
+- `./devnet/run-doctor-smoke.sh`: `<pass/fail>`
 - `./devnet/run-distributed-pilot-checklist.sh`: `<pass/fail>`
 - `./devnet/run-restart-smoke.sh`: `<pass/fail>`
 
@@ -60,7 +61,8 @@ Short statement of what this pilot candidate is intended to prove.
 
 ## Known limitations
 
-- in-memory runtime state only; restart rebuilds state from config and bootstrap
+- only the last-known active bootstrap peers are recovered across restart;
+  presence, services, sessions, relay tunnels, and path probes still rebuild
 - static bootstrap over pinned `http://...#sha256=<pin>` artifacts only
 - distributed operator commands are one-shot and operator-directed
 - off-box evidence must still be collected manually from separate hosts

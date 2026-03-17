@@ -17,7 +17,7 @@ use std::{
 
 use operator_state::{OperatorStateManager, RuntimeShutdownReason};
 use overlay_core::{
-    config::OverlayConfig,
+    config::{ConfigTemplateProfile, OverlayConfig},
     identity::{derive_app_id, NodeId},
     records::{IntroTicket, PresenceRecord},
     relay::{IntroResponse, ResolveIntro},
@@ -30,10 +30,24 @@ use overlay_core::{
     wire::MessageType,
     REPOSITORY_STAGE,
 };
-use signal::{install_shutdown_handlers, pending_shutdown_signal, ShutdownSignal};
+use serde::Serialize;
+use serde_json::Value;
+use signal::{install_shutdown_handlers, pending_shutdown_signal, process_exists, ShutdownSignal};
 
 fn main() -> ExitCode {
-    match try_main() {
+    let command = match parse_command(env::args_os()) {
+        Ok(command) => command,
+        Err(error) => {
+            eprintln!("overlay-cli: {error}");
+            return ExitCode::from(1);
+        }
+    };
+
+    if let Command::Doctor { config_path } = command {
+        return doctor_command(config_path);
+    }
+
+    match execute_command(command) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("overlay-cli: {error}");
@@ -42,8 +56,8 @@ fn main() -> ExitCode {
     }
 }
 
-fn try_main() -> Result<(), String> {
-    match parse_command(env::args_os())? {
+fn execute_command(command: Command) -> Result<(), String> {
+    match command {
         Command::Stage => {
             println!("overlay-cli: {}", REPOSITORY_STAGE);
             Ok(())
@@ -52,8 +66,14 @@ fn try_main() -> Result<(), String> {
             print_usage();
             Ok(())
         }
-        Command::ConfigTemplate { output_path } => config_template_command(output_path),
-        Command::Status { config_path } => print_status_command(config_path),
+        Command::ConfigTemplate {
+            output_path,
+            profile,
+        } => config_template_command(output_path, profile),
+        Command::Status {
+            config_path,
+            summary_only,
+        } => print_status_command(config_path, summary_only),
         Command::Run {
             config_path,
             tick_ms,
@@ -142,6 +162,7 @@ fn try_main() -> Result<(), String> {
             requester_node_id,
             expires_in_s,
         ),
+        Command::Doctor { .. } => unreachable!("doctor is handled before execute_command"),
     }
 }
 
@@ -158,9 +179,11 @@ enum Command {
     Help,
     ConfigTemplate {
         output_path: Option<PathBuf>,
+        profile: ConfigTemplateProfile,
     },
     Status {
         config_path: PathBuf,
+        summary_only: bool,
     },
     Run {
         config_path: PathBuf,
@@ -208,6 +231,9 @@ enum Command {
         requester_node_id: NodeId,
         expires_in_s: u64,
     },
+    Doctor {
+        config_path: PathBuf,
+    },
 }
 
 fn parse_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, String> {
@@ -221,6 +247,7 @@ fn parse_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, St
         "-h" | "--help" => Ok(Command::Help),
         "config-template" => parse_config_template_command(args),
         "status" => parse_status_command(args),
+        "doctor" => parse_doctor_command(args),
         "run" => parse_run_command(args),
         "smoke" => parse_smoke_command(args),
         "bootstrap-serve" => parse_bootstrap_serve_command(args),
@@ -236,6 +263,7 @@ fn parse_config_template_command(
     args: impl IntoIterator<Item = OsString>,
 ) -> Result<Command, String> {
     let mut output_path = None;
+    let mut profile = ConfigTemplateProfile::UserNode;
     let mut args = args.into_iter();
 
     while let Some(arg) = args.next() {
@@ -246,15 +274,63 @@ fn parse_config_template_command(
                 };
                 output_path = Some(PathBuf::from(value));
             }
+            "--profile" => {
+                let Some(value) = args.next() else {
+                    return Err(
+                        "--profile requires one of: user-node, relay-capable, bootstrap-seed"
+                            .to_string(),
+                    );
+                };
+                profile = ConfigTemplateProfile::parse(&value.to_string_lossy()).ok_or_else(|| {
+                    format!(
+                        "unsupported config profile '{}'; use one of: user-node, relay-capable, bootstrap-seed",
+                        value.to_string_lossy()
+                    )
+                })?;
+            }
             "-h" | "--help" => return Ok(Command::Help),
             other => return Err(format!("unknown config-template flag '{other}'")),
         }
     }
 
-    Ok(Command::ConfigTemplate { output_path })
+    Ok(Command::ConfigTemplate {
+        output_path,
+        profile,
+    })
 }
 
 fn parse_status_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, String> {
+    let mut config_path = None;
+    let mut summary_only = false;
+    let mut args = args.into_iter();
+
+    while let Some(arg) = args.next() {
+        match arg.to_string_lossy().as_ref() {
+            "--config" => {
+                let Some(value) = args.next() else {
+                    return Err("--config requires a path".to_string());
+                };
+                config_path = Some(PathBuf::from(value));
+            }
+            "--summary" => {
+                summary_only = true;
+            }
+            "-h" | "--help" => return Ok(Command::Help),
+            other => return Err(format!("unknown status flag '{other}'")),
+        }
+    }
+
+    let Some(config_path) = config_path else {
+        return Err("status requires --config <path>".to_string());
+    };
+
+    Ok(Command::Status {
+        config_path,
+        summary_only,
+    })
+}
+
+fn parse_doctor_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, String> {
     let mut config_path = None;
     let mut args = args.into_iter();
 
@@ -267,15 +343,15 @@ fn parse_status_command(args: impl IntoIterator<Item = OsString>) -> Result<Comm
                 config_path = Some(PathBuf::from(value));
             }
             "-h" | "--help" => return Ok(Command::Help),
-            other => return Err(format!("unknown status flag '{other}'")),
+            other => return Err(format!("unknown doctor flag '{other}'")),
         }
     }
 
     let Some(config_path) = config_path else {
-        return Err("status requires --config <path>".to_string());
+        return Err("doctor requires --config <path>".to_string());
     };
 
-    Ok(Command::Status { config_path })
+    Ok(Command::Doctor { config_path })
 }
 
 fn parse_run_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, String> {
@@ -705,8 +781,11 @@ fn parse_usize_flag(flag: &str, value: &OsString) -> Result<usize, String> {
         .map_err(|error| format!("{flag} must be an unsigned integer: {error}"))
 }
 
-fn config_template_command(output_path: Option<PathBuf>) -> Result<(), String> {
-    let rendered = render_config_template()?;
+fn config_template_command(
+    output_path: Option<PathBuf>,
+    profile: ConfigTemplateProfile,
+) -> Result<(), String> {
+    let rendered = render_config_template(profile)?;
     if let Some(path) = output_path {
         write_config_template_file(&path, rendered.as_bytes())?;
     } else {
@@ -715,8 +794,8 @@ fn config_template_command(output_path: Option<PathBuf>) -> Result<(), String> {
     Ok(())
 }
 
-fn render_config_template() -> Result<String, String> {
-    let template = OverlayConfig::template();
+fn render_config_template(profile: ConfigTemplateProfile) -> Result<String, String> {
+    let template = OverlayConfig::template_for_profile(profile);
     template
         .clone()
         .validate()
@@ -1058,6 +1137,7 @@ fn run_command(
 
     let mut runtime =
         NodeRuntime::from_config_path(&config_path).map_err(|error| error.to_string())?;
+    let recovery_state = OperatorStateManager::read_recovery_state(&config_path)?;
     let startup_timestamp = current_unix_ms()?;
     let mut operator_state = OperatorStateManager::acquire(
         &config_path,
@@ -1065,7 +1145,9 @@ fn run_command(
         startup_timestamp,
     )?;
 
-    if let Err(error) = runtime.startup(startup_timestamp) {
+    if let Err(error) =
+        runtime.startup_with_recovery_state(startup_timestamp, recovery_state.as_ref())
+    {
         let _ = operator_state.write_status(&runtime, 0, startup_timestamp);
         return Err(error.to_string());
     }
@@ -1145,9 +1227,20 @@ fn run_command(
     Ok(())
 }
 
-fn print_status_command(config_path: PathBuf) -> Result<(), String> {
-    let status = OperatorStateManager::read_status_file(&config_path)?;
-    println!("{status}");
+fn print_status_command(config_path: PathBuf, summary_only: bool) -> Result<(), String> {
+    let status = OperatorStateManager::read_status_value(&config_path)?;
+    let output = if summary_only {
+        status
+            .get("summary")
+            .cloned()
+            .ok_or_else(|| "persisted runtime status did not include a summary".to_string())?
+    } else {
+        status
+    };
+    println!(
+        "{}",
+        serde_json::to_string(&output).map_err(|error| error.to_string())?
+    );
     Ok(())
 }
 
@@ -1189,6 +1282,305 @@ fn print_status_snapshot(
     Ok(())
 }
 
+const DOCTOR_EXIT_WARN: u8 = 2;
+const DOCTOR_EXIT_FAIL: u8 = 3;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum DoctorResult {
+    Ok,
+    Warn,
+    Fail,
+}
+
+impl DoctorResult {
+    const fn exit_code(self) -> u8 {
+        match self {
+            Self::Ok => 0,
+            Self::Warn => DOCTOR_EXIT_WARN,
+            Self::Fail => DOCTOR_EXIT_FAIL,
+        }
+    }
+
+    fn escalate(&mut self, other: Self) {
+        let current = self.exit_code();
+        let next = other.exit_code();
+        if next > current {
+            *self = other;
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct DoctorCheck {
+    name: &'static str,
+    result: DoctorResult,
+    detail: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct DoctorReport {
+    kind: &'static str,
+    stage: &'static str,
+    config_path: String,
+    status_file: String,
+    result: DoctorResult,
+    exit_code: u8,
+    checks: Vec<DoctorCheck>,
+    summary: Option<Value>,
+}
+
+fn doctor_command(config_path: PathBuf) -> ExitCode {
+    let (report, exit_code) = build_doctor_report(&config_path);
+    match serde_json::to_string(&report) {
+        Ok(encoded) => println!("{encoded}"),
+        Err(error) => {
+            eprintln!("overlay-cli: failed to encode doctor report: {error}");
+            return ExitCode::from(1);
+        }
+    }
+    ExitCode::from(exit_code)
+}
+
+fn build_doctor_report(config_path: &Path) -> (DoctorReport, u8) {
+    let status_file = OperatorStateManager::status_file_path(config_path)
+        .unwrap_or_else(|_| config_path.to_path_buf());
+    let mut result = DoctorResult::Ok;
+    let mut checks = Vec::new();
+
+    let expected_node_id = match NodeRuntime::from_config_path(config_path) {
+        Ok(runtime) => {
+            checks.push(DoctorCheck {
+                name: "config",
+                result: DoctorResult::Ok,
+                detail: format!(
+                    "config loaded successfully for node_id {}",
+                    runtime.context().node_id()
+                ),
+            });
+            Some(runtime.context().node_id().to_string())
+        }
+        Err(error) => {
+            result.escalate(DoctorResult::Fail);
+            checks.push(DoctorCheck {
+                name: "config",
+                result: DoctorResult::Fail,
+                detail: error.to_string(),
+            });
+            None
+        }
+    };
+
+    let status_value = match OperatorStateManager::read_status_value(config_path) {
+        Ok(value) => {
+            checks.push(DoctorCheck {
+                name: "status_file",
+                result: DoctorResult::Ok,
+                detail: format!(
+                    "persisted runtime status loaded from {}",
+                    status_file.display()
+                ),
+            });
+            Some(value)
+        }
+        Err(error) => {
+            result.escalate(DoctorResult::Fail);
+            checks.push(DoctorCheck {
+                name: "status_file",
+                result: DoctorResult::Fail,
+                detail: error,
+            });
+            None
+        }
+    };
+
+    if let Some(status) = status_value.as_ref() {
+        if let (Some(expected_node_id), Some(status_node_id)) = (
+            expected_node_id.as_deref(),
+            status.pointer("/lifecycle/node_id").and_then(Value::as_str),
+        ) {
+            if expected_node_id == status_node_id {
+                checks.push(DoctorCheck {
+                    name: "node_id",
+                    result: DoctorResult::Ok,
+                    detail: format!(
+                        "config and persisted status agree on node_id {status_node_id}"
+                    ),
+                });
+            } else {
+                result.escalate(DoctorResult::Fail);
+                checks.push(DoctorCheck {
+                    name: "node_id",
+                    result: DoctorResult::Fail,
+                    detail: format!(
+                        "config resolved node_id {expected_node_id}, but persisted status belongs to {status_node_id}"
+                    ),
+                });
+            }
+        }
+
+        let clean_shutdown = status
+            .pointer("/lifecycle/clean_shutdown")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let pid = status.pointer("/lifecycle/pid").and_then(Value::as_u64);
+        let process_running = pid
+            .filter(|pid| *pid <= u32::MAX as u64)
+            .map(|pid| process_exists(pid as u32))
+            .unwrap_or(false);
+        let runtime_state = status
+            .pointer("/health/runtime/state")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown");
+        let active_peers = status
+            .pointer("/health/runtime/active_peers")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let accepted_sources = status
+            .pointer("/health/bootstrap/last_accepted_sources")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let restored_from_peer_cache = status
+            .pointer("/health/recovery/restored_from_peer_cache")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let recent_failures = status
+            .pointer("/summary/recent_failures")
+            .and_then(Value::as_array)
+            .map(|failures| failures.len())
+            .unwrap_or(0);
+        let recovered_from_unclean_shutdown = status
+            .pointer("/lifecycle/recovered_from_unclean_shutdown")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+
+        let process_check = if process_running {
+            DoctorCheck {
+                name: "process",
+                result: DoctorResult::Ok,
+                detail: "runtime appears active".to_string(),
+            }
+        } else if clean_shutdown {
+            result.escalate(DoctorResult::Warn);
+            DoctorCheck {
+                name: "process",
+                result: DoctorResult::Warn,
+                detail: "runtime is not currently active; last shutdown was clean".to_string(),
+            }
+        } else {
+            result.escalate(DoctorResult::Fail);
+            DoctorCheck {
+                name: "process",
+                result: DoctorResult::Fail,
+                detail:
+                    "runtime is not active and the last persisted status was not a clean shutdown"
+                        .to_string(),
+            }
+        };
+        checks.push(process_check);
+
+        let runtime_check = match runtime_state {
+            "running" if active_peers > 0 => DoctorCheck {
+                name: "runtime_state",
+                result: DoctorResult::Ok,
+                detail: format!("runtime is running with {active_peers} active peers"),
+            },
+            "degraded" => {
+                result.escalate(DoctorResult::Fail);
+                DoctorCheck {
+                    name: "runtime_state",
+                    result: DoctorResult::Fail,
+                    detail: "runtime is degraded and currently has no active peers".to_string(),
+                }
+            }
+            "shutting_down" if clean_shutdown => {
+                result.escalate(DoctorResult::Warn);
+                DoctorCheck {
+                    name: "runtime_state",
+                    result: DoctorResult::Warn,
+                    detail: "runtime status reflects a clean shutdown; restart the node for live service".to_string(),
+                }
+            }
+            other => {
+                result.escalate(DoctorResult::Warn);
+                DoctorCheck {
+                    name: "runtime_state",
+                    result: DoctorResult::Warn,
+                    detail: format!("runtime last reported state {other}"),
+                }
+            }
+        };
+        checks.push(runtime_check);
+
+        let bootstrap_check = if accepted_sources > 0 {
+            DoctorCheck {
+                name: "bootstrap",
+                result: DoctorResult::Ok,
+                detail: format!(
+                    "latest bootstrap attempt accepted {accepted_sources} configured source(s)"
+                ),
+            }
+        } else if restored_from_peer_cache && active_peers > 0 {
+            result.escalate(DoctorResult::Warn);
+            DoctorCheck {
+                name: "bootstrap",
+                result: DoctorResult::Warn,
+                detail: "live bootstrap is currently unavailable; runtime recovered from the persisted peer cache and will keep retrying bootstrap".to_string(),
+            }
+        } else {
+            result.escalate(DoctorResult::Fail);
+            DoctorCheck {
+                name: "bootstrap",
+                result: DoctorResult::Fail,
+                detail: "no bootstrap source was accepted and no recoverable active peers were available".to_string(),
+            }
+        };
+        checks.push(bootstrap_check);
+
+        if recovered_from_unclean_shutdown {
+            result.escalate(DoctorResult::Warn);
+            checks.push(DoctorCheck {
+                name: "shutdown_recovery",
+                result: DoctorResult::Warn,
+                detail: "runtime recovered after a previous unclean shutdown; inspect recent failures before regular use".to_string(),
+            });
+        }
+
+        if recent_failures > 0 {
+            result.escalate(DoctorResult::Warn);
+            checks.push(DoctorCheck {
+                name: "recent_failures",
+                result: DoctorResult::Warn,
+                detail: format!(
+                    "status summary includes {recent_failures} recent failure record(s)"
+                ),
+            });
+        } else {
+            checks.push(DoctorCheck {
+                name: "recent_failures",
+                result: DoctorResult::Ok,
+                detail: "no recent failure records were captured in the persisted summary"
+                    .to_string(),
+            });
+        }
+    }
+
+    let exit_code = result.exit_code();
+    (
+        DoctorReport {
+            kind: "runtime_doctor",
+            stage: REPOSITORY_STAGE,
+            config_path: config_path.display().to_string(),
+            status_file: status_file.display().to_string(),
+            result,
+            exit_code,
+            checks,
+            summary: status_value.and_then(|status| status.get("summary").cloned()),
+        },
+        exit_code,
+    )
+}
+
 fn current_unix_ms() -> Result<u64, String> {
     Ok(SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1226,8 +1618,11 @@ fn print_usage() {
     println!("overlay-cli: {}", REPOSITORY_STAGE);
     println!("usage:");
     println!("  overlay-cli");
-    println!("  overlay-cli config-template [--output <path>]");
-    println!("  overlay-cli status --config <path>");
+    println!(
+        "  overlay-cli config-template [--output <path>] [--profile <user-node|relay-capable|bootstrap-seed>]"
+    );
+    println!("  overlay-cli status --config <path> [--summary]");
+    println!("  overlay-cli doctor --config <path>");
     println!(
         "  overlay-cli run --config <path> [--tick-ms <ms>] [--max-ticks <count>] [--status-every <ticks>] [--dial <tcp://host:port> ...] [--service <namespace:name[:version]> ...]"
     );
@@ -1264,7 +1659,10 @@ mod tests {
         parse_command, render_config_template, write_config_template_file, Command,
         LocalServiceSpec,
     };
-    use overlay_core::{config::OverlayConfig, identity::NodeId};
+    use overlay_core::{
+        config::{ConfigTemplateProfile, OverlayConfig},
+        identity::NodeId,
+    };
 
     #[test]
     fn parse_command_defaults_to_stage() {
@@ -1311,6 +1709,7 @@ mod tests {
             .unwrap(),
             Command::Status {
                 config_path: PathBuf::from("devnet/configs/node-a.json"),
+                summary_only: false,
             }
         );
     }
@@ -1327,19 +1726,72 @@ mod tests {
             .unwrap(),
             Command::ConfigTemplate {
                 output_path: Some(PathBuf::from("configs/node.json")),
+                profile: ConfigTemplateProfile::UserNode,
             }
         );
     }
 
     #[test]
     fn render_config_template_matches_overlay_core_template() {
-        let rendered = render_config_template().expect("config template should render");
+        let rendered = render_config_template(ConfigTemplateProfile::UserNode)
+            .expect("config template should render");
         let parsed: OverlayConfig =
             serde_json::from_str(&rendered).expect("rendered template should parse");
         assert_eq!(parsed, OverlayConfig::template());
         parsed
             .validate()
             .expect("rendered template should remain valid");
+    }
+
+    #[test]
+    fn parse_command_parses_config_template_profile_flag() {
+        assert_eq!(
+            parse_command([
+                OsString::from("overlay-cli"),
+                OsString::from("config-template"),
+                OsString::from("--profile"),
+                OsString::from("relay-capable"),
+            ])
+            .unwrap(),
+            Command::ConfigTemplate {
+                output_path: None,
+                profile: ConfigTemplateProfile::RelayCapable,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_command_parses_status_summary_flag() {
+        assert_eq!(
+            parse_command([
+                OsString::from("overlay-cli"),
+                OsString::from("status"),
+                OsString::from("--config"),
+                OsString::from("devnet/configs/node-a.json"),
+                OsString::from("--summary"),
+            ])
+            .unwrap(),
+            Command::Status {
+                config_path: PathBuf::from("devnet/configs/node-a.json"),
+                summary_only: true,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_command_parses_doctor_flags() {
+        assert_eq!(
+            parse_command([
+                OsString::from("overlay-cli"),
+                OsString::from("doctor"),
+                OsString::from("--config"),
+                OsString::from("devnet/configs/node-a.json"),
+            ])
+            .unwrap(),
+            Command::Doctor {
+                config_path: PathBuf::from("devnet/configs/node-a.json"),
+            }
+        );
     }
 
     #[test]

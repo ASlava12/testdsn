@@ -2,10 +2,9 @@
 
 Run the following commands when applicable.
 
-## Current Milestone 20 sign-off path
+## Current Milestone 21 sign-off path
 
-Use the current regular-distributed-use sign-off order on the commit you
-intend to
+Use the current first-user-runtime sign-off order on the commit you intend to
 validate:
 
 ```bash
@@ -98,9 +97,9 @@ cargo test -p overlay-core --test integration_service_open
 ```
 
 Use this only when you need the older localhost rehearsal path for the landed
-Milestone 18 baseline. It is not part of current Milestone 20 sign-off.
+Milestone 18 baseline. It is not part of current Milestone 21 sign-off.
 
-## Milestone 20 regular-distributed-use checklist
+## Current distributed pilot checklist
 
 ```bash
 ./devnet/run-distributed-pilot-checklist.sh
@@ -128,6 +127,7 @@ TMPDIR=/tmp cargo test -p overlay-core --test integration_service_open
 ./devnet/run-distributed-smoke.sh
 ./devnet/run-multihost-smoke.sh
 ./devnet/run-soak.sh
+./devnet/run-doctor-smoke.sh
 ./devnet/run-restart-smoke.sh
 ./devnet/run-distributed-pilot-checklist.sh
 ```
@@ -166,6 +166,12 @@ or
 
 ```bash
 ./devnet/run-multihost-smoke.sh
+```
+
+## Milestone 21 doctor/self-check smoke
+
+```bash
+./devnet/run-doctor-smoke.sh
 ```
 
 ## Milestone 5 regression runs
@@ -222,10 +228,9 @@ cargo test -p overlay-core --test integration_service_open
 
 - Milestones 1-12 are considered implemented baseline work, and the current
   repository stage marker is
-  `milestone-20-regular-distributed-use-closure` (Milestone 20 regular
-  distributed use closure support on top of the landed Milestone 19 pilot
-  closure baseline).
-- The current sign-off path is the top-level Milestone 20 section above:
+  `milestone-21-first-user-runtime` (Milestone 21 first-user runtime support
+  on top of the landed Milestone 20 regular distributed use closure baseline).
+- The current sign-off path is the top-level Milestone 21 section above:
   workspace format/lint/build/test, then `./devnet/run-launch-gate.sh`, then
   `./devnet/run-distributed-pilot-checklist.sh`.
 - Use the Milestone 1-12 regression runs, stage-boundary smoke tests, the
@@ -281,11 +286,13 @@ cargo test -p overlay-core --test integration_service_open
   the required launch order.
 - `./devnet/run-pilot-checklist.sh` remains the Milestone 18 localhost
   rehearsal pack for the smoke-harness pilot boundary; it is retained for the
-  landed baseline but is not the current Milestone 20 sign-off path.
-- `./devnet/run-distributed-pilot-checklist.sh` is the current Milestone 20
-  regular-distributed-use proof path for the dedicated pilot topology pack,
-  the expanded fault matrix, the repeated relay-bind evidence, and the
+  landed baseline but is not the current Milestone 21 sign-off path.
+- `./devnet/run-distributed-pilot-checklist.sh` remains the current distributed
+  proof path for the dedicated pilot topology pack, the expanded fault matrix,
+  the repeated relay-bind evidence, and the
   unavailable/integrity/stale/empty pinned-bootstrap diagnostics.
+- `./devnet/run-doctor-smoke.sh` is the current Milestone 21 operator-surface
+  proof for `overlay-cli doctor` against a live runtime.
 - The Milestone 12 soak path also stays in-process and advances logical time
   through repeated runtime ticks so stale-session/service/relay/probe cleanup,
   bootstrap retry, and health snapshots can be exercised without a separate
@@ -293,6 +300,8 @@ cargo test -p overlay-core --test integration_service_open
 - `overlay-cli run --status-every <ticks>` now emits JSON health snapshots with
   runtime counts, observability counters, relay usage, cleanup totals, and
   resource-limit surfaces for a single node.
+- `overlay-cli status --summary` now emits the persisted operator summary with
+  peer/bootstrap/presence/service/relay sections and recent failure excerpts.
 - `./devnet/run-distributed-smoke.sh` now also validates network bootstrap over
   `http://` before listener bind, outbound dial, accept, and handshake-backed
   session establishment across separate localhost processes.

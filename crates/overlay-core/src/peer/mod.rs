@@ -150,6 +150,10 @@ impl PeerStore {
             .filter(|neighbor| neighbor.state == NeighborState::Active)
     }
 
+    pub fn active_neighbor_entries(&self) -> Vec<NeighborStateEntry> {
+        self.active_neighbors().cloned().collect()
+    }
+
     pub fn candidate_neighbors(&self) -> impl Iterator<Item = &NeighborStateEntry> {
         self.neighbors
             .values()
@@ -187,6 +191,32 @@ impl PeerStore {
                 Err(error)
             }
         }
+    }
+
+    pub fn restore_bootstrap_neighbors(
+        &mut self,
+        entries: impl IntoIterator<Item = NeighborStateEntry>,
+        now_unix_s: u64,
+    ) -> Vec<NodeId> {
+        self.neighbors.clear();
+        for entry in entries {
+            self.neighbors.insert(
+                entry.node_id,
+                NeighborStateEntry {
+                    node_id: entry.node_id,
+                    transport_classes: entry.transport_classes,
+                    capabilities: entry.capabilities,
+                    dial_hints: entry.dial_hints,
+                    observed_role: entry.observed_role,
+                    source: NeighborSource::Bootstrap,
+                    state: NeighborState::Candidate,
+                    selection_reason: None,
+                    selected_transport_class: None,
+                    last_updated_unix_s: now_unix_s,
+                },
+            );
+        }
+        self.rebalance()
     }
 
     fn upsert_bootstrap_peer(&mut self, peer: BootstrapPeer, now_unix_s: u64) {

@@ -86,7 +86,7 @@ Do not add by default:
   conservative bootstrap retry, runtime health snapshots, status dumps, and the
   logical soak path.
 - The current repository stage marker is
-  `milestone-20-regular-distributed-use-closure`.
+  `milestone-21-first-user-runtime`.
 - Milestone 14 launch gate and pilot tag remains part of the landed pilot
   baseline.
 - Milestone 16 network bootstrap and multi-host devnet is implemented with
@@ -107,7 +107,7 @@ Do not add by default:
   `http://...#sha256=<pin>` bootstrap-artifact integrity checks,
   `devnet/run-distributed-pilot-checklist.sh`, and synchronized post-pilot
   closure docs.
-- Milestone 20 regular distributed use closure is the current stage with
+- Milestone 20 regular distributed use closure is part of the landed baseline with
   per-source bootstrap diagnostics on the runtime status surface, preferred
   retry/fallback ordering across configured bootstrap sources, expanded
   localhost checklist proof for unavailable/integrity/stale/empty bootstrap
@@ -115,11 +115,17 @@ Do not add by default:
   topology, and reproducible `--evidence-dir` wrappers for the distributed
   smoke and pilot checklist. This stage still does not claim
   hostile-environment or public-production readiness.
+- Milestone 21 first-user runtime is the current stage with bounded restart
+  recovery from the last-known active bootstrap peers, continued bootstrap
+  retry after peer-cache recovery, `overlay-cli status --summary`,
+  `overlay-cli doctor`, stable first-user example profiles, and more
+  actionable config validation. This stage still does not claim
+  hostile-environment or public-production readiness.
 
 For normal work, touch Milestones 1-12 only for regression fixes, spec
 mismatches, vector maintenance, validation maintenance, or launch-maintenance
 updates unless the task explicitly reopens that stage. Treat current-stage work as narrow
-`milestone-20-regular-distributed-use-closure` work, not as a restart from
+`milestone-21-first-user-runtime` work, not as a restart from
 earlier milestones.
 
 ## 3. Change policy

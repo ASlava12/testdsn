@@ -7,11 +7,12 @@ This file is the execution plan for Codex.
 The repository has a closed Milestone 1-12 baseline, a landed Milestone 14
 pilot launch gate, a landed Milestone 16 network-bootstrap stage, a landed
 Milestone 17 operator-runtime stage, a landed Milestone 18 real-pilot stage,
-and the current Milestone 20 regular-distributed-use-closure stage.
+the landed Milestone 20 regular-distributed-use-closure stage, and the current
+Milestone 21 first-user-runtime stage.
 The current repository stage marker is
-`milestone-20-regular-distributed-use-closure`.
+`milestone-21-first-user-runtime`.
 
-## Current regular-distributed-use green path
+## Current first-user-runtime green path
 
 Treat the current stage as having one localhost sign-off flow:
 
@@ -171,6 +172,18 @@ rehearsal only. It is not the current sign-off path.
   reproducible `--evidence-dir` support for the distributed smoke and pilot
   checklist. The repository stage marker now advances to
   `milestone-20-regular-distributed-use-closure`.
+- Milestone 21 first-user-runtime support is now implemented in
+  `crates/overlay-core/src/runtime.rs`, `crates/overlay-core/src/peer/mod.rs`,
+  `crates/overlay-cli/src/main.rs`, `crates/overlay-cli/src/operator_state.rs`,
+  `crates/overlay-core/src/config.rs`, `devnet/run-doctor-smoke.sh`,
+  `devnet/run-restart-smoke.sh`, `docs/CONFIG_EXAMPLES.md`, and the current
+  runbook/status docs, with bounded restart recovery from the last-known active
+  bootstrap peers, continued bootstrap retry after peer-cache recovery,
+  persisted status summaries with peer/bootstrap/presence/service/relay
+  sections, the `overlay-cli doctor` self-check surface and exit codes, stable
+  first-user example profiles, and more actionable config validation. The
+  repository stage marker now advances to
+  `milestone-21-first-user-runtime`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -178,9 +191,9 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Use `prompts/codex-milestone-20.md` as the recommended next-task prompt for the
-current `milestone-20-regular-distributed-use-closure` stage and keep work
-conservative from the current regular-distributed-use boundary:
+Use `prompts/codex-milestone-21.md` as the recommended next-task prompt for the
+current `milestone-21-first-user-runtime` stage and keep work conservative from
+the current first-user-runtime boundary:
 
 1. preserve the current launch surface documented in
    `docs/LAUNCH_CHECKLIST.md`, `docs/RUNBOOK.md`, `docs/DEVNET.md`,
@@ -701,3 +714,45 @@ pilot-only operating model.
   order, and remaining limitations without source-code spelunking;
 - validation and status docs report the same Milestone 20 stage marker and
   narrower remaining blockers.
+
+## Milestone 21 — first-user runtime
+
+Status: current repository stage.
+
+### Goal
+Make the current runtime usable for first users without widening protocol
+scope: preserve the smallest practical local recovery state, improve operator
+visibility, and make configs runnable without repository spelunking.
+
+### Tasks
+1. Recover the smallest practical local runtime state on restart, centered on
+   last-known active bootstrap peers, without introducing a database or broad
+   persistence layer.
+2. Keep bootstrap retries active after peer-cache recovery so live bootstrap
+   health can recover without manual rebuild.
+3. Add concise operator surfaces through `overlay-cli status --summary` and
+   `overlay-cli doctor`.
+4. Define stable first-user config examples and profile-aware config-template
+   output for `user-node`, `relay-capable`, and `bootstrap-seed`.
+5. Update validation, runbooks, troubleshooting, and stage-marker docs to the
+   Milestone 21 boundary.
+
+### Important constraints
+- Do not add protocol layers, a database, or a general control plane.
+- Keep recovery bounded to conservative local state and document the
+  assumptions explicitly.
+- Do not change wire, handshake, record, quota, or routing semantics unless a
+  concrete bug requires it.
+- Keep operator outputs machine-readable and explicit about degraded or
+  recovered states.
+
+### Done when
+- a restarted node can recover from the last-known active bootstrap peers when
+  live bootstrap is temporarily unavailable, and status surfaces make that
+  recovery explicit;
+- the launch gate includes a doctor/self-check proof and the restart smoke
+  proves peer-cache recovery;
+- the config examples and `overlay-cli config-template` surface map cleanly to
+  first-user roles without source-code reading;
+- validation and status docs report the same Milestone 21 stage marker and the
+  narrower remaining first-user blockers.

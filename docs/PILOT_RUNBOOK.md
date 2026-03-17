@@ -1,7 +1,6 @@
 # Pilot Runbook
 
-This runbook defines the Milestone 20 regular-distributed-use-closure
-exercise.
+This runbook defines the Milestone 21 first-user-runtime distributed exercise.
 
 It extends the landed Milestone 18 pilot pack with minimal distributed
 operator surfaces, two relay-capable fallback paths, conservative bootstrap
@@ -29,6 +28,8 @@ Use this runbook to prove:
   scenarios;
 - per-source bootstrap diagnostics through
   `runtime_status.health.bootstrap.last_attempt_summary` and `last_sources`;
+- persisted status summaries through `overlay-cli status --summary`;
+- local self-diagnosis through `overlay-cli doctor --config <path>`;
 - an operator-collected off-box report with exact hosts, date, and commit SHA.
 
 Current pilot limits remain in force:
@@ -40,7 +41,8 @@ Current pilot limits remain in force:
   system;
 - lookup remains exact-by-`node_id` only and service resolution remains
   exact-by-`app_id` only;
-- peers, presence, services, sessions, relay tunnels, and path probes remain
+- only the last-known active bootstrap peers are recovered across restart;
+  presence, services, sessions, relay tunnels, and path probes still remain
   in-memory runtime state;
 - this runbook still does not claim hostile-environment or public-Internet
   deployment readiness.
@@ -146,13 +148,18 @@ Files:
    TMPDIR=/tmp cargo run -p overlay-cli -- status --config /path/to/node-a.json
    ```
 
-5. Use [devnet/run-multihost-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-multihost-smoke.sh)
+5. Run the local doctor surface against at least one live node:
+
+   ```bash
+   TMPDIR=/tmp cargo run -p overlay-cli -- doctor --config /path/to/node-a.json
+   ```
+
+6. Use [devnet/run-multihost-smoke.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-multihost-smoke.sh)
    as the repo-local proof for bootstrap plus real networked operator flows on
    the host-style config pack.
 
-6. Use [devnet/run-distributed-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-pilot-checklist.sh)
-   as the localhost proof for the current Milestone 20
-   regular-distributed-use checklist. Use `--evidence-dir <dir>` when you want
+7. Use [devnet/run-distributed-pilot-checklist.sh](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/devnet/run-distributed-pilot-checklist.sh)
+   as the localhost proof for the current distributed checklist. Use `--evidence-dir <dir>` when you want
    the wrapper to preserve the raw logs and status files automatically.
 
 ## Distributed operator flow
@@ -290,6 +297,8 @@ Record all eight scenarios in the pilot report:
 - the raw off-box `publish`, `lookup`, `open-service`, and both `relay-intro`
   command outputs
 - per-host `overlay-cli status --config ...` JSON snapshots
+- per-host `overlay-cli status --config ... --summary` excerpts
+- at least one `overlay-cli doctor --config ...` output from a live node
 - bootstrap status excerpts showing `last_attempt_summary` and `last_sources`
   for any degraded or fallback startup
 - lookup latency values from the `lookup` command
@@ -297,9 +306,9 @@ Record all eight scenarios in the pilot report:
 - service restart evidence from the persisted status JSON
 - tampered-bootstrap rejection logs
 
-## Remaining closure items for regular distributed use
+## Remaining closure items for first-user runtime
 
-- The localhost checklist is the current Milestone 20 green path, but it still
+- The localhost checklist is the current Milestone 21 green path, but it still
   does not replace the required off-box pilot evidence on separate hosts for a
   release note.
 - Bootstrap remains static pinned `http://` artifact delivery; operators must
@@ -307,7 +316,7 @@ Record all eight scenarios in the pilot report:
 - The distributed operator commands remain one-shot proof surfaces, not a
   general control plane or distributed discovery layer.
 - Runtime peers, presence, services, sessions, relay tunnels, and path probes
-  still reset on restart.
+  still reset on restart except for the bounded active-peer bootstrap cache.
 - Relay proof remains bounded to the checked-in two-relay topology rather than
   arbitrary relay graphs or public-network conditions.
 

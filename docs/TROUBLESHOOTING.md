@@ -25,11 +25,19 @@ status surface:
 TMPDIR=/tmp cargo run -p overlay-cli -- status --config <config-path>
 ```
 
+For the concise operator summary and a machine-readable self-check:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- status --config <config-path> --summary
+TMPDIR=/tmp cargo run -p overlay-cli -- doctor --config <config-path>
+```
+
 ## Matrix
 
 | Symptom | Real signals to inspect | Likely cause in the current repo | Action |
 | --- | --- | --- | --- |
 | Bootstrap failure | `health.runtime.state == "degraded"`, `health.bootstrap.last_accepted_sources == 0`, and `health.bootstrap.last_attempt_summary` or `last_sources` show `unavailable`, `integrity_mismatch`, `stale`, `empty_peer_set`, or `rejected` | missing file, invalid JSON, expired bootstrap seed, empty peer list, unsupported source such as `https://...`, schema rejection, or a SHA-256 pin mismatch on `http://...#sha256=<hex>` | fix the specific source called out in `last_sources`; use only local `.json`, `file:`, or static pinned `http://...` sources; rerun with `--max-ticks 0 --status-every 1` first |
+| Bootstrap recovered from cache | `summary.bootstrap.state == "recovered_from_peer_cache"`, `health.recovery.restored_from_peer_cache == true`, and `health.bootstrap.last_accepted_sources == 0` | all configured bootstrap sources are currently unavailable, but the runtime recovered from the persisted active-peer cache | treat the node as usable but not healthy; restore at least one configured bootstrap source and watch `overlay-cli doctor` move back to `result=ok` |
 | Lookup timeout or `not_found` | external caller waits, or `overlay-cli lookup` returns `not_found`; if you have observability around a lookup call, `lookup_node` results are `missing`, `negative_cache_hit`, or `budget_exhausted` | the target runtime does not have the record in its local rendezvous store, the publish was sent to a different runtime, or the exact `node_id` is wrong | first reproduce with `overlay-cli lookup --config <path> --target <tcp://host:port> --node-id <hex>` against the runtime that received the publish; if it still fails, fix publish target, exact ID, or record freshness first |
 | Relay quota rejection | relay log `resolve_intro`=`rejected_rate_limited`, relay log `bind_tunnel`=`rejected`, `health.metrics.dropped_rate_limited_total` increments, `health.relay.active_tunnels` or `recent_intro_requests` approaches `health.resource_limits` | intro request or tunnel quota hit, or relay mode is disabled on that node | use a node with `relay_mode: true`; reduce concurrent relay load; confirm the relay-enabled config was actually the one started |
 | Service policy denial | service log `open_app_session`=`rejected_policy` | local service policy is deny-all in the embedding or harness | the stock JSON schema cannot change this; inspect the caller code that registers the service because checked-in configs alone cannot produce allow or deny policy changes |
@@ -50,6 +58,8 @@ TMPDIR=/tmp cargo run -p overlay-cli -- status --config <config-path>
   expired or timing-invalid.
 - `health.bootstrap.last_sources[].result=empty_peer_set`: the artifact
   validated but contained zero peers.
+- `peer_cache_recovery=restored`: startup recovered from the persisted
+  active-peer cache because live bootstrap sources were unavailable.
 - `state_transition=degraded`: no active peers are currently available.
 - `state_transition=running`: at least one active peer is available.
 - `publish_presence=stored|replaced|duplicate|stale`: local presence publish
@@ -73,3 +83,5 @@ TMPDIR=/tmp cargo run -p overlay-cli -- status --config <config-path>
 - `overlay-cli run` now handles `SIGINT` and `SIGTERM` gracefully, but any
   crash or hard kill will leave `.overlay-runtime/` marked as an unclean exit
   until the next startup recovers it.
+- `overlay-cli doctor` uses only local config, status, and process state; it
+  does not probe the overlay through a new control socket.

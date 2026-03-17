@@ -1,7 +1,7 @@
 # Host-Style Devnet Layouts
 
 This directory contains the Milestone 16 host-style devnet assets carried into
-the current Milestone 20 regular-distributed-use-closure stage.
+the current Milestone 21 first-user-runtime stage.
 
 ## Layouts
 

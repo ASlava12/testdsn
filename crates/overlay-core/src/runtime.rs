@@ -10,7 +10,7 @@ use std::{
 };
 
 use getrandom::getrandom;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest as ShaDigest, Sha256};
 use thiserror::Error;
 
@@ -26,7 +26,7 @@ use crate::{
     error::{PresenceVerificationError, RecordEncodingError, ServiceVerificationError},
     identity::{derive_app_id, derive_node_id, NodeId},
     metrics::{LogComponent, LogContext, MetricsSnapshot, Observability},
-    peer::{PeerStore, PeerStoreError},
+    peer::{NeighborStateEntry, PeerStore, PeerStoreError},
     records::ServiceRecord,
     relay::{
         IntroResponseStatus, RelayCleanupSummary, RelayError, RelayManager, RelayUsageSnapshot,
@@ -76,7 +76,7 @@ pub enum NodeRuntimeState {
 }
 
 impl NodeRuntimeState {
-    const fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Init => "init",
             Self::Bootstrapping => "bootstrapping",
@@ -112,6 +112,7 @@ pub struct NodeRuntimeSnapshot {
     pub state: NodeRuntimeState,
     pub node_id: NodeId,
     pub active_peers: usize,
+    pub candidate_peers: usize,
     pub managed_sessions: usize,
     pub tracked_paths: usize,
     pub selected_path_id: Option<u64>,
@@ -238,16 +239,49 @@ pub struct NodeRuntimeMaintenancePolicy {
     pub path_probe_timeout_ms: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+pub struct NodeRuntimePresenceSnapshot {
+    pub local_record_present: bool,
+    pub local_record_expires_at_unix_s: Option<u64>,
+    pub next_refresh_unix_s: Option<u64>,
+    pub published_records: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+pub struct NodeRuntimeServiceSnapshot {
+    pub registered_services: usize,
+    pub open_sessions: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+pub struct NodeRuntimeRecoverySnapshot {
+    pub restored_from_peer_cache: bool,
+    pub restored_active_peers: usize,
+    pub recoverable_active_peers: usize,
+    pub last_recovered_unix_ms: Option<u64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NodeRuntimeHealthSnapshot {
     pub runtime: NodeRuntimeSnapshot,
     pub total_peers: usize,
     pub metrics: MetricsSnapshot,
     pub relay: RelayUsageSnapshot,
+    pub presence: NodeRuntimePresenceSnapshot,
+    pub services: NodeRuntimeServiceSnapshot,
+    pub recovery: NodeRuntimeRecoverySnapshot,
     pub resource_limits: NodeRuntimeResourceLimits,
     pub maintenance_policy: NodeRuntimeMaintenancePolicy,
     pub cleanup_totals: RuntimeCleanupTotals,
     pub bootstrap: BootstrapRuntimeStatus,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RuntimeRecoveryState {
+    pub version: u8,
+    pub node_id: NodeId,
+    pub saved_at_unix_ms: u64,
+    pub active_neighbors: Vec<NeighborStateEntry>,
 }
 
 #[derive(Debug, Error)]
@@ -487,6 +521,7 @@ pub struct NodeRuntime {
     last_tick_unix_ms: Option<u64>,
     cleanup_totals: RuntimeCleanupTotals,
     bootstrap_status: BootstrapRuntimeStatus,
+    recovery_snapshot: NodeRuntimeRecoverySnapshot,
 }
 
 impl NodeRuntime {
@@ -508,6 +543,7 @@ impl NodeRuntime {
                 configured_sources,
                 ..BootstrapRuntimeStatus::default()
             },
+            recovery_snapshot: NodeRuntimeRecoverySnapshot::default(),
         };
         runtime.log_state_transition(current_unix_ms(), NodeRuntimeState::Init);
         runtime
@@ -573,6 +609,7 @@ impl NodeRuntime {
             state: self.state,
             node_id: self.context.node_id,
             active_peers: self.context.peer_store.active_neighbors().count(),
+            candidate_peers: self.context.peer_store.candidate_neighbors().count(),
             managed_sessions: self.managed_sessions.len(),
             tracked_paths: self.context.path_states.len(),
             selected_path_id: self.context.route_selector.current_path_id(),
@@ -590,10 +627,22 @@ impl NodeRuntime {
             total_peers: self.context.peer_store.neighbor_count(),
             metrics: self.context.observability.metrics().clone(),
             relay: self.context.relay_manager.usage_snapshot(),
+            presence: self.presence_snapshot(),
+            services: self.service_snapshot(),
+            recovery: self.recovery_snapshot(),
             resource_limits: self.resource_limits(),
             maintenance_policy: self.maintenance_policy(),
             cleanup_totals: self.cleanup_totals,
             bootstrap: self.bootstrap_status.clone(),
+        }
+    }
+
+    pub fn recovery_state_snapshot(&self, timestamp_unix_ms: u64) -> RuntimeRecoveryState {
+        RuntimeRecoveryState {
+            version: 1,
+            node_id: self.context.node_id,
+            saved_at_unix_ms: timestamp_unix_ms,
+            active_neighbors: self.context.peer_store.active_neighbor_entries(),
         }
     }
 
@@ -645,12 +694,23 @@ impl NodeRuntime {
     }
 
     pub fn startup(&mut self, timestamp_unix_ms: u64) -> Result<(), NodeRuntimeError> {
+        self.startup_with_recovery_state(timestamp_unix_ms, None)
+    }
+
+    pub fn startup_with_recovery_state(
+        &mut self,
+        timestamp_unix_ms: u64,
+        recovery_state: Option<&RuntimeRecoveryState>,
+    ) -> Result<(), NodeRuntimeError> {
         self.ensure_state("startup", self.state == NodeRuntimeState::Init)?;
         self.log_state_transition(timestamp_unix_ms, NodeRuntimeState::Bootstrapping);
 
         self.bind_tcp_listener(timestamp_unix_ms)?;
         let now_unix_s = unix_ms_to_s(timestamp_unix_ms);
-        self.refresh_bootstrap_sources(timestamp_unix_ms, now_unix_s)?;
+        let accepted_sources = self.refresh_bootstrap_sources(timestamp_unix_ms, now_unix_s)?;
+        if accepted_sources == 0 {
+            self.restore_recovery_state(recovery_state, timestamp_unix_ms, now_unix_s);
+        }
         self.sync_active_peer_gauge();
         self.sync_operating_state(timestamp_unix_ms);
         Ok(())
@@ -1080,6 +1140,36 @@ impl NodeRuntime {
         }
     }
 
+    fn presence_snapshot(&self) -> NodeRuntimePresenceSnapshot {
+        let local_record = self
+            .context
+            .local_presence
+            .as_ref()
+            .map(|record| record.record());
+        NodeRuntimePresenceSnapshot {
+            local_record_present: local_record.is_some(),
+            local_record_expires_at_unix_s: local_record.map(|record| record.expires_at_unix_s),
+            next_refresh_unix_s: self.context.next_presence_refresh_unix_s,
+            published_records: self.context.rendezvous.published_record_count(),
+        }
+    }
+
+    fn service_snapshot(&self) -> NodeRuntimeServiceSnapshot {
+        NodeRuntimeServiceSnapshot {
+            registered_services: self.context.service_registry.registered_service_count(),
+            open_sessions: self.context.service_registry.open_session_count(),
+        }
+    }
+
+    fn recovery_snapshot(&self) -> NodeRuntimeRecoverySnapshot {
+        NodeRuntimeRecoverySnapshot {
+            restored_from_peer_cache: self.recovery_snapshot.restored_from_peer_cache,
+            restored_active_peers: self.recovery_snapshot.restored_active_peers,
+            recoverable_active_peers: self.context.peer_store.active_neighbors().count(),
+            last_recovered_unix_ms: self.recovery_snapshot.last_recovered_unix_ms,
+        }
+    }
+
     fn maintenance_policy(&self) -> NodeRuntimeMaintenancePolicy {
         NodeRuntimeMaintenancePolicy {
             bootstrap_retry_interval_ms: self.bootstrap_retry_interval_ms(),
@@ -1158,7 +1248,7 @@ impl NodeRuntime {
         timestamp_unix_ms: u64,
         now_unix_s: u64,
     ) -> Result<usize, NodeRuntimeError> {
-        if self.state != NodeRuntimeState::Degraded {
+        if self.bootstrap_status.last_accepted_sources > 0 {
             return Ok(0);
         }
 
@@ -1196,6 +1286,74 @@ impl NodeRuntime {
             },
         );
         Ok(accepted_sources)
+    }
+
+    fn restore_recovery_state(
+        &mut self,
+        recovery_state: Option<&RuntimeRecoveryState>,
+        timestamp_unix_ms: u64,
+        now_unix_s: u64,
+    ) {
+        let Some(recovery_state) = recovery_state else {
+            self.context.observability.push_log(
+                allocate_log_context(
+                    &mut self.next_correlation_id,
+                    self.context.node_id,
+                    timestamp_unix_ms,
+                ),
+                LogComponent::Runtime,
+                "peer_cache_recovery",
+                "missing",
+            );
+            return;
+        };
+
+        if recovery_state.node_id != self.context.node_id {
+            self.context.observability.push_log(
+                allocate_log_context(
+                    &mut self.next_correlation_id,
+                    self.context.node_id,
+                    timestamp_unix_ms,
+                ),
+                LogComponent::Runtime,
+                "peer_cache_recovery",
+                "rejected_node_id_mismatch",
+            );
+            return;
+        }
+
+        let restored = self
+            .context
+            .peer_store
+            .restore_bootstrap_neighbors(recovery_state.active_neighbors.clone(), now_unix_s)
+            .len();
+        if restored == 0 {
+            self.context.observability.push_log(
+                allocate_log_context(
+                    &mut self.next_correlation_id,
+                    self.context.node_id,
+                    timestamp_unix_ms,
+                ),
+                LogComponent::Runtime,
+                "peer_cache_recovery",
+                "empty",
+            );
+            return;
+        }
+
+        self.recovery_snapshot.restored_from_peer_cache = true;
+        self.recovery_snapshot.restored_active_peers = restored;
+        self.recovery_snapshot.last_recovered_unix_ms = Some(timestamp_unix_ms);
+        self.context.observability.push_log(
+            allocate_log_context(
+                &mut self.next_correlation_id,
+                self.context.node_id,
+                timestamp_unix_ms,
+            ),
+            LogComponent::Runtime,
+            "peer_cache_recovery",
+            "restored",
+        );
     }
 
     fn bootstrap_source_attempt_order(&self) -> Vec<usize> {
@@ -2697,10 +2855,7 @@ mod tests {
             .startup(START_UNIX_MS)
             .expect("startup should succeed");
 
-        assert_eq!(
-            REPOSITORY_STAGE,
-            "milestone-20-regular-distributed-use-closure"
-        );
+        assert_eq!(REPOSITORY_STAGE, "milestone-21-first-user-runtime");
         assert_eq!(runtime.state(), NodeRuntimeState::Running);
         assert_eq!(
             runtime.context().node_id(),
@@ -3065,6 +3220,82 @@ mod tests {
         assert_eq!(
             refreshed_status.last_sources[1].result,
             BootstrapSourceResult::Unavailable
+        );
+    }
+
+    #[test]
+    fn startup_recovers_active_peers_from_cached_state_and_keeps_retrying_bootstrap() {
+        let dir = unique_test_dir("runtime-peer-cache-recovery");
+        let key_path = dir.join("node.key");
+        let good_config_path = dir.join("good-overlay-config.json");
+        let recovery_config_path = dir.join("recovery-overlay-config.json");
+        let bootstrap_path = dir.join("bootstrap.json");
+        let missing_bootstrap_path = dir.join("missing-bootstrap.json");
+        let signing_key = Ed25519SigningKey::from_seed([39_u8; 32]);
+        let mut config = sample_config("node.key", vec!["bootstrap.json".to_string()]);
+        config.presence_ttl_s = 20;
+
+        fs::write(&key_path, signing_key.as_bytes()).expect("key file should be written");
+        write_json(&bootstrap_path, &sample_bootstrap_response())
+            .expect("bootstrap file should be written");
+        write_json(&good_config_path, &config).expect("config file should be written");
+        let mut recovery_config =
+            sample_config("node.key", vec!["missing-bootstrap.json".to_string()]);
+        recovery_config.presence_ttl_s = 20;
+        write_json(&recovery_config_path, &recovery_config)
+            .expect("recovery config should be written");
+
+        let mut primed_runtime = NodeRuntime::from_config_path(&good_config_path)
+            .expect("runtime should load from config");
+        primed_runtime
+            .startup(START_UNIX_MS)
+            .expect("startup should bootstrap successfully");
+        let recovery_state = primed_runtime.recovery_state_snapshot(START_UNIX_MS + 1);
+        assert_eq!(recovery_state.active_neighbors.len(), 3);
+
+        let mut recovered_runtime = NodeRuntime::from_config_path(&recovery_config_path)
+            .expect("runtime should load from recovery config");
+        recovered_runtime
+            .startup_with_recovery_state(START_UNIX_MS + 2, Some(&recovery_state))
+            .expect("startup should recover from cached peers");
+
+        let recovered_health = recovered_runtime.health_snapshot();
+        assert_eq!(recovered_runtime.state(), NodeRuntimeState::Running);
+        assert_eq!(recovered_health.bootstrap.last_accepted_sources, 0);
+        assert!(recovered_health.recovery.restored_from_peer_cache);
+        assert_eq!(recovered_health.recovery.restored_active_peers, 3);
+        assert_eq!(recovered_runtime.snapshot().active_peers, 3);
+        assert!(recovered_runtime
+            .context()
+            .observability()
+            .logs()
+            .iter()
+            .any(|entry| {
+                entry.component == crate::metrics::LogComponent::Runtime
+                    && entry.event == "peer_cache_recovery"
+                    && entry.result == "restored"
+            }));
+
+        let early_retry = recovered_runtime
+            .tick(START_UNIX_MS + 5_000)
+            .expect("tick before retry window should succeed");
+        assert!(!early_retry.bootstrap_retry_attempted);
+
+        write_json(&missing_bootstrap_path, &sample_bootstrap_response())
+            .expect("bootstrap file should be written before retry");
+        let recovered = recovered_runtime
+            .tick(START_UNIX_MS + 5_002)
+            .expect("running runtime should still retry bootstrap after peer-cache recovery");
+
+        assert!(recovered.bootstrap_retry_attempted);
+        assert_eq!(recovered.bootstrap_sources_accepted, 1);
+        assert_eq!(recovered_runtime.state(), NodeRuntimeState::Running);
+        assert_eq!(
+            recovered_runtime
+                .health_snapshot()
+                .bootstrap
+                .total_successes,
+            1
         );
     }
 

@@ -1,6 +1,7 @@
 # Pilot Devnet
 
-This directory contains the Milestone 20 regular-distributed-use assets.
+This directory contains the Milestone 20 regular-distributed-use assets carried
+into the current Milestone 21 first-user-runtime stage.
 
 It keeps the landed pilot topology pack and extends it with:
 

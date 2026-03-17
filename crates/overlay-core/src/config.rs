@@ -27,6 +27,32 @@ pub enum LogLevel {
     Trace,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfigTemplateProfile {
+    UserNode,
+    RelayCapable,
+    BootstrapSeed,
+}
+
+impl ConfigTemplateProfile {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::UserNode => "user-node",
+            Self::RelayCapable => "relay-capable",
+            Self::BootstrapSeed => "bootstrap-seed",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "user-node" => Some(Self::UserNode),
+            "relay-capable" => Some(Self::RelayCapable),
+            "bootstrap-seed" => Some(Self::BootstrapSeed),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OverlayConfig {
@@ -47,7 +73,11 @@ pub struct OverlayConfig {
 
 impl OverlayConfig {
     pub fn template() -> Self {
-        Self {
+        Self::template_for_profile(ConfigTemplateProfile::UserNode)
+    }
+
+    pub fn template_for_profile(profile: ConfigTemplateProfile) -> Self {
+        let mut config = Self {
             node_key_path: PathBuf::from("./keys/node.key"),
             bootstrap_sources: vec!["./bootstrap/node-foundation.json".to_string()],
             tcp_listener_addr: Some("127.0.0.1:4101".to_string()),
@@ -60,7 +90,11 @@ impl OverlayConfig {
             max_transport_buffer_bytes: 65_536,
             relay_mode: false,
             log_level: LogLevel::Info,
+        };
+        if matches!(profile, ConfigTemplateProfile::RelayCapable) {
+            config.relay_mode = true;
         }
+        config
     }
 
     pub fn validate(self) -> Result<Self, ConfigError> {
@@ -173,15 +207,15 @@ impl OverlayConfig {
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
-    #[error("config field {field} must not be empty")]
+    #[error("config field {field} must not be empty; start from `overlay-cli config-template --profile user-node` or see docs/CONFIG_EXAMPLES.md")]
     EmptyField { field: &'static str },
-    #[error("config bootstrap_sources[{index}] must not be empty")]
+    #[error("config bootstrap_sources[{index}] must not be empty; use a local .json path, file:<path>, or pinned http://host[:port]/path#sha256=<hex> source")]
     EmptyBootstrapSource { index: usize },
-    #[error("config bootstrap_sources[{index}] is not a supported local .json, file:, or http:// source: {value}")]
+    #[error("config bootstrap_sources[{index}] is not a supported source: {value}; accepted forms are local .json paths, file:<path>, or http://host[:port]/path#sha256=<hex>")]
     UnsupportedBootstrapSource { index: usize, value: String },
-    #[error("config tcp_listener_addr must be a host:port socket address: {detail}")]
+    #[error("config tcp_listener_addr must be a host:port socket address such as 127.0.0.1:4101: {detail}")]
     InvalidTcpListenerAddr { detail: String },
-    #[error("config limit {field} must be non-zero")]
+    #[error("config limit {field} must be non-zero; see docs/CONFIG_EXAMPLES.md for the current bounded defaults")]
     ZeroLimit { field: &'static str },
     #[error(transparent)]
     PeerStore(#[from] PeerStoreError),
@@ -270,7 +304,7 @@ mod tests {
 
     use serde_json::json;
 
-    use super::{ConfigError, LogLevel, OverlayConfig};
+    use super::{ConfigError, ConfigTemplateProfile, LogLevel, OverlayConfig};
 
     fn sample_config() -> OverlayConfig {
         OverlayConfig {
@@ -313,6 +347,24 @@ mod tests {
         assert_eq!(config.max_transport_buffer_bytes, 65_536);
         assert!(!config.relay_mode);
         assert_eq!(config.log_level, LogLevel::Info);
+    }
+
+    #[test]
+    fn template_profiles_apply_expected_profile_defaults() {
+        let relay = OverlayConfig::template_for_profile(ConfigTemplateProfile::RelayCapable)
+            .validate()
+            .expect("relay-capable template should be valid");
+        assert!(relay.relay_mode);
+
+        let bootstrap_seed =
+            OverlayConfig::template_for_profile(ConfigTemplateProfile::BootstrapSeed)
+                .validate()
+                .expect("bootstrap-seed template should be valid");
+        assert!(!bootstrap_seed.relay_mode);
+        assert_eq!(
+            bootstrap_seed.bootstrap_sources,
+            vec!["./bootstrap/node-foundation.json".to_string()]
+        );
     }
 
     #[test]

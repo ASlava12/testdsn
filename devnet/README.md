@@ -1,13 +1,13 @@
 # Devnet
 
 This directory contains the checked-in devnet and pilot assets for the current
-Milestone 20 stage:
+Milestone 21 stage:
 
 - the original four-node local-file devnet under `configs/` and `bootstrap/`
 - the host-style multi-host devnet layouts under `hosts/`
-- the dedicated Milestone 20 regular-distributed-use pack under `pilot/`
+- the dedicated distributed pilot pack under `pilot/`
 - wrapper scripts for the local, distributed, network-bootstrap, and
-  regular-distributed-use proof paths
+  first-user-runtime proof paths
 
 Nodes:
 
@@ -23,14 +23,16 @@ Nodes:
 - `keys/*.key`: deterministic Ed25519 seed files in hex form
 - `bootstrap/*.json`: local bootstrap seed files used by runtime startup
 - `hosts/`: host-style config layouts for localhost proof and multi-host copy/edit use
-- `pilot/`: dedicated Milestone 20 configs and pinned bootstrap artifacts
+- `pilot/`: dedicated distributed pilot configs and pinned bootstrap artifacts
 - `run-smoke.sh`: wrapper around `overlay-cli smoke`
 - `run-distributed-smoke.sh`: wrapper around the minimal multi-process localhost TCP smoke
 - `run-multihost-smoke.sh`: wrapper around the host-style network-bootstrap smoke
-- `run-distributed-pilot-checklist.sh`: wrapper around the Milestone 20 regular-distributed-use checklist
+- `run-distributed-pilot-checklist.sh`: wrapper around the current distributed pilot checklist
 - `run-pilot-checklist.sh`: retained Milestone 18 localhost rehearsal pack,
   not the current sign-off path
 - `run-launch-gate.sh`: wrapper around the Milestone 17 launch gate
+- `run-doctor-smoke.sh`: wrapper around the Milestone 21 doctor/self-check
+  smoke
 - `run-restart-smoke.sh`: wrapper around the bounded restart smoke
 - `run-soak.sh`: wrapper around the logical long-run runtime soak
 
@@ -67,6 +69,12 @@ Read the persisted status surface:
 
 ```bash
 TMPDIR=/tmp cargo run -p overlay-cli -- status --config devnet/configs/node-a.json
+```
+
+Run the local self-check surface:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- doctor --config devnet/configs/node-a.json
 ```
 
 ## Distributed TCP smoke
@@ -124,5 +132,6 @@ This is the current localhost sign-off path after `./devnet/run-launch-gate.sh`.
   publish/lookup/service/relay steps
 - the distributed operator flows are explicit point-to-point CLI surfaces, not
   a general distributed control plane
+- restart recovery is bounded to the last-known active bootstrap peers only
 - lookup is still exact-by-`node_id` only, and service resolution is still
   exact-by-`app_id` only

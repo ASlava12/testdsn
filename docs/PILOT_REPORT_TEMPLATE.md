@@ -1,6 +1,6 @@
 # Pilot Report Template
 
-Use this template for each Milestone 20 regular-distributed-use run.
+Use this template for each current-stage off-box distributed pilot run.
 
 Do not describe the result as GA, production-ready, or ready for hostile
 public deployment.
@@ -8,7 +8,7 @@ public deployment.
 ## Metadata
 
 - Date: `<YYYY-MM-DD>`
-- Repository stage: `milestone-20-regular-distributed-use-closure`
+- Repository stage: `milestone-21-first-user-runtime`
 - Commit: `<git-sha>`
 - Operator: `<name>`
 - Topology: `pilot-5-host-two-relay`
@@ -105,7 +105,8 @@ public deployment.
   than a general distributed control plane
 - lookup is still exact-by-`node_id` only, and service resolution is still
   exact-by-`app_id` only
-- peers, presence, services, sessions, relay tunnels, and path probes remain
+- only the last-known active bootstrap peers are recovered across restart;
+  presence, services, sessions, relay tunnels, and path probes remain
   in-memory runtime state
 - this stage still does not claim hostile-environment or public-Internet
   rollout readiness

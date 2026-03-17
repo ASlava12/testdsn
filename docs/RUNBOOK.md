@@ -6,7 +6,7 @@ not for hostile-Internet or public-production deployment.
 Use [docs/LAUNCH_CHECKLIST.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/LAUNCH_CHECKLIST.md)
 as the release gate, this runbook as the operator flow behind that gate, and
 [docs/PILOT_RUNBOOK.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/PILOT_RUNBOOK.md)
-for the dedicated Milestone 20 off-box regular-distributed-use exercise.
+for the dedicated current-stage off-box distributed exercise.
 
 The current localhost sign-off path is `./devnet/run-launch-gate.sh` followed
 by `./devnet/run-distributed-pilot-checklist.sh`. The older
@@ -25,6 +25,12 @@ What exists today:
   local service record on startup
 - `overlay-cli status --config <path>` reads the last-known health and
   lifecycle snapshot from the config-local `.overlay-runtime/` directory
+- `overlay-cli status --config <path> --summary` reads the persisted operator
+  summary for peers, bootstrap, presence, services, relay usage, and recent
+  failures
+- `overlay-cli doctor --config <path>` checks config validity, persisted
+  runtime state, bootstrap health, and peer-cache recovery using local files
+  only
 - `overlay-cli publish`, `lookup`, `open-service`, and `relay-intro` provide
   bounded one-shot operator flows over established runtime sessions
 - `overlay-cli smoke --devnet-dir <path>` still starts the local four-node
@@ -36,8 +42,9 @@ What does not exist today:
 
 - no public bootstrap-provider infrastructure or HTTPS bootstrap fetch
 - no general distributed control plane beyond the explicit operator commands
-- no persistent on-disk runtime state for peers, presence, services, or relay
-  tunnels beyond bounded operator metadata and last-known health
+- no broad persistent on-disk runtime state beyond bounded operator metadata,
+  last-known health, and the last-known active bootstrap peers used for restart
+  recovery
 - no rolling upgrade or orchestration framework
 
 ## Prerequisites
@@ -51,8 +58,10 @@ What does not exist today:
 
 ## Startup checklist
 
-1. Generate a starter config with `overlay-cli config-template --output <path>`
-   or pick a role example from [docs/CONFIG_EXAMPLES.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/CONFIG_EXAMPLES.md).
+1. Generate a starter config with
+   `overlay-cli config-template --profile <user-node|relay-capable|bootstrap-seed> --output <path>`
+   or pick a stable profile example from
+   [docs/CONFIG_EXAMPLES.md](/mnt/c/Users/Noki1/OneDrive/Documents/testdsn/docs/CONFIG_EXAMPLES.md).
 2. Verify the config only uses supported top-level fields.
 3. Verify `node_key_path` points to an existing seed file.
 4. Verify every `bootstrap_sources[]` entry points to a local `.json` file,
@@ -67,8 +76,8 @@ What does not exist today:
    `runtime_status` payload with `lifecycle.clean_shutdown == false` while the
    process is still active.
 9. If bootstrap is degraded or unexpectedly slow, inspect
-   `health.bootstrap.last_attempt_summary` and `health.bootstrap.last_sources`
-   before changing configs.
+   `health.bootstrap.last_attempt_summary`, `health.bootstrap.last_sources`,
+   and `overlay-cli status --config <path> --summary` before changing configs.
 10. For cross-node behavior, use the distributed operator commands or the
    checked-in smoke/checklist wrappers after single-node startup looks healthy.
 
@@ -77,7 +86,7 @@ What does not exist today:
 Generate a new template config:
 
 ```bash
-TMPDIR=/tmp cargo run -p overlay-cli -- config-template --output /path/to/node.json
+TMPDIR=/tmp cargo run -p overlay-cli -- config-template --profile user-node --output /path/to/node.json
 ```
 
 Single-node bounded startup:
@@ -96,6 +105,18 @@ Read the persisted operator status:
 
 ```bash
 TMPDIR=/tmp cargo run -p overlay-cli -- status --config docs/config-examples/relay-enabled-node.json
+```
+
+Read only the persisted operator summary:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- status --config docs/config-examples/relay-capable.json --summary
+```
+
+Run the local doctor surface:
+
+```bash
+TMPDIR=/tmp cargo run -p overlay-cli -- doctor --config docs/config-examples/user-node.json
 ```
 
 One-shot distributed operator commands:
@@ -184,6 +205,8 @@ Structured log records are emitted as one JSON object per line, for example:
   `last_attempt_summary` and `last_sources` for per-source diagnostics
 - `health.cleanup_totals`: how many stale objects have been pruned
 - `health.resource_limits`: effective local limits after config projection
+- `summary`: a concise persisted operator surface for peers, bootstrap,
+  presence, services, relay usage, and recent failures
 
 Important fields to watch first:
 
@@ -198,9 +221,12 @@ Important fields to watch first:
 
 ## Restart procedure
 
-The current runtime is in-memory only. A restart means:
+The current runtime keeps a bounded peer-cache recovery path. A restart means:
 
-- peer state is rebuilt from bootstrap files
+- the runtime first tries live bootstrap sources
+- if all configured bootstrap sources are temporarily unavailable, the runtime
+  may recover from the last-known active bootstrap peers persisted in
+  `runtime_status`
 - sessions are reopened from scratch
 - published presence and service-open session state are lost unless the caller
   recreates them
@@ -210,7 +236,7 @@ What does persist across restarts:
 
 - `.overlay-runtime/<config-stem>/runtime.lock` while the process is active
 - `.overlay-runtime/<config-stem>/runtime-status.json` with the last known
-  `runtime_status` payload
+  `runtime_status` payload, including the bounded peer-cache recovery state
 - startup counters plus clean/unclean shutdown markers for operator recovery
 
 For a bounded restart check:

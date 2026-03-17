@@ -1,13 +1,13 @@
 # Launch Checklist
 
 This checklist defines the Milestone 17 operator-runtime gate that remains the
-prerequisite launch gate for the current Milestone 20
-regular-distributed-use-closure stage.
+prerequisite launch gate for the current Milestone 21
+first-user-runtime stage.
 
 It is a pilot gate, not a public-production or hostile-Internet readiness
 claim.
 
-For current Milestone 20 sign-off, the validation green path is
+For current Milestone 21 sign-off, the validation green path is
 `./devnet/run-launch-gate.sh` followed by
 `./devnet/run-distributed-pilot-checklist.sh` on the same commit.
 
@@ -28,7 +28,8 @@ The current launchable MVP surface is frozen to:
 - bounded path metrics, deterministic scoring, and hysteresis;
 - exact service resolution by `app_id` and `OpenAppSession`;
 - structured logs, runtime health snapshots, and bounded counters;
-- `overlay-cli run` / `overlay-cli status` for single-node inspection;
+- `overlay-cli run`, `overlay-cli status`, `overlay-cli status --summary`, and
+  `overlay-cli doctor` for single-node inspection;
 - `overlay-cli run --service` for bounded local service registration;
 - `overlay-cli publish`, `lookup`, `open-service`, and `relay-intro` as
   one-shot distributed operator surfaces;
@@ -45,8 +46,9 @@ The current gate does not claim:
 
 - broad public bootstrap-provider infrastructure;
 - HTTPS, DNS-derived bootstrap, or a public bootstrap trust framework;
-- persistent on-disk peers, presence, services, sessions, or relay state
-  beyond bounded operator metadata and last-known health;
+- broad persistent on-disk peers, presence, services, sessions, or relay state
+  beyond bounded operator metadata, last-known health, and the last-known
+  active bootstrap peers;
 - global node or service discovery;
 - onion routing or stronger anonymity;
 - full post-quantum handshake;
@@ -71,6 +73,7 @@ TMPDIR=/tmp cargo test -p overlay-core --test integration_service_open
 ./devnet/run-distributed-smoke.sh
 ./devnet/run-multihost-smoke.sh
 ./devnet/run-soak.sh
+./devnet/run-doctor-smoke.sh
 ./devnet/run-restart-smoke.sh
 ```
 
@@ -89,11 +92,13 @@ Pass criteria:
 - the multi-host smoke includes networked `publish_presence`, `lookup_node`,
   `open_service`, `relay_fallback_planned`, and `relay_fallback_bound`;
 - the bounded soak completes with cleanup and presence-refresh checks;
+- the doctor smoke proves `overlay-cli doctor` returns `0` and reports a
+  healthy running runtime;
 - the restart smoke proves a `SIGTERM`-driven clean shutdown, a readable
-  `overlay-cli status` surface, and a second clean startup against the same
-  config.
+  `overlay-cli status` surface, peer-cache recovery on the second startup, and
+  a second clean shutdown against the same config.
 
-## Current regular-distributed-use follow-on
+## Current distributed follow-on
 
 After the launch gate stays green on the target commit, run the current
 regular-distributed-use checklist:
@@ -157,14 +162,16 @@ Pass criteria:
    tagging:
 
    ```bash
-   TMPDIR=/tmp cargo run -p overlay-cli -- run --config docs/config-examples/bootstrap-node.json --max-ticks 2 --status-every 1
+   TMPDIR=/tmp cargo run -p overlay-cli -- run --config docs/config-examples/bootstrap-seed.json --max-ticks 2 --status-every 1
    ```
 
 4. Confirm the first logs include `bootstrap_fetch`, `bootstrap_ingest`, and
    `state_transition`, and that `runtime_status.health.runtime.state` becomes
    `running` or `degraded`.
 5. Confirm `overlay-cli status --config <path>` returns the same node's last
-   known `health` plus `lifecycle.clean_shutdown` / `lifecycle.startup_count`.
+   known `health` plus `lifecycle.clean_shutdown` / `lifecycle.startup_count`,
+   and that `overlay-cli status --config <path> --summary` exposes the concise
+   peer/bootstrap/presence/service/relay summary.
 6. Use `./devnet/run-distributed-smoke.sh` as the real-process proof path for
    network bootstrap, listener bind, outbound dial, accept, and handshake-backed
    session establishment.
@@ -206,10 +213,12 @@ Workflow:
 
 ## Known limitations to carry into every pilot note
 
-- The current runtime is in-memory only and loses peers, sessions, presence,
-  service-open state, relay tunnels, and path probes on restart.
-- The current on-disk state is bounded to operator lock/status metadata under
-  `.overlay-runtime/`; it is not protocol-state persistence.
+- The current runtime recovers only the last-known active bootstrap peers on
+  restart; sessions, presence, service-open state, relay tunnels, and path
+  probes are rebuilt.
+- The current on-disk state is bounded to operator lock/status metadata and
+  the embedded peer-cache recovery payload under `.overlay-runtime/`; it is not
+  broad protocol-state persistence.
 - Bootstrap remains static JSON served over `http://`; integrity comes from
   SHA-256-pinned artifact URLs rather than HTTPS or a public trust root.
 - `overlay-cli bootstrap-serve` is a devnet seed server, not a public bootstrap
@@ -227,7 +236,7 @@ Workflow:
 - Relay quotas and most service-open policy are still code-level defaults rather
   than a rich operator-configurable surface.
 
-## Remaining blockers after Milestone 20
+## Remaining blockers after Milestone 21
 
 - Run and attach the off-box pilot report for the exact commit being signed
   off; the localhost checklist is necessary but not sufficient evidence for a
@@ -240,7 +249,7 @@ Workflow:
 - Treat the distributed operator commands as explicit proof surfaces only; they
   are not a general distributed control plane, orchestration layer, or
   discovery system.
-- Expect restart loss of peers, presence, service-open state, relay tunnels,
-  and path probes until durable protocol-state persistence is explicitly added.
+- Expect restart loss of presence, service-open state, relay tunnels, and path
+  probes until durable protocol-state persistence is explicitly added.
 - Treat the checked-in two-relay topology as the only proven relay closure
   layout for the current stage.

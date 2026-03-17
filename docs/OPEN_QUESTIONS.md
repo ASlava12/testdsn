@@ -2,7 +2,7 @@
 
 This file exists so Codex does not silently invent protocol details.
 All currently known MVP ambiguities affecting the current
-`milestone-20-regular-distributed-use-closure` baseline are resolved below and should be reused
+`milestone-21-first-user-runtime` baseline are resolved below and should be reused
 as the conservative defaults.
 
 ## Resolved conservative choices for MVP
@@ -265,7 +265,7 @@ For current work, treat the repository stage as:
 - Milestone 12 launch hardening is implemented with bounded cleanup, degraded
   bootstrap retry, runtime health snapshots, and the logical soak path;
 - the current repository stage marker is
-  `milestone-20-regular-distributed-use-closure`;
+  `milestone-21-first-user-runtime`;
 - Milestone 17 operator-grade runtime hardening is part of the landed baseline,
   with `docs/LAUNCH_CHECKLIST.md`, the documented green-path validation and
   launch sequence, signal-aware `overlay-cli run`, config-local
@@ -277,12 +277,17 @@ For current work, treat the repository stage as:
 - Milestone 19 pilot closure is part of the landed baseline, with distributed
   operator surfaces, pinned static bootstrap artifacts, the expanded pilot
   topology, and `devnet/run-distributed-pilot-checklist.sh`;
-- Milestone 20 regular distributed use closure is now the current stage, with
+- Milestone 20 regular distributed use closure is part of the landed baseline,
+  with
   per-source bootstrap diagnostics on the runtime status surface, preferred
   retry/fallback ordering across configured bootstrap sources, the expanded
   localhost checklist proof for unavailable/integrity/stale/empty bootstrap
   cases, and stronger relay-bind evidence across the checked-in two-relay
   topology;
+- Milestone 21 first-user runtime is now the current stage, with bounded
+  restart recovery from the last-known active bootstrap peers, continued
+  bootstrap retry after peer-cache recovery, persisted status summaries,
+  `overlay-cli doctor`, and stable first-user example profiles;
 
 That means:
 
@@ -300,10 +305,10 @@ That means:
   vectors, or spec mismatches;
 - Milestone 8 is closed and should be touched only for regressions,
   vectors, or spec mismatches;
-- Milestone 20 is the current stage and should stay limited to
-  regular-distributed-use closure support, network-bootstrap and
-  operator-runtime maintenance, regression fixes, validation maintenance, and
-  documentation synchronization unless a task explicitly reopens scope;
+- Milestone 21 is the current stage and should stay limited to first-user
+  runtime support, network-bootstrap and operator-runtime maintenance,
+  regression fixes, validation maintenance, and documentation synchronization
+  unless a task explicitly reopens scope;
 - the current localhost sign-off flow is `./devnet/run-launch-gate.sh`
   followed by `./devnet/run-distributed-pilot-checklist.sh` on the same
   commit;
@@ -357,17 +362,25 @@ Rules:
   higher sequence, and equal epoch plus sequence must be byte-identical to be
   treated as the same record.
 
-### 12. Conservative operator-state persistence for the current pilot runtime
+### 12. Conservative operator-state persistence for the current first-user runtime
 
-For the current Milestone 20 pilot runtime, persist only bounded operator
-metadata, not protocol-layer state.
+For the current Milestone 21 runtime, persist bounded operator metadata plus
+the smallest practical bootstrap-recovery state, not broad protocol-layer
+state.
 
 Rules:
 - derive `.overlay-runtime/<config-stem>/` from the config file directory;
 - keep only a live lock file plus the last known `runtime_status` JSON payload;
-- use that state to detect stale locks and mark clean versus unclean shutdown;
-- do not persist peers, presence, services, sessions, relay tunnels, or path
-  probes.
+- embed a bounded recovery payload in that persisted `runtime_status` file;
+- the recovery payload may contain only the last-known active bootstrap peers
+  selected into the local peer store;
+- use that state to detect stale locks, mark clean versus unclean shutdown, and
+  recover active peers when all configured bootstrap sources are temporarily
+  unavailable;
+- continue live bootstrap retry after peer-cache recovery until a configured
+  source is accepted again;
+- do not persist presence records, registered services, sessions, relay
+  tunnels, or path probes.
 
 ### 12. Conservative direct-first reachability policy for MVP
 
@@ -949,6 +962,22 @@ For the current regular-distributed-use closure stage:
   own;
 - these diagnostics are operator-facing runtime status fields, not new protocol
   messages or schema changes.
+
+### 38. Conservative status-summary and doctor defaults for Milestone 21
+
+For the current first-user-runtime stage:
+
+- persisted `runtime_status` may include a bounded summary surface for peers,
+  bootstrap health, presence state, service-registration state, relay usage,
+  and recent failures;
+- `overlay-cli status --summary` may print that summary directly without adding
+  a new runtime control socket or metrics backend;
+- `overlay-cli doctor` may diagnose config validity, persisted runtime state,
+  bootstrap health, and peer-cache recovery from local files only;
+- the smallest conservative doctor exit-code surface is:
+  `0` healthy, `2` warn/degraded-but-readable, and `3` failed or unusable;
+- these are local operator surfaces only, not protocol messages or distributed
+  orchestration features.
 
 ## Rule
 
