@@ -1,10 +1,12 @@
 # First-User Acceptance
 
-This document defines the current Milestone 27
-relay-topology-generalization acceptance boundary.
+This document defines the functional acceptance boundary reused inside the
+current Milestone 28 production-gates-packaging-safety-hardening release gate.
 
-It is the bounded basis for describing the repository as sufficiently working
-for first users. It is not a public-production or hostile-environment claim.
+It remains the bounded basis for describing the repository as functionally
+working for first users. On its own it is not the full Milestone 28
+production-release claim, and it is still not a hostile-environment or
+public-Internet claim.
 
 ## Current acceptance flow
 
@@ -29,6 +31,12 @@ The acceptance wrapper reuses the landed component proofs:
 
 - `./devnet/run-launch-gate.sh`
 - `./devnet/run-distributed-pilot-checklist.sh`
+
+The current Milestone 28 production gate adds two more bounded checks above
+this acceptance layer:
+
+- `./devnet/run-production-soak.sh`
+- `./devnet/run-packaging-check.sh`
 
 ## Required acceptance scenarios
 
@@ -123,10 +131,10 @@ These outcomes are part of the current honest acceptance boundary:
   tunnels, or path probes beyond the bounded bootstrap-source, active-peer,
   and local-service-intent recovery state.
 
-## First-user ready boundary
+## Acceptance boundary inside the production gate
 
-The repository may be described as sufficiently working for first users only
-when all of the following are true:
+The repository may be described as functionally accepted for first-user
+behavior only when all of the following are true:
 
 - the commands above passed on the same commit;
 - the acceptance wrapper reached `first_user_acceptance_complete`;
@@ -134,8 +142,16 @@ when all of the following are true:
   surfaces (`publish`, `lookup`, `open-service`, `relay-intro`, and
   `inspect`), the signed bootstrap-artifact model described in the runbooks,
   and the checked-in bounded three-relay pilot topology;
-- separate-host evidence is collected for the same commit before the claim is
-  used in a release note or handoff.
+- separate-host evidence is collected for the same commit before the broader
+  Milestone 28 bounded production release claim is used in a release note or
+  handoff.
+
+For the current Milestone 28 production claim, this acceptance document is
+necessary but not sufficient on its own. Also require:
+
+- `./devnet/run-production-gate.sh` on the same commit;
+- the separate-host evidence run from `docs/PILOT_RUNBOOK.md`;
+- the release-note limitations carried forward from `docs/KNOWN_LIMITATIONS.md`.
 
 ## Out of scope
 
@@ -145,4 +161,8 @@ The current first-user-ready claim does not include:
 - a general distributed control plane or autonomous discovery;
 - broad durable protocol-state persistence;
 - arbitrary relay graphs or public-network relay closure;
-- public-production or hostile-environment deployment readiness.
+- bounded production release packaging, install verification, or release-note
+  requirements by themselves; those live in `docs/PRODUCTION_CHECKLIST.md`
+  and `docs/PRODUCTION_RELEASE_TEMPLATE.md`;
+- public-production beyond the bounded Milestone 28 claim, or
+  hostile-environment deployment readiness.

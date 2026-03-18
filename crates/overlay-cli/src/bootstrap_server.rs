@@ -265,7 +265,7 @@ mod tests {
 
     use overlay_core::{bootstrap::SignedBootstrapArtifact, crypto::sign::Ed25519SigningKey};
 
-    use super::{build_signed_bootstrap_body, run};
+    use super::{build_signed_bootstrap_body, load_signing_key, run};
 
     #[test]
     fn bootstrap_server_serves_configured_file() {
@@ -351,5 +351,41 @@ mod tests {
 
         assert_eq!(artifact.signer_public_key, signing_key.public_key());
         assert_eq!(artifact.bootstrap_response.version, 1);
+    }
+
+    #[test]
+    fn signed_bootstrap_body_rejects_invalid_bootstrap_json() {
+        let dir =
+            std::env::temp_dir().join(format!("overlay-cli-bootstrap-sign-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir should exist");
+        let bootstrap_path = dir.join("invalid-bootstrap.json");
+        std::fs::write(&bootstrap_path, br#"{"version":"bad"}"#)
+            .expect("invalid bootstrap file should exist");
+
+        let signing_key = Ed25519SigningKey::from_seed([3_u8; 32]);
+        let error = build_signed_bootstrap_body(
+            std::fs::read(&bootstrap_path).expect("bootstrap response should read"),
+            &bootstrap_path,
+            &signing_key,
+        )
+        .expect_err("invalid bootstrap body should fail to sign");
+
+        assert!(error.contains("could not parse bootstrap source"));
+    }
+
+    #[test]
+    fn load_signing_key_rejects_invalid_hex_text() {
+        let dir =
+            std::env::temp_dir().join(format!("overlay-cli-bootstrap-sign-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir should exist");
+        let key_path = dir.join("invalid-bootstrap-signer.key");
+        std::fs::write(&key_path, b"zz").expect("invalid key file should exist");
+
+        let error = match load_signing_key(&key_path) {
+            Ok(_) => panic!("invalid signing key text should fail"),
+            Err(error) => error,
+        };
+
+        assert!(error.contains("must be exactly 32 raw bytes or 64 hex characters"));
     }
 }

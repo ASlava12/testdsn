@@ -15,7 +15,7 @@ pub mod session;
 pub mod transport;
 pub mod wire;
 
-pub const REPOSITORY_STAGE: &str = "milestone-27-relay-topology-generalization";
+pub const REPOSITORY_STAGE: &str = "milestone-28-production-gates-packaging-safety-hardening";
 
 #[cfg(test)]
 mod tests {

@@ -2,7 +2,7 @@
 
 This file exists so Codex does not silently invent protocol details.
 All currently known MVP ambiguities affecting the current
-`milestone-27-relay-topology-generalization` baseline are resolved below and should be reused
+`milestone-28-production-gates-packaging-safety-hardening` baseline are resolved below and should be reused
 as the conservative defaults.
 
 ## Resolved conservative choices for MVP
@@ -265,7 +265,7 @@ For current work, treat the repository stage as:
 - Milestone 12 launch hardening is implemented with bounded cleanup, degraded
   bootstrap retry, runtime health snapshots, and the logical soak path;
 - the current repository stage marker is
-  `milestone-27-relay-topology-generalization`;
+  `milestone-28-production-gates-packaging-safety-hardening`;
 - Milestone 17 operator-grade runtime hardening is part of the landed baseline,
   with `docs/LAUNCH_CHECKLIST.md`, the documented green-path validation and
   launch sequence, signal-aware `overlay-cli run`, config-local
@@ -305,10 +305,16 @@ For current work, treat the repository stage as:
   `overlay-cli inspect`, bounded machine-readable operator reports that bundle
   local status/doctor data with explicit remote lookup/open-service/relay-intro
   probes, and the synchronized operator/runbook docs;
-- Milestone 27 relay and topology generalization is now the current stage,
+- Milestone 27 relay and topology generalization is now part of the landed
+  baseline,
   with bounded three-relay pilot topology proof, deterministic
   multi-candidate relay-plan coverage, repeated relay-bind failure recovery
   through a later bounded candidate, and the synchronized relay/runbook docs;
+- Milestone 28 production gates, packaging, and safety hardening is now the
+  current stage, with a bounded production gate above the first-user
+  acceptance pack, reproducible release bundles plus install verification, a
+  longer bounded soak, synchronized production release/limitations docs, and
+  targeted parser-negative hardening;
 
 That means:
 
@@ -326,11 +332,11 @@ That means:
   vectors, or spec mismatches;
 - Milestone 8 is closed and should be touched only for regressions,
   vectors, or spec mismatches;
-- Milestone 27 is the current stage and should stay limited to bounded
-  relay-topology hardening, operator-runtime maintenance, regression fixes,
-  validation maintenance, and documentation synchronization unless a task
-  explicitly reopens scope;
-- the current localhost sign-off flow is `./devnet/run-first-user-acceptance.sh`
+- Milestone 28 is the current stage and should stay limited to release-gate
+  hardening, packaging/install verification, safety validation, regression
+  fixes, and documentation synchronization unless a task explicitly reopens
+  scope;
+- the current localhost sign-off flow is `./devnet/run-production-gate.sh`
   on the same commit after the applicable workspace validation commands;
 - `./devnet/run-pilot-checklist.sh` is retained only as the older Milestone 18
   localhost rehearsal and should not be treated as the current sign-off path;
@@ -1094,6 +1100,26 @@ For the current relay-topology-generalization stage:
   runbooks instead of silently suppressing them;
 - keep the broader first-user-ready claim bounded to the checked-in
   three-relay pilot topology until a larger topology is separately validated.
+
+### 44. Conservative bounded production-release defaults for Milestone 28
+
+For the current production-gates-packaging-safety-hardening stage:
+
+- keep the release claim bounded to the exact same-commit results from
+  `./devnet/run-production-gate.sh`, the separate-host report from
+  `docs/PILOT_RUNBOOK.md`, and the packaged artifact produced by
+  `./devnet/package-release.sh`;
+- treat `./devnet/run-first-user-acceptance.sh` as a required functional
+  component inside the production gate, not as the whole release gate by
+  itself;
+- require the package/install check to prove stage consistency and exclude
+  private key material from shipped artifacts;
+- keep the shipped operator artifact limited to the binary, current docs, and
+  non-secret example configs; do not ship signer keys, node keys, or pretend
+  the package is a full platform installer;
+- keep the broader production claim bounded to operator-managed deployments
+  that stay inside the documented static bootstrap model, explicit operator
+  surfaces, and checked-in three-relay topology proof.
 
 ## Rule
 

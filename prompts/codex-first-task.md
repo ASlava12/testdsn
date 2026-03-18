@@ -4,12 +4,13 @@ Read `AGENTS.md`, `IMPLEMENT.md`, `VALIDATION.md`, `docs/OPEN_QUESTIONS.md`,
 
 Goal:
 Synchronize on the current repository stage,
-`milestone-27-relay-topology-generalization`, and use the dedicated
-Milestone 27 prompt
+`milestone-28-production-gates-packaging-safety-hardening`, and use the
+dedicated Milestone 28 prompt
 for the next concrete current-stage task.
 
 Current repository baseline:
-- The current repository stage is `milestone-27-relay-topology-generalization`.
+- The current repository stage is
+  `milestone-28-production-gates-packaging-safety-hardening`.
 - Milestone 0 is already complete.
 - Milestone 1 foundations are already implemented, vectorized, and validated in
   `overlay-core` (`identity`, `records`, `wire`).
@@ -66,10 +67,11 @@ Current repository baseline:
 - Milestone 25 runtime persistence and recovery hardening is landed baseline
   work.
 - Milestone 26 bounded operator control plane is landed baseline work.
-- Milestone 27 relay and topology generalization is the current stage with a
-  bounded third relay-capable pilot node, deterministic multi-candidate relay
-  proof, repeated relay-bind failure recovery, and synchronized relay/runbook
-  docs.
+- Milestone 27 relay and topology generalization is landed baseline work.
+- Milestone 28 production gates, packaging, and safety hardening is the
+  current stage with a bounded production gate, reproducible release bundles,
+  install verification, a longer bounded soak, and synchronized production
+  release/limitations docs.
 
 Constraints:
 - do not restart the repository from Milestone 0;
@@ -79,8 +81,8 @@ Constraints:
 
 Tasks:
 - confirm the repository already sits at the closed Milestone 1-8 baseline;
-- use `prompts/codex-milestone-27.md` for the next concrete
-  `milestone-27-relay-topology-generalization` task;
+- use `prompts/codex-milestone-28.md` for the next concrete
+  `milestone-28-production-gates-packaging-safety-hardening` task;
 - keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, affected prompts, and
   `docs/OPEN_QUESTIONS.md` synchronized if the repository baseline changes;
 - treat Milestones 1-12 as closed baseline work, touching them only for

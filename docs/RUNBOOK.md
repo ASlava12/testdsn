@@ -1,17 +1,19 @@
 # Runbook
 
-This runbook is for the repository's current local and pilot launch surface,
-not for hostile-Internet or public-production deployment.
+This runbook is for the repository's current bounded production release
+surface, not for hostile-Internet deployment.
 
-Use [docs/LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md)
-as the release gate, this runbook as the operator flow behind that gate, and
+Use [docs/PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md)
+as the release gate, [docs/LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md) as the
+component gate inside it, this runbook as the operator flow behind that gate,
+and
 [docs/FIRST_USER_ACCEPTANCE.md](FIRST_USER_ACCEPTANCE.md)
-for the current first-user-ready boundary, and
+for the current functional acceptance boundary, and
 [docs/PILOT_RUNBOOK.md](PILOT_RUNBOOK.md)
 for the dedicated current-stage off-box distributed exercise.
 
 The current localhost sign-off path is
-`./devnet/run-first-user-acceptance.sh`. The older
+`./devnet/run-production-gate.sh`. The older
 `./devnet/run-pilot-checklist.sh` remains a retained Milestone 18 rehearsal only.
 
 ## Current boundary
@@ -47,7 +49,13 @@ What exists today:
   emits a signed bootstrap artifact and prints the signer key plus SHA-256 of
   the signed body
 - `./devnet/run-first-user-acceptance.sh` wraps the landed launch gate and the
-  distributed checklist into the current bounded first-user-ready proof
+  distributed checklist into the current bounded functional acceptance proof
+- `./devnet/run-production-soak.sh` extends the older logical soak into the
+  current longer-run production-hardening check
+- `./devnet/run-packaging-check.sh` proves the package/build/install path and
+  keeps private keys out of shipped artifacts
+- `./devnet/package-release.sh` creates the reproducible ship artifact for the
+  validated commit
 
 What does not exist today:
 

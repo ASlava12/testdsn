@@ -86,7 +86,7 @@ Do not add by default:
   conservative bootstrap retry, runtime health snapshots, status dumps, and the
   logical soak path.
 - The current repository stage marker is
-  `milestone-27-relay-topology-generalization`.
+  `milestone-28-production-gates-packaging-safety-hardening`.
 - Milestone 14 launch gate and pilot tag remains part of the landed pilot
   baseline.
 - Milestone 16 network bootstrap and multi-host devnet is implemented with
@@ -145,16 +145,25 @@ Do not add by default:
   local status/doctor data with explicit remote lookup/service/relay probes,
   improved operator runbooks, and synchronized Milestone 26 docs. This stage
   still does not claim hostile-environment or public-production readiness.
-- Milestone 27 relay and topology generalization is the current stage with a
+- Milestone 27 relay and topology generalization remains part of the landed
+  baseline with a
   bounded third relay-capable pilot node, deterministic multi-candidate relay
   planning proof, repeated relay-bind failure recovery through a later bounded
-  candidate, and synchronized Milestone 27 docs. This stage
-  still does not claim hostile-environment or public-production readiness.
+  candidate, and synchronized Milestone 27 docs.
+- Milestone 28 production gates, packaging, and safety hardening is the
+  current stage with `./devnet/run-production-gate.sh`, reproducible
+  `./devnet/package-release.sh` bundles plus
+  `./devnet/run-packaging-check.sh` install verification, a longer bounded
+  production soak, synchronized production release docs/templates, and
+  stronger parser-focused negative coverage. This stage supports only a
+  bounded production claim for operator-managed deployments that stay inside
+  the documented bootstrap, relay-topology, and operator-surface limits; it
+  still does not claim hostile-environment or public-Internet readiness.
 
 For normal work, touch Milestones 1-12 only for regression fixes, spec
 mismatches, vector maintenance, validation maintenance, or launch-maintenance
 updates unless the task explicitly reopens that stage. Treat current-stage work as narrow
-`milestone-27-relay-topology-generalization` work, not as a restart from
+`milestone-28-production-gates-packaging-safety-hardening` work, not as a restart from
 earlier milestones.
 
 ## 3. Change policy

@@ -2,9 +2,9 @@
 
 Run the following commands when applicable.
 
-## Current Milestone 27 sign-off path
+## Current Milestone 28 sign-off path
 
-Use the current first-user acceptance-pack sign-off order on the commit you intend to
+Use the current bounded production sign-off order on the commit you intend to
 validate:
 
 ```bash
@@ -12,12 +12,14 @@ cargo fmt --all --check
 TMPDIR=/tmp cargo clippy --workspace --all-targets --all-features -- -D warnings
 TMPDIR=/tmp cargo check --workspace
 TMPDIR=/tmp cargo test --workspace
-./devnet/run-first-user-acceptance.sh
+./devnet/run-production-gate.sh
 ```
 
 `./devnet/run-pilot-checklist.sh` is retained as the Milestone 18 localhost
 rehearsal pack only. It is not part of the current sign-off path.
 
+`./devnet/run-first-user-acceptance.sh` remains the landed functional
+acceptance component inside `./devnet/run-production-gate.sh`.
 `./devnet/run-launch-gate.sh` and `./devnet/run-distributed-pilot-checklist.sh`
 remain required component scripts inside `./devnet/run-first-user-acceptance.sh`.
 
@@ -99,7 +101,7 @@ cargo test -p overlay-core --test integration_service_open
 ```
 
 Use this only when you need the older localhost rehearsal path for the landed
-Milestone 18 baseline. It is not part of current Milestone 27 sign-off.
+Milestone 18 baseline. It is not part of current Milestone 28 sign-off.
 
 ## Current first-user acceptance flow
 
@@ -118,6 +120,40 @@ Equivalent component order:
 ```bash
 ./devnet/run-launch-gate.sh
 ./devnet/run-distributed-pilot-checklist.sh --evidence-dir /tmp/overlay-first-user-acceptance/distributed-pilot-evidence
+```
+
+## Current bounded production gate
+
+```bash
+./devnet/run-production-gate.sh
+```
+
+Optional evidence-preserving form:
+
+```bash
+./devnet/run-production-gate.sh --evidence-dir /tmp/overlay-production-gate
+```
+
+Equivalent component order:
+
+```bash
+./devnet/run-first-user-acceptance.sh --evidence-dir /tmp/overlay-production-gate/first-user-acceptance
+./devnet/run-production-soak.sh
+./devnet/run-packaging-check.sh
+```
+
+## Release packaging
+
+Generate the release artifact that matches the validated commit:
+
+```bash
+./devnet/package-release.sh --output-dir /tmp/overlay-release
+```
+
+Validate the package contents, install flow, and stage consistency:
+
+```bash
+./devnet/run-packaging-check.sh
 ```
 
 ## Current distributed pilot checklist
@@ -249,23 +285,30 @@ cargo test -p overlay-core --test integration_service_open
 
 - Milestones 1-12 are considered implemented baseline work, and the current
   repository stage marker is
-  `milestone-27-relay-topology-generalization` (Milestone 27 bounded
-  relay-topology generalization on top of the landed Milestone 26 operator
+  `milestone-28-production-gates-packaging-safety-hardening` (Milestone 28
+  bounded production gates, packaging, and safety hardening on top of the
+  landed Milestone 27 relay-topology baseline, the Milestone 26 operator
   surface, the Milestone 25 runtime persistence/recovery baseline, the
   Milestone 24 bootstrap trust baseline, and the Milestone 22 first-user
   acceptance baseline).
-- The current sign-off path is the top-level Milestone 27 section above:
-  workspace format/lint/build/test, then
-  `./devnet/run-first-user-acceptance.sh`.
+- The current sign-off path is the top-level Milestone 28 section above:
+  workspace format/lint/build/test, then `./devnet/run-production-gate.sh`.
+- `./devnet/run-first-user-acceptance.sh` remains a required functional
+  acceptance component inside the current production gate.
+- `./devnet/run-production-soak.sh` extends the older logical soak to the
+  bounded longer-run Milestone 28 path.
+- `./devnet/run-packaging-check.sh` proves the reproducible package, install,
+  and private-key-exclusion path before a release note is honest.
 - Use the Milestone 1-12 regression runs, stage-boundary smoke tests, the
   distributed localhost smoke, the bounded soak, and the retained Milestone 18
   checklist only when the touched code or docs justify the narrower reruns.
 - If `REPOSITORY_STAGE`, `README.md`, `HANDOFF.md`, `IMPLEMENT.md`,
   `VALIDATION.md`, `docs/FIRST_USER_ACCEPTANCE.md`,
-  `docs/PILOT_RUNBOOK.md`, `docs/DEVNET.md`, `docs/LAUNCH_CHECKLIST.md`,
-  `docs/OPEN_QUESTIONS.md`, milestone prompts, or other status markers change,
-  rerun the stage-boundary smoke tests and the full
-  `./devnet/run-first-user-acceptance.sh` flow so code and docs stay aligned.
+  `docs/PRODUCTION_CHECKLIST.md`, `docs/PILOT_RUNBOOK.md`,
+  `docs/DEVNET.md`, `docs/LAUNCH_CHECKLIST.md`, `docs/OPEN_QUESTIONS.md`,
+  milestone prompts, packaging/install scripts, or other status markers
+  change, rerun the stage-boundary smoke tests and the full
+  `./devnet/run-production-gate.sh` flow so code and docs stay aligned.
 - `integration_publish_lookup` remains the real Milestone 5 integration path; `integration_relay_fallback` is the real Milestone 6 integration path; `integration_routing` is the real Milestone 7 integration path; `integration_service_open` is now the real Milestone 8 integration path.
 - Milestone 9 hardening coverage remains part of the frozen baseline through
   `bootstrap::tests`, `config::tests`, `metrics::tests`, `peer::tests`,
@@ -314,7 +357,7 @@ cargo test -p overlay-core --test integration_service_open
   the required launch order.
 - `./devnet/run-pilot-checklist.sh` remains the Milestone 18 localhost
   rehearsal pack for the smoke-harness pilot boundary; it is retained for the
-  landed baseline but is not the current Milestone 27 sign-off path.
+  landed baseline but is not the current Milestone 28 sign-off path.
 - `./devnet/run-distributed-pilot-checklist.sh` remains the current
   distributed component proof path for the dedicated pilot topology pack, the
   expanded fault matrix, the repeated relay-bind evidence, the fresh-node-join
@@ -323,13 +366,17 @@ cargo test -p overlay-core --test integration_service_open
 - `./devnet/run-doctor-smoke.sh` remains the landed operator-surface proof for
   `overlay-cli doctor` against a live runtime and is exercised through
   `./devnet/run-launch-gate.sh`.
-- `./devnet/run-first-user-acceptance.sh` is the current Milestone 27 wrapper
-  that combines the landed launch gate and the distributed acceptance
-  scenarios into one bounded first-user-ready proof.
-- Milestone 27 relay-topology work should rerun
+- `./devnet/run-first-user-acceptance.sh` remains the landed acceptance wrapper
+  that combines the launch gate and distributed acceptance scenarios into one
+  bounded functional proof.
+- `./devnet/run-production-gate.sh` is the current Milestone 28 wrapper that
+  layers the first-user acceptance proof, the longer production soak, and the
+  packaging/install verification path into one bounded production gate.
+- Milestone 28 release-gate work should rerun
   `./devnet/run-multihost-smoke.sh`,
   `./devnet/run-distributed-pilot-checklist.sh`, and the full acceptance
-  wrapper so the bounded relay-topology proofs, distributed operator proofs,
+  wrapper, plus `./devnet/run-packaging-check.sh`, so the bounded
+  relay-topology proofs, distributed operator proofs, release package flow,
   and current-stage docs stay aligned.
 - The Milestone 12 soak path also stays in-process and advances logical time
   through repeated runtime ticks so stale-session/service/relay/probe cleanup,

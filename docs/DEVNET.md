@@ -39,7 +39,16 @@ and the carried-forward distributed pilot pack under
 - [devnet/run-distributed-pilot-checklist.sh](../devnet/run-distributed-pilot-checklist.sh):
   wrapper for the current distributed pilot checklist
 - [devnet/run-first-user-acceptance.sh](../devnet/run-first-user-acceptance.sh):
-  wrapper for the current Milestone 27 first-user acceptance flow
+  wrapper for the landed functional acceptance flow reused inside the current
+  production gate
+- [devnet/run-production-soak.sh](../devnet/run-production-soak.sh):
+  wrapper for the longer bounded production soak
+- [devnet/run-packaging-check.sh](../devnet/run-packaging-check.sh):
+  wrapper for package/build/install verification
+- [devnet/package-release.sh](../devnet/package-release.sh):
+  reproducible release bundle generator for the validated commit
+- [devnet/run-production-gate.sh](../devnet/run-production-gate.sh):
+  wrapper for the current Milestone 28 bounded production gate
 - [devnet/run-doctor-smoke.sh](../devnet/run-doctor-smoke.sh):
   wrapper for the landed Milestone 21 doctor/self-check surface
 - [devnet/run-pilot-checklist.sh](../devnet/run-pilot-checklist.sh):
@@ -122,7 +131,8 @@ Optional evidence-preserving form:
 ```
 
 This is the current distributed component proof path inside
-`./devnet/run-first-user-acceptance.sh`.
+`./devnet/run-first-user-acceptance.sh`, which is itself a required component
+inside `./devnet/run-production-gate.sh`.
 
 This uses the dedicated `devnet/pilot/localhost` topology pack and validates:
 
@@ -156,12 +166,33 @@ Optional evidence-preserving form:
 ./devnet/run-first-user-acceptance.sh --evidence-dir /tmp/overlay-first-user-acceptance
 ```
 
-This is the current top-level localhost sign-off path. It wraps:
+This is the landed functional acceptance path reused by the current bounded
+production gate. It wraps:
 
 - `./devnet/run-launch-gate.sh` for format, lint, build, test, soak, doctor,
   and restart recovery proof
 - `./devnet/run-distributed-pilot-checklist.sh` for distributed acceptance
   scenarios on the checked-in pilot topology
+
+## Production gate wrapper
+
+Run:
+
+```bash
+./devnet/run-production-gate.sh
+```
+
+Optional evidence-preserving form:
+
+```bash
+./devnet/run-production-gate.sh --evidence-dir /tmp/overlay-production-gate
+```
+
+This is the current top-level localhost sign-off path. It wraps:
+
+- `./devnet/run-first-user-acceptance.sh`
+- `./devnet/run-production-soak.sh`
+- `./devnet/run-packaging-check.sh`
 
 ## Single-node inspection
 

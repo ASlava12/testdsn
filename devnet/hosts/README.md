@@ -1,7 +1,7 @@
 # Host-Style Devnet Layouts
 
 This directory contains the Milestone 16 host-style devnet assets carried into
-the current Milestone 27 relay-topology-generalization stage.
+the current Milestone 28 production-gates-packaging-safety-hardening stage.
 
 ## Layouts
 

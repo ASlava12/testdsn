@@ -1,7 +1,8 @@
 # Pilot Devnet
 
 This directory contains the Milestone 20 regular-distributed-use assets carried
-into the current Milestone 27 relay-topology-generalization stage.
+into the current Milestone 28 production-gates-packaging-safety-hardening
+stage.
 
 It keeps the landed pilot topology pack and extends it with:
 
@@ -22,4 +23,4 @@ Suggested host map:
 
 Use [docs/PILOT_RUNBOOK.md](../../docs/PILOT_RUNBOOK.md)
 for the full execution order, distributed operator commands, fault scenarios,
-and reporting steps.
+and reporting steps that feed the bounded production release claim.

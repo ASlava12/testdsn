@@ -1,6 +1,10 @@
-# Pilot Release Template
+# Pilot Release Appendix Template
 
-Use this template for each current-stage distributed pilot candidate tag.
+Use this template only as the separate-host appendix paired with the current
+bounded production release note.
+
+The current release note template lives in
+[docs/PRODUCTION_RELEASE_TEMPLATE.md](PRODUCTION_RELEASE_TEMPLATE.md).
 
 Do not describe the release as GA, production-ready, or ready for hostile
 public deployment.
@@ -8,7 +12,7 @@ public deployment.
 ## Release metadata
 
 - Tag: `pilot-v0.1.0-rcN`
-- Repository stage: `milestone-27-relay-topology-generalization`
+- Repository stage: `milestone-28-production-gates-packaging-safety-hardening`
 - Commit: `<git-sha>`
 - Release date: `<YYYY-MM-DD>`
 - Operator: `<name>`
@@ -20,8 +24,8 @@ Short statement of what this pilot candidate is intended to prove.
 ## Frozen launch surface
 
 - `overlay-cli run` for single-node bounded startup and status inspection
-- `./devnet/run-first-user-acceptance.sh` as the current localhost sign-off
-  path, reusing the landed launch gate and distributed checklist
+- `./devnet/run-production-gate.sh` as the current localhost sign-off path,
+  reusing the landed acceptance, soak, and packaging checks
 - supporting repo-local proof paths in `./devnet/run-smoke.sh`,
   `./devnet/run-distributed-smoke.sh`, and `./devnet/run-multihost-smoke.sh`
 - `overlay-cli inspect` for bounded machine-readable operator reports over the
@@ -36,7 +40,10 @@ Short statement of what this pilot candidate is intended to prove.
 - `cargo clippy --workspace --all-targets --all-features -- -D warnings`: `<pass/fail>`
 - `cargo check --workspace`: `<pass/fail>`
 - `cargo test --workspace`: `<pass/fail>`
+- `./devnet/run-production-gate.sh`: `<pass/fail>`
 - `./devnet/run-first-user-acceptance.sh`: `<pass/fail>`
+- `./devnet/run-production-soak.sh`: `<pass/fail>`
+- `./devnet/run-packaging-check.sh`: `<pass/fail>`
 - `cargo test -p overlay-core --test integration_bootstrap`: `<pass/fail>`
 - `cargo test -p overlay-core --test integration_publish_lookup`: `<pass/fail>`
 - `cargo test -p overlay-core --test integration_relay_fallback`: `<pass/fail>`
@@ -76,11 +83,12 @@ Short statement of what this pilot candidate is intended to prove.
   `node-a -> node-relay -> node-b`,
   `node-a -> node-relay-b -> node-b`, and
   `node-a -> node-relay-c -> node-b` paths
-- pilot-only release; not a public-production deployment claim
+- appendix-only evidence for the bounded production release; not a broad
+  public-production deployment claim
 
 ## Go / no-go
 
 - [ ] Launch gate stayed green on the tagged commit.
 - [ ] Release note matches the exact validated commit and tag.
 - [ ] Known limitations are carried forward without dilution.
-- [ ] The release is described as pilot-ready only.
+- [ ] The appendix stays within the bounded Milestone 28 production claim.

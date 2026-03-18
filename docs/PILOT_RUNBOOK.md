@@ -1,15 +1,15 @@
 # Pilot Runbook
 
-This runbook defines the current Milestone 27
-relay-topology-generalization distributed exercise.
+This runbook defines the current Milestone 28
+production-gates-packaging-safety-hardening distributed exercise.
 
-It extends the landed Milestone 18 pilot pack with minimal distributed
-operator surfaces, three bounded relay-capable fallback paths, conservative
-bootstrap artifact trust pins, and the evidence expected from the first real
-off-box pilot closure run.
+It extends the landed pilot pack with minimal distributed operator surfaces,
+three bounded relay-capable fallback paths, conservative bootstrap artifact
+trust pins, and the separate-host evidence expected before a bounded
+production release note is honest.
 
-It is still a pilot-only document. It does not claim public-production or
-hostile-environment readiness.
+It is still a bounded operator-managed deployment document. It does not claim
+hostile-environment or broad public-Internet readiness.
 
 ## Scope
 
@@ -38,7 +38,8 @@ Use this runbook to prove:
 - persisted status summaries through `overlay-cli status --summary`;
 - local self-diagnosis through `overlay-cli doctor --config <path>`;
 - bounded machine-readable operator reports through `overlay-cli inspect`;
-- an operator-collected off-box report with exact hosts, date, and commit SHA.
+- an operator-collected off-box report with exact hosts, date, and commit SHA
+  that can be attached to the current bounded production release note.
 
 Current pilot limits remain in force:
 
@@ -54,7 +55,7 @@ Current pilot limits remain in force:
   last-known active bootstrap peers, and local service registration intent;
   presence, service-open sessions, relay tunnels, and path probes still
   remain in-memory runtime state;
-- this runbook still does not claim hostile-environment or public-Internet
+- this runbook still does not claim hostile-environment or broad public-Internet
   deployment readiness.
 
 ## Topology
@@ -104,10 +105,10 @@ Files:
 
 ## Prerequisites
 
-- Run the current acceptance flow first:
+- Run the current production gate first:
 
   ```bash
-  ./devnet/run-first-user-acceptance.sh
+  ./devnet/run-production-gate.sh
   ```
 
 - Keep the same validated commit on all pilot hosts.
@@ -377,6 +378,7 @@ Record all thirteen scenarios in the pilot report:
 - exact date and UTC/local time range
 - exact commit SHA on every host
 - exact hostnames and IPs used in the run
+- `./devnet/run-production-gate.sh` result on the validated commit
 - `./devnet/run-launch-gate.sh` result on the validated commit
 - `./devnet/run-multihost-smoke.sh` result on the validated commit
 - `./devnet/run-distributed-pilot-checklist.sh --evidence-dir <dir>` result on
@@ -394,10 +396,10 @@ Record all thirteen scenarios in the pilot report:
 - service restart evidence from the persisted status JSON
 - tampered-bootstrap integrity-mismatch logs
 
-## Remaining limitations after Milestone 27
+## Remaining limitations after Milestone 28
 
-- The localhost acceptance pack is the current Milestone 27 green path, but it still
-  does not replace the required off-box pilot evidence on separate hosts for a
+- The localhost production gate is the current Milestone 28 green path, but it
+  still does not replace the required off-box evidence on separate hosts for a
   release note.
 - Bootstrap remains static signed artifact delivery over `http://`; operators
   must keep the signer pin and any `#sha256=<hex>` URLs synchronized manually.
@@ -411,4 +413,5 @@ Record all thirteen scenarios in the pilot report:
   arbitrary relay graphs or public-network conditions.
 
 Use [docs/PILOT_REPORT_TEMPLATE.md](PILOT_REPORT_TEMPLATE.md)
-to write the final report.
+to write the final off-box evidence report, then attach it to the bounded
+production release note from [docs/PRODUCTION_RELEASE_TEMPLATE.md](PRODUCTION_RELEASE_TEMPLATE.md).

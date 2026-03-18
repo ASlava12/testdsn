@@ -40,8 +40,8 @@ TMPDIR=/tmp cargo run -p overlay-cli -- inspect --config <config-path> --lookup 
 ```
 
 After fixing a current-stage issue, rerun
-`./devnet/run-first-user-acceptance.sh` before treating the repository as
-first-user-ready again.
+`./devnet/run-production-gate.sh` before treating the repository as within the
+current bounded production claim again.
 
 ## Matrix
 

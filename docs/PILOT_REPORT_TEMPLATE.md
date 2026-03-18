@@ -1,14 +1,14 @@
 # Pilot Report Template
 
-Use this template for each current-stage off-box distributed pilot run.
+Use this template for each current-stage off-box distributed evidence run.
 
-Do not describe the result as GA, production-ready, or ready for hostile
+Do not describe the result as hostile-environment-ready or ready for broad
 public deployment.
 
 ## Metadata
 
 - Date: `<YYYY-MM-DD>`
-- Repository stage: `milestone-27-relay-topology-generalization`
+- Repository stage: `milestone-28-production-gates-packaging-safety-hardening`
 - Commit: `<git-sha>`
 - Operator: `<name>`
 - Topology: `pilot-6-host-three-relay`
@@ -25,6 +25,7 @@ public deployment.
 
 ## Validation Summary
 
+- Production gate (`./devnet/run-production-gate.sh`): `<pass/fail>`
 - Launch gate (`./devnet/run-launch-gate.sh`): `<pass/fail>`
 - First-user acceptance flow (`./devnet/run-first-user-acceptance.sh`): `<pass/fail>`
 - Host-style smoke (`./devnet/run-multihost-smoke.sh`): `<pass/fail>`

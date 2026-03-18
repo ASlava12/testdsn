@@ -13,7 +13,7 @@ A Codex-oriented handoff bundle containing:
 ## Current repository stage
 
 - The root `REPOSITORY_STAGE` marker and `overlay_core::REPOSITORY_STAGE` both
-  read `milestone-27-relay-topology-generalization`.
+  read `milestone-28-production-gates-packaging-safety-hardening`.
 - Milestones 0-12 are a closed baseline in this repository, and Milestones
   14/16/17/18 are landed pilot-baseline work.
 - Milestone 17 operator-grade runtime hardening is part of the landed baseline
@@ -56,63 +56,76 @@ A Codex-oriented handoff bundle containing:
   with `overlay-cli inspect`, bounded machine-readable operator reports that
   combine local status/doctor data with explicit remote lookup, service, and
   relay probes, and synchronized operator/runbook docs.
-- Milestone 27 relay and topology generalization is the current stage with a
-  bounded third relay-capable pilot node, deterministic multi-candidate relay
-  proof, repeated relay-bind failure recovery through a later bounded
-  candidate, and synchronized relay/runbook docs.
-- The current validation green path is `./devnet/run-first-user-acceptance.sh`
+- Milestone 27 relay and topology generalization remains part of the landed
+  baseline with a bounded third relay-capable pilot node, deterministic
+  multi-candidate relay proof, repeated relay-bind failure recovery through a
+  later bounded candidate, and synchronized relay/runbook docs.
+- Milestone 28 production gates, packaging, and safety hardening is the
+  current stage with `./devnet/run-production-gate.sh`,
+  `./devnet/package-release.sh`, `./devnet/run-packaging-check.sh`, a longer
+  bounded soak, synchronized production release docs/templates, and stronger
+  parser-focused negative coverage.
+- The current validation green path is `./devnet/run-production-gate.sh`
   on the same commit after the applicable workspace validation commands.
 - Separate-host evidence is still required on the validated commit before
-  claiming first-user-ready status for that release candidate.
+  claiming bounded production release status for that release candidate.
 
 ## Current green path
 
 1. Run the applicable commands in `VALIDATION.md`.
-2. Run `./devnet/run-first-user-acceptance.sh`.
-3. Use `docs/PILOT_RUNBOOK.md` for the off-box pilot run and evidence
-   collection.
+2. Run `./devnet/run-production-gate.sh`.
+3. Use `docs/PILOT_RUNBOOK.md` for the off-box distributed evidence run.
+4. Generate the release package with `./devnet/package-release.sh` on the
+   same validated commit.
 
+`./devnet/run-first-user-acceptance.sh` remains the landed functional
+acceptance component inside the current production gate.
 `./devnet/run-launch-gate.sh` and
 `./devnet/run-distributed-pilot-checklist.sh` remain the landed component
-scripts inside the current acceptance flow. `./devnet/run-pilot-checklist.sh`
-is retained only for the older Milestone 18 localhost rehearsal.
+scripts inside that acceptance flow. `./devnet/run-pilot-checklist.sh` is
+retained only for the older Milestone 18 localhost rehearsal.
 
-## Remaining limitations after Milestone 27
+## Remaining limitations after Milestone 28
 
 - bootstrap remains static signed artifact delivery over `http://`
 - operator surfaces remain bounded and operator-directed; `overlay-cli
   inspect` aggregates explicit requested probes, but the repo still has no
   general control plane
+- release bundles and installs are validated, but the repo still has no
+  service-manager packages, rolling upgrades, or platform-wide installer
+  matrix
 - restart recovery stays bounded to bootstrap-source state, last-known active
   bootstrap peers, and local service registration intent; presence, service
   sessions, relay tunnels, and path probes still reset
 - relay fallback proof remains bounded to the checked-in three-relay pilot pack
 - off-box evidence is still required on separate hosts for the exact release
-  commit before claiming first-user-ready status
+  commit before claiming bounded production release status
 
 ## Recommended first Codex task
 
-Use `prompts/codex-milestone-27.md` as the first task prompt for the current
-`milestone-27-relay-topology-generalization` stage. It assumes the repository already has a
+Use `prompts/codex-milestone-28.md` as the first task prompt for the current
+`milestone-28-production-gates-packaging-safety-hardening` stage. It assumes the repository already has a
 closed Milestone 1-12 baseline and does not need to restart from Milestone
 0/1/2.
 
 ## Recommended workflow
 
 1. Confirm from `README.md`, `AGENTS.md`, and `IMPLEMENT.md` that the current
-   stage is `milestone-27-relay-topology-generalization`.
+   stage is `milestone-28-production-gates-packaging-safety-hardening`.
 2. Do not restart from Milestone 0/1/2; treat Milestones 1-12 as
    regression-fix, vector-maintenance, validation-maintenance, and
    launch-maintenance territory only unless the task explicitly reopens them.
-3. Treat `./devnet/run-first-user-acceptance.sh` as the current localhost
-   sign-off flow and the launch gate plus distributed pilot checklist as its
-   landed component scripts.
+3. Treat `./devnet/run-production-gate.sh` as the current localhost
+   sign-off flow, with `./devnet/run-first-user-acceptance.sh`,
+   `./devnet/run-production-soak.sh`, and `./devnet/run-packaging-check.sh`
+   as its landed component scripts.
 4. Scope work narrowly from the pilot execution boundary instead of treating
    the stage as a feature umbrella.
 5. Keep broader protocol scope, public-production claims, and redesign work out
    of current-stage tasks unless explicitly requested.
 6. Keep `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, `VALIDATION.md`,
-   `docs/FIRST_USER_ACCEPTANCE.md`, `docs/PILOT_RUNBOOK.md`,
+   `docs/FIRST_USER_ACCEPTANCE.md`, `docs/PRODUCTION_CHECKLIST.md`,
+   `docs/PILOT_RUNBOOK.md`,
    `docs/DEVNET.md`, `docs/LAUNCH_CHECKLIST.md`, `docs/OPEN_QUESTIONS.md`,
    milestone prompts, and the root `REPOSITORY_STAGE` marker aligned as the
    repository stage evolves.

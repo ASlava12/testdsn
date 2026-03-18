@@ -1,24 +1,28 @@
 # Launch Checklist
 
 This checklist defines the landed Milestone 17 operator-runtime gate that
-remains the first component of the current Milestone 27
-relay-topology-generalization stage.
+remains the first component of the current Milestone 28
+production-gates-packaging-safety-hardening stage.
 
 It is a pilot gate, not a public-production or hostile-Internet readiness
 claim.
 
-For current Milestone 27 sign-off, the bounded acceptance flow is
-`./devnet/run-first-user-acceptance.sh` on the same commit after the
-applicable workspace validation commands.
+For current Milestone 28 sign-off, this launch gate is a component inside the
+bounded production flow:
+`./devnet/run-production-gate.sh` on the same commit after the applicable
+workspace validation commands.
 
 This checklist still matters because `./devnet/run-first-user-acceptance.sh`
-reuses `./devnet/run-launch-gate.sh` as a landed prerequisite component.
+reuses `./devnet/run-launch-gate.sh` as a landed prerequisite component, and
+`./devnet/run-production-gate.sh` reuses that acceptance flow.
 
 `./devnet/run-pilot-checklist.sh` remains a retained Milestone 18 localhost
 rehearsal. Do not treat it as the current sign-off path.
 
 Use [docs/FIRST_USER_ACCEPTANCE.md](FIRST_USER_ACCEPTANCE.md)
-for the current first-user-ready acceptance scenarios and boundary.
+for the current acceptance scenarios and boundary, and
+[docs/PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md)
+for the current bounded production release gate.
 
 ## Launchable surface freeze
 
@@ -264,7 +268,7 @@ Workflow:
 - Relay quotas and most service-open policy are still code-level defaults rather
   than a rich operator-configurable surface.
 
-## Remaining limitations after Milestone 27
+## Remaining limitations after Milestone 28
 
 - Run and attach the off-box pilot report for the exact commit being signed
   off; the localhost checklist is necessary but not sufficient evidence for a
@@ -273,7 +277,7 @@ Workflow:
   synchronized manually; the current repo still has no HTTPS bootstrap or
   public trust root.
 - Keep the current localhost sign-off path anchored on
-  `./devnet/run-distributed-pilot-checklist.sh`; the older
+  `./devnet/run-production-gate.sh`; the older
   `./devnet/run-pilot-checklist.sh` remains a historical rehearsal only.
 - Treat the distributed operator surfaces as bounded proof flows only;
   `overlay-cli inspect` improves repeatable operator checks, but it is not a

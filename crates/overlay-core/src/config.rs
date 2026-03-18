@@ -529,6 +529,21 @@ mod tests {
             Err(ConfigError::UnsupportedBootstrapSource { index: 1, .. })
         ));
 
+        let mut duplicate_ed25519_fragment_key = sample_config();
+        duplicate_ed25519_fragment_key.bootstrap_sources[1] = "http://127.0.0.1:4201/bootstrap.json#ed25519=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef&ed25519=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
+        assert!(matches!(
+            duplicate_ed25519_fragment_key.validate(),
+            Err(ConfigError::UnsupportedBootstrapSource { index: 1, .. })
+        ));
+
+        let mut trailing_fragment_separator = sample_config();
+        trailing_fragment_separator.bootstrap_sources[1] =
+            "http://127.0.0.1:4201/bootstrap.json#sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef&".to_string();
+        assert!(matches!(
+            trailing_fragment_separator.validate(),
+            Err(ConfigError::UnsupportedBootstrapSource { index: 1, .. })
+        ));
+
         let mut unknown_fragment_key = sample_config();
         unknown_fragment_key.bootstrap_sources[1] =
             "http://127.0.0.1:4201/bootstrap.json#trust=on".to_string();

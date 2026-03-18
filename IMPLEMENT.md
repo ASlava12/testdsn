@@ -8,21 +8,25 @@ The repository has a closed Milestone 1-12 baseline, a landed Milestone 14
 pilot launch gate, a landed Milestone 16 network-bootstrap stage, a landed
 Milestone 17 operator-runtime stage, a landed Milestone 18 real-pilot stage,
 the landed Milestone 20 regular-distributed-use-closure stage, and the current
-Milestone 27 relay-topology-generalization stage.
+Milestone 28 production-gates-packaging-safety-hardening stage.
 The current repository stage marker is
-`milestone-27-relay-topology-generalization`.
+`milestone-28-production-gates-packaging-safety-hardening`.
 
 ## Current operator-surface green path
 
 Treat the current stage as having one localhost sign-off flow:
 
 1. run the applicable commands in `VALIDATION.md`;
-2. run `./devnet/run-first-user-acceptance.sh` on the same commit;
-3. use `docs/PILOT_RUNBOOK.md` for the separate-host evidence run.
+2. run `./devnet/run-production-gate.sh` on the same commit;
+3. use `docs/PILOT_RUNBOOK.md` for the separate-host evidence run;
+4. generate the ship artifact with `./devnet/package-release.sh` on that same
+   validated commit.
 
+`./devnet/run-first-user-acceptance.sh` remains the landed functional
+acceptance component inside the current production gate.
 `./devnet/run-launch-gate.sh` and
 `./devnet/run-distributed-pilot-checklist.sh` remain the landed component
-scripts inside the current acceptance flow. `./devnet/run-pilot-checklist.sh`
+scripts inside that acceptance flow. `./devnet/run-pilot-checklist.sh`
 remains a retained Milestone 18 localhost rehearsal only.
 
 - Milestone 0 bootstrap is complete.
@@ -233,6 +237,18 @@ remains a retained Milestone 18 localhost rehearsal only.
   coverage, repeated relay-bind failure recovery through a later bounded
   candidate, and synchronized Milestone 27 docs. The repository stage marker
   now advances to `milestone-27-relay-topology-generalization`.
+- Milestone 28 production-gates-packaging-safety-hardening support is now
+  implemented in `devnet/run-production-gate.sh`,
+  `devnet/run-production-soak.sh`,
+  `devnet/package-release.sh`,
+  `devnet/run-packaging-check.sh`,
+  `packaging/install-overlay.sh`, the synchronized production
+  release/limitations docs, and targeted parser-negative tests in
+  `overlay-core` and `overlay-cli`, with a bounded production gate above the
+  existing first-user acceptance pack, reproducible release bundles plus
+  install verification, a longer bounded soak, and synchronized bounded
+  production claim docs. The repository stage marker now advances to
+  `milestone-28-production-gates-packaging-safety-hardening`.
 
 Treat Milestones 0-8 as a closed baseline. Prefer regression fixes,
 spec-conformance fixes, vector maintenance, and validation maintenance there
@@ -240,21 +256,21 @@ over refactoring the already present work.
 
 ## Recommended next Codex task
 
-Use `prompts/codex-milestone-27.md` as the recommended next-task prompt for the
-current `milestone-27-relay-topology-generalization` stage and keep
-work conservative from the current first-user-ready boundary:
+Use `prompts/codex-milestone-28.md` as the recommended next-task prompt for the
+current `milestone-28-production-gates-packaging-safety-hardening` stage and
+keep work conservative from the current bounded production boundary:
 
 1. preserve the current launch surface documented in
    `docs/LAUNCH_CHECKLIST.md`, `docs/RUNBOOK.md`, `docs/DEVNET.md`,
    `docs/PILOT_RUNBOOK.md`, and `devnet/pilot/README.md`;
 2. keep Milestones 1-12 limited to regression fixes, launch-maintenance
    updates, vector maintenance, or conservative spec-conformance fixes;
-3. prefer pilot execution support, validation maintenance, documentation sync,
-   and bounded relay-topology hardening over feature expansion;
-4. rerun the documented first-user acceptance flow whenever `REPOSITORY_STAGE`,
+3. prefer release-gate maintenance, packaging/install verification,
+   validation maintenance, and documentation sync over feature expansion;
+4. rerun the documented production gate whenever `REPOSITORY_STAGE`,
    `README.md`, `HANDOFF.md`, `IMPLEMENT.md`, `VALIDATION.md`,
-   `docs/FIRST_USER_ACCEPTANCE.md`, launch docs, pilot docs, or current-stage
-   scripts change;
+   `docs/FIRST_USER_ACCEPTANCE.md`, production docs, launch docs, pilot docs,
+   packaging/install scripts, or current-stage scripts change;
 5. keep public bootstrap infrastructure, protocol redesign, and scope expansion
    out of work unless explicitly requested.
 

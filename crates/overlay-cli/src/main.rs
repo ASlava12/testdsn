@@ -2836,6 +2836,58 @@ mod tests {
         );
     }
 
+    #[test]
+    fn parse_command_rejects_malformed_inspect_lookup_spec() {
+        let error = parse_command([
+            OsString::from("overlay-cli"),
+            OsString::from("inspect"),
+            OsString::from("--config"),
+            OsString::from("devnet/hosts/localhost/configs/node-a.json"),
+            OsString::from("--lookup"),
+            OsString::from("tcp://127.0.0.1:4101"),
+        ])
+        .expect_err("missing lookup node id should fail");
+
+        assert_eq!(error, "--lookup requires tcp://host:port,<node-id-hex>");
+    }
+
+    #[test]
+    fn parse_command_rejects_malformed_inspect_open_service_spec() {
+        let error = parse_command([
+            OsString::from("overlay-cli"),
+            OsString::from("inspect"),
+            OsString::from("--config"),
+            OsString::from("devnet/hosts/localhost/configs/node-a.json"),
+            OsString::from("--open-service"),
+            OsString::from(
+                "tcp://127.0.0.1:4112,1eed29b1654fbca94617004d7969dfc4652b1f30a7a8b771c34800155483380b,devnet",
+            ),
+        ])
+        .expect_err("missing service name should fail");
+
+        assert_eq!(
+            error,
+            "--open-service requires tcp://host:port,<target-node-id-hex>,<namespace>,<name>"
+        );
+    }
+
+    #[test]
+    fn parse_command_rejects_malformed_inspect_relay_intro_spec() {
+        let error = parse_command([
+            OsString::from("overlay-cli"),
+            OsString::from("inspect"),
+            OsString::from("--config"),
+            OsString::from("devnet/hosts/localhost/configs/node-a.json"),
+            OsString::from("--relay-intro"),
+            OsString::from(
+                "tcp://127.0.0.1:4198,16f52d6fea63ef086405aa71b537dd4833bd0b36ffe054be0fd07fb525af157d,83561adb398fd87f8e7ed8331bff2fcb945733cc3012879cb9fab07928667062,0",
+            ),
+        ])
+        .expect_err("zero relay-intro expiry should fail");
+
+        assert_eq!(error, "--relay-intro must be greater than zero");
+    }
+
     fn unique_temp_dir(label: &str) -> PathBuf {
         let suffix = SystemTime::now()
             .duration_since(UNIX_EPOCH)

@@ -1,7 +1,7 @@
 # Devnet
 
 This directory contains the checked-in devnet and pilot assets for the current
-Milestone 27 stage:
+Milestone 28 stage:
 
 - the original four-node local-file devnet under `configs/` and `bootstrap/`
 - the host-style multi-host devnet layouts under `hosts/`
@@ -30,8 +30,13 @@ Nodes:
 - `run-multihost-smoke.sh`: wrapper around the host-style network-bootstrap smoke
   plus the bounded `overlay-cli inspect` report
 - `run-distributed-pilot-checklist.sh`: wrapper around the current distributed pilot checklist
-- `run-first-user-acceptance.sh`: wrapper around the current Milestone 27
-  first-user acceptance flow
+- `run-first-user-acceptance.sh`: wrapper around the landed functional
+  acceptance flow
+- `run-production-soak.sh`: wrapper around the longer bounded production soak
+- `run-packaging-check.sh`: wrapper around the package/build/install check
+- `package-release.sh`: reproducible release bundle generator
+- `run-production-gate.sh`: wrapper around the current Milestone 28 bounded
+  production gate
 - `run-pilot-checklist.sh`: retained Milestone 18 localhost rehearsal pack,
   not the current sign-off path
 - `run-launch-gate.sh`: wrapper around the Milestone 17 launch gate
@@ -132,7 +137,9 @@ service-host restart/status behavior plus three relay candidates and repeated
 relay-bind failure recovery, validates tampered bootstrap rejection, and emits
 a final `pilot_checklist_complete` summary.
 
-This is the current localhost sign-off path after `./devnet/run-launch-gate.sh`.
+This is the current distributed acceptance component inside
+`./devnet/run-first-user-acceptance.sh`, which is itself a required component
+inside `./devnet/run-production-gate.sh`.
 
 ## Current limits
 
